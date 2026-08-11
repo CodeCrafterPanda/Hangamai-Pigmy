@@ -13,8 +13,12 @@ export default function AgentLogin() {
   const handleSendOTP = () => {
     if (phoneNumber.length === 10) {
       console.log('Send OTP to:', phoneNumber);
-      // TODO: Send OTP and navigate to verification screen
       Keyboard.dismiss();
+      // Navigate to MPIN setup (first time)
+      router.push({
+        pathname: '/(auth)/mpin',
+        params: { phoneNumber, isSetup: 'true' },
+      });
     }
   };
 

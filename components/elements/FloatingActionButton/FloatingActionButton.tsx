@@ -12,8 +12,8 @@ export default function FloatingActionButton({ onPress, icon = '+' }: FloatingAc
   const styles = StyleSheet.create({
     fab: {
       position: 'absolute',
-      bottom: spacing(theme, 'xl') + 60, // Above tab bar
-      right: spacing(theme, 'md'),
+      bottom: spacing(theme, 'screenPadding'), // Above tab bar
+      right: spacing(theme, 'screenPadding'),
       width: 56,
       height: 56,
       borderRadius: 28,

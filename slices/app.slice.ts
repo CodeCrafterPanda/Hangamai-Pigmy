@@ -36,4 +36,6 @@ export function useAppSlice() {
   return { dispatch, ...state, ...slice.actions };
 }
 
+export const { setLoggedIn, setUser, reset } = slice.actions;
+
 export default slice.reducer;

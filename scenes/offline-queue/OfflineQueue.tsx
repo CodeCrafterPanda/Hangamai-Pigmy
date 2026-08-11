@@ -1,62 +1,72 @@
 import { View, Text, StyleSheet, ScrollView, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useMemo } from 'react';
 import { useRouter } from 'expo-router';
+import { useSelector } from 'react-redux';
+import type { State } from '@/utils/store';
 import { useTheme, typography, spacing } from '@/theme';
 import SyncStatusCard from '@/components/elements/SyncStatusCard';
 import OfflineTransactionCard from '@/components/elements/OfflineTransactionCard';
+import { selectCollectionsNeedingSync, selectAllCollections } from '@/slices/collections.slice';
+import { selectAllCustomers } from '@/slices/customers.slice';
+import { selectSession } from '@/slices/settings.slice';
 import type { OfflineTransaction, SyncStatus } from '@/types/OfflineQueueData';
 
 export default function OfflineQueue() {
   const router = useRouter();
   const { theme } = useTheme();
 
-  // Mock data - replace with actual data from Redux/API
+  // Get session
+  const session = useSelector(selectSession);
+  const agentId = session.agentId || 'demo-agent';
+
+  // Get today's business date
+  const today = new Date();
+  const todayBusinessDate = today.toISOString().split('T')[0]; // YYYY-MM-DD format
+
+  // Get collections needing sync (only TODAY's)
+  const needsSyncCollections = useSelector(selectCollectionsNeedingSync);
+  const allCustomers = useSelector(selectAllCustomers);
+
+  // Filter for current agent and TODAY only
+  const todayNeedsSyncCollections = useMemo(() => {
+    return needsSyncCollections.filter(c => {
+      const collectionDate = c.collectedAt.split('T')[0];
+      return c.collectedByAgentId === agentId && collectionDate === todayBusinessDate;
+    });
+  }, [needsSyncCollections, agentId, todayBusinessDate]);
+
+  // Calculate sync status
+  const pendingCount = todayNeedsSyncCollections.filter(c => c.status === 'CREATED').length;
+  const failedCount = todayNeedsSyncCollections.filter(c => c.status === 'FAILED').length;
+  const totalAmount = todayNeedsSyncCollections.reduce((sum, c) => sum + c.amount + c.penaltyAmount, 0);
+
   const syncStatus: SyncStatus = {
-    pendingCount: 12,
-    failedCount: 1,
-    lastSyncTime: '2 hours ago',
-    totalAmount: 6450,
+    pendingCount,
+    failedCount,
+    lastSyncTime: '2 hours ago', // TODO: Get from sync queue
+    totalAmount,
   };
 
-  const transactions: OfflineTransaction[] = [
-    {
-      id: '1',
-      receiptNumber: '#REC-9920',
-      customerName: 'Anita Desai',
-      amount: 1200.0,
-      time: '09:15 AM',
-      status: 'failed',
-      errorMessage: 'Network timeout during upload',
-      timestamp: new Date('2023-10-24T09:15:00'),
-    },
-    {
-      id: '2',
-      receiptNumber: '#REC-9921',
-      customerName: 'Rajesh Kumar',
-      amount: 500.0,
-      time: '10:30 AM',
-      status: 'pending',
-      timestamp: new Date('2023-10-24T10:30:00'),
-    },
-    {
-      id: '3',
-      receiptNumber: '#REC-9922',
-      customerName: 'Vikram Singh',
-      amount: 2100.0,
-      time: '11:45 AM',
-      status: 'pending',
-      timestamp: new Date('2023-10-24T11:45:00'),
-    },
-    {
-      id: '4',
-      receiptNumber: '#REC-9923',
-      customerName: 'Meera Patel',
-      amount: 750.0,
-      time: '12:00 PM',
-      status: 'pending',
-      timestamp: new Date('2023-10-24T12:00:00'),
-    },
-  ];
+  // Convert to OfflineTransaction format
+  const transactions: OfflineTransaction[] = todayNeedsSyncCollections.map(c => {
+    const customer = allCustomers.find(cust => cust.id === c.customerId);
+    const time = new Date(c.collectedAt).toLocaleTimeString('en-US', {
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+
+    return {
+      id: c.id,
+      receiptNumber: c.receiptNo,
+      customerName: customer?.fullName || 'Unknown',
+      amount: c.amount,
+      time,
+      status: c.status === 'FAILED' ? 'failed' : 'pending',
+      errorMessage: c.status === 'FAILED' ? 'Sync failed - will retry' : undefined,
+      timestamp: new Date(c.collectedAt),
+    };
+  });
 
   const styles = StyleSheet.create({
     container: {
@@ -198,8 +208,6 @@ export default function OfflineQueue() {
     console.log('Sync now pressed');
     // TODO: Trigger sync
   };
-
-  const failedCount = transactions.filter((t) => t.status === 'failed').length;
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>

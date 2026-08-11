@@ -18,13 +18,13 @@ export default function Splash() {
       setProgress((prev) => {
         if (prev >= 100) {
           clearInterval(interval);
-          // Navigate to main app after loading
+          // Navigate directly to home (auth temporarily disabled)
           setTimeout(() => {
-            router.replace('/(main)/(tabs)/home');
+            router.replace('/(app)/(home)');
           }, 500);
           return 100;
         }
-        
+
         // Update loading text based on progress
         if (prev < 30) {
           setLoadingText('Verifying Device...');
@@ -35,7 +35,7 @@ export default function Splash() {
         } else {
           setLoadingText('Almost Ready...');
         }
-        
+
         return prev + 2;
       });
     }, 50);

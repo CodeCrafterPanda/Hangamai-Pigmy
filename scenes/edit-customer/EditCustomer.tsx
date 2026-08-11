@@ -9,17 +9,98 @@ import {
   Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useRouter } from 'expo-router';
+import { useSelector, useDispatch } from 'react-redux';
+import type { State, Dispatch } from '@/utils/store';
 import { useTheme, typography, spacing, radius } from '@/theme';
+import EditCustomerHeader from '@/components/elements/EditCustomerHeader';
+import BottomSheet from '@/components/elements/BottomSheet';
+import { selectAllRoutes, selectAllAgents } from '@/slices/settings.slice';
+import { updateCustomer, persistCustomers } from '@/slices/customers.slice';
 import type { EditCustomerData } from '@/types/EditCustomerData';
 
-export default function EditCustomer() {
-  const router = useRouter();
-  const { theme } = useTheme();
+interface EditCustomerProps {
+  customerId?: string;
+}
 
-  // Mock data - replace with actual data from Redux/API/route params
-  const [customerData, setCustomerData] = useState<EditCustomerData>({
+export default function EditCustomer({ customerId }: EditCustomerProps) {
+  const router = useRouter();
+  const dispatch = useDispatch<Dispatch>();
+  const { theme } = useTheme();
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
+
+  // Get dropdown options from Redux
+  const allRoutes = useSelector(selectAllRoutes);
+  const allAgents = useSelector(selectAllAgents);
+
+  // Get actual customer data from Redux if customerId is provided
+  const actualCustomer = useSelector((state: State) =>
+    customerId ? state.customers.customers.byId[customerId] : null
+  );
+  const allAccountsData = useSelector((state: State) => state.accounts.accounts);
+  const customerAccounts = useMemo(() => {
+    if (!customerId) return [];
+    return allAccountsData.allIds
+      .map(id => allAccountsData.byId[id])
+      .filter(a => a?.customerId === customerId);
+  }, [customerId, allAccountsData]);
+
+  // Format options for dropdowns
+  const routeOptions = useMemo(() => {
+    return allRoutes.map(r => `${r.routeCode} - ${r.name}`);
+  }, [allRoutes]);
+
+  const agentOptions = useMemo(() => {
+    return allAgents.map(a => `${a.name || 'Agent'} (${a.id})`);
+  }, [allAgents]);
+
+  // Use actual data from Redux if available, otherwise use mock data
+  const getInitials = (name: string) => {
+    const parts = name.split(' ');
+    if (parts.length >= 2) {
+      return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
+    }
+    return name.substring(0, 2).toUpperCase();
+  };
+
+  const initialData: EditCustomerData = actualCustomer ? {
+    basicInfo: {
+      id: actualCustomer.id,
+      customerId: actualCustomer.customerCode,
+      name: actualCustomer.fullName,
+      idNumber: actualCustomer.customerCode.replace('CUST-', ''),
+      avatarUrl: undefined,
+      isVerified: true,
+      assignedAgent: allAgents.find(a => a.id === actualCustomer.primaryAgentId)?.name || 'Agent',
+      activeAccountsCount: customerAccounts.length,
+    },
+    personalInfo: {
+      fullName: actualCustomer.fullName,
+      mobileNumber: actualCustomer.phone || '',
+      address: actualCustomer.addressLine1,
+      customerId: actualCustomer.customerCode.replace('CUST-', ''),
+      currentBalance: customerAccounts[0]?.currentBalance || 0,
+      accountNumber: customerAccounts[0]?.accountNumber || 'N/A',
+      homeBranch: 'Hanga',
+    },
+    collectionMapping: {
+      assignedRoute: allRoutes.find(r => r.id === actualCustomer.routeId)?.name || 'Unknown',
+      routeId: allRoutes.find(r => r.id === actualCustomer.routeId)?.routeCode || '',
+      primaryAgent: allAgents.find(a => a.id === actualCustomer.primaryAgentId)?.name || 'Agent',
+      agentId: actualCustomer.primaryAgentId,
+    },
+    kycDocuments: [],
+    associatedAccounts: customerAccounts.map((acc, idx) => ({
+      id: acc.id,
+      type: 'Pigmy Daily Deposit',
+      accountNumber: acc.accountNumber,
+      status: acc.status === 'ACTIVE' ? 'Active' : 'Inactive',
+      icon: '💰',
+      iconColor: '#2ED47A',
+    })),
+  } : {
     basicInfo: {
       id: 'CUST-8921',
       customerId: '#CUST-8921',
@@ -45,84 +126,19 @@ export default function EditCustomer() {
       primaryAgent: 'Suresh P.',
       agentId: 'AG-102',
     },
-    kycDocuments: [
-      {
-        id: '1',
-        type: 'Aadhar Card',
-        verifiedDate: 'Jan 12, 2023',
-        isVerified: true,
-      },
-      {
-        id: '2',
-        type: 'PAN Card',
-        verifiedDate: 'Jan 12, 2023',
-        isVerified: true,
-      },
-    ],
-    associatedAccounts: [
-      {
-        id: '1',
-        type: 'Pigmy Daily Deposit',
-        accountNumber: '001239882',
-        status: 'Active',
-        icon: '💰',
-        iconColor: '#2ED47A',
-      },
-      {
-        id: '2',
-        type: 'Recurring Deposit',
-        accountNumber: '992120012',
-        status: 'Active',
-        icon: '📅',
-        iconColor: '#8E54E9',
-      },
-    ],
-  });
+    kycDocuments: [],
+    associatedAccounts: [],
+  };
+
+  const [customerData, setCustomerData] = useState<EditCustomerData>(initialData);
 
   const styles = StyleSheet.create({
     container: {
       flex: 1,
       backgroundColor: theme.colors.background.app,
     },
-    header: {
-      backgroundColor: theme.colors.background.cardElevated,
-      paddingHorizontal: spacing(theme, 'screenPadding'),
-      paddingTop: spacing(theme, 'md'),
-      paddingBottom: spacing(theme, 'md'),
-      borderBottomWidth: 1,
-      borderBottomColor: theme.colors.background.divider,
-    },
-    headerTop: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: spacing(theme, 'md'),
-    },
-    backButton: {
-      width: 40,
-      height: 40,
-      justifyContent: 'center',
-      alignItems: 'center',
-    },
-    backIcon: {
-      fontSize: 24,
-      color: theme.colors.text.primary,
-    },
-    headerTitles: {
-      flex: 1,
-    },
-    title: {
-      ...typography(theme, 'pageTitle'),
-      fontSize: 18,
-      color: theme.colors.text.primary,
-      fontWeight: '700',
-    },
-    subtitle: {
-      ...typography(theme, 'caption'),
-      color: theme.colors.text.muted,
-    },
     scrollContent: {
-      paddingTop: spacing(theme, 'md'),
-      paddingBottom: spacing(theme, 'xxl') + 80,
+      paddingVertical: spacing(theme, 'xl'),
     },
     customerCard: {
       backgroundColor: theme.colors.background.card,
@@ -136,7 +152,8 @@ export default function EditCustomer() {
     },
     customerHeader: {
       flexDirection: 'row',
-      alignItems: 'center',
+      alignItems: 'flex-start',
+      justifyContent: 'space-between',
       gap: spacing(theme, 'sm'),
     },
     avatarContainer: {
@@ -189,17 +206,19 @@ export default function EditCustomer() {
       alignItems: 'center',
       gap: spacing(theme, 'xxs'),
       paddingHorizontal: spacing(theme, 'xs'),
-      paddingVertical: spacing(theme, 'xxs') - 2,
-      backgroundColor: theme.colors.brand.primary,
+      paddingVertical: spacing(theme, 'xxs'),
+      backgroundColor: theme.colors.surfaceTint.primarySoft,
       borderRadius: radius(theme, 'chip'),
+      borderWidth: 1,
+      borderColor: theme.colors.brand.primary,
     },
     agentIcon: {
       fontSize: 10,
-      color: '#FFFFFF',
+      color: theme.colors.brand.primary,
     },
     agentText: {
-      ...typography(theme, 'micro'),
-      color: '#FFFFFF',
+      ...typography(theme, 'caption'),
+      color: theme.colors.brand.primary,
       fontWeight: '600',
       fontSize: 10,
     },
@@ -327,6 +346,42 @@ export default function EditCustomer() {
     dropdownIcon: {
       fontSize: 12,
       color: theme.colors.text.muted,
+    },
+    bottomSheetContent: {
+      paddingHorizontal: spacing(theme, 'screenPadding'),
+      paddingTop: spacing(theme, 'md'),
+      paddingBottom: spacing(theme, 'xl'),
+    },
+    bottomSheetTitle: {
+      ...typography(theme, 'pageTitle'),
+      color: theme.colors.text.primary,
+      fontWeight: '700',
+      marginBottom: spacing(theme, 'lg'),
+      textAlign: 'center',
+    },
+    optionsList: {
+      gap: spacing(theme, 'xs'),
+    },
+    option: {
+      backgroundColor: theme.colors.background.cardElevated,
+      borderRadius: radius(theme, 'input'),
+      borderWidth: 1,
+      borderColor: theme.colors.background.divider,
+      paddingHorizontal: spacing(theme, 'md'),
+      paddingVertical: spacing(theme, 'md'),
+    },
+    optionSelected: {
+      backgroundColor: theme.colors.surfaceTint.primarySoft,
+      borderColor: theme.colors.brand.primary,
+    },
+    optionText: {
+      ...typography(theme, 'body'),
+      color: theme.colors.text.primary,
+      fontWeight: '500',
+    },
+    optionTextSelected: {
+      color: theme.colors.brand.primary,
+      fontWeight: '700',
     },
     kycSection: {
       marginBottom: spacing(theme, 'lg'),
@@ -459,14 +514,7 @@ export default function EditCustomer() {
       color: theme.colors.text.muted,
     },
     actionButtons: {
-      position: 'absolute',
-      bottom: 0,
-      left: 0,
-      right: 0,
-      backgroundColor: theme.colors.background.card,
-      padding: spacing(theme, 'screenPadding'),
-      borderTopWidth: 1,
-      borderTopColor: theme.colors.background.divider,
+      paddingHorizontal: spacing(theme, 'screenPadding'),
       flexDirection: 'row',
       gap: spacing(theme, 'sm'),
     },
@@ -500,13 +548,57 @@ export default function EditCustomer() {
     },
   });
 
-  const handleBack = () => {
-    router.back();
-  };
+  const handleUpdate = async () => {
+    // Validate required fields
+    if (!customerData.personalInfo.fullName.trim()) {
+      Alert.alert('Validation Error', 'Please enter customer name');
+      return;
+    }
+    if (!customerData.personalInfo.address.trim()) {
+      Alert.alert('Validation Error', 'Please enter address');
+      return;
+    }
+    if (!customerData.personalInfo.mobileNumber.trim()) {
+      Alert.alert('Validation Error', 'Please enter mobile number');
+      return;
+    }
 
-  const handleUpdate = () => {
-    console.log('Update customer:', customerData);
-    Alert.alert('Success', 'Customer updated successfully!');
+    try {
+      console.log('Updating customer:', customerData);
+
+      // Find route ID from route code
+      const route = allRoutes.find(
+        r => r.routeCode === customerData.collectionMapping.routeId ||
+        r.name === customerData.collectionMapping.assignedRoute
+      );
+
+      // Update customer in Redux
+      dispatch(
+        updateCustomer({
+          id: customerData.basicInfo.id,
+          updates: {
+            fullName: customerData.personalInfo.fullName,
+            phone: customerData.personalInfo.mobileNumber,
+            addressLine1: customerData.personalInfo.address,
+            routeId: route?.id,
+            primaryAgentId: customerData.collectionMapping.agentId,
+          },
+        })
+      );
+
+      // Persist changes
+      await dispatch(persistCustomers());
+
+      Alert.alert('Success', 'Customer updated successfully!', [
+        {
+          text: 'OK',
+          onPress: () => router.back(),
+        },
+      ]);
+    } catch (error) {
+      console.error('Error updating customer:', error);
+      Alert.alert('Error', 'Failed to update customer');
+    }
   };
 
   const handleCancel = () => {
@@ -518,85 +610,85 @@ export default function EditCustomer() {
     // TODO: Navigate to account details
   };
 
-  const getInitials = (name: string) => {
-    const parts = name.split(' ');
-    if (parts.length >= 2) {
-      return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
+  const openDropdown = (dropdownName: string) => {
+    setActiveDropdown(dropdownName);
+    setIsDropdownOpen(true);
+  };
+
+  const closeDropdown = () => {
+    setIsDropdownOpen(false);
+    setActiveDropdown(null);
+  };
+
+  const handleDropdownSelect = (value: string) => {
+    if (activeDropdown === 'route') {
+      const routeCode = value.split(' - ')[0];
+      const route = allRoutes.find(r => r.routeCode === routeCode);
+      const routeName = value.split(' - ')[1] || value;
+      setCustomerData({
+        ...customerData,
+        collectionMapping: {
+          ...customerData.collectionMapping,
+          routeId: route?.routeCode || routeCode,
+          assignedRoute: routeName,
+        },
+      });
+    } else if (activeDropdown === 'agent') {
+      const agentName = value.split(' (')[0];
+      const agentId = value.match(/\(([^)]+)\)/)?.[1] || '';
+      setCustomerData({
+        ...customerData,
+        collectionMapping: {
+          ...customerData.collectionMapping,
+          primaryAgent: agentName,
+          agentId: agentId,
+        },
+      });
     }
-    return name.substring(0, 2).toUpperCase();
+    closeDropdown();
+  };
+
+  const getDropdownOptions = () => {
+    switch (activeDropdown) {
+      case 'route': return routeOptions;
+      case 'agent': return agentOptions;
+      default: return [];
+    }
+  };
+
+  const getDropdownValue = () => {
+    switch (activeDropdown) {
+      case 'route': return customerData.collectionMapping.assignedRoute;
+      case 'agent': return customerData.collectionMapping.primaryAgent;
+      default: return '';
+    }
+  };
+
+  const getDropdownTitle = () => {
+    switch (activeDropdown) {
+      case 'route': return 'Select Route';
+      case 'agent': return 'Select Primary Agent';
+      default: return '';
+    }
   };
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      <View style={styles.header}>
-        <View style={styles.headerTop}>
-          <Pressable onPress={handleBack} style={styles.backButton}>
-            <Text style={styles.backIcon}>←</Text>
-          </Pressable>
-          <View style={styles.headerTitles}>
-            <Text style={styles.title}>Edit Customer</Text>
-            <Text style={styles.subtitle}>{customerData.basicInfo.customerId}</Text>
-          </View>
-        </View>
-      </View>
+      <EditCustomerHeader customerId={customerData.basicInfo.customerId} />
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         {/* Customer Card */}
         <View style={styles.customerCard}>
           <View style={styles.customerHeader}>
-            <View style={styles.avatarContainer}>
-              {customerData.basicInfo.avatarUrl ? (
-                <Image
-                  source={{ uri: customerData.basicInfo.avatarUrl }}
-                  style={styles.avatarImage}
-                />
-              ) : (
-                <View style={styles.avatar}>
-                  <View
-                    style={{
-                      width: 56,
-                      height: 56,
-                      borderRadius: 28,
-                      justifyContent: 'center',
-                      alignItems: 'center',
-                    }}
-                  >
-                    <Text
-                      style={{
-                        ...typography(theme, 'sectionTitle'),
-                        color: theme.colors.text.secondary,
-                        fontWeight: '700',
-                      }}
-                    >
-                      {getInitials(customerData.basicInfo.name)}
-                    </Text>
-                  </View>
-                </View>
-              )}
-              {customerData.basicInfo.isVerified && (
-                <View style={styles.verifiedBadge}>
-                  <Text style={styles.checkIcon}>✓</Text>
-                </View>
-              )}
-            </View>
-
             <View style={styles.customerInfo}>
               <Text style={styles.customerName}>{customerData.basicInfo.name}</Text>
               <Text style={styles.customerId}>ID: {customerData.basicInfo.idNumber}</Text>
-              <View style={styles.agentBadge}>
-                <Text style={styles.agentIcon}>👤</Text>
-                <Text style={styles.agentText}>
-                  Agent: {customerData.basicInfo.assignedAgent}
-                </Text>
-              </View>
             </View>
-          </View>
 
-          <View style={styles.statusRow}>
-            <Text style={styles.statusLabel}>STATUS</Text>
-            <Text style={styles.statusValue}>
-              {customerData.basicInfo.activeAccountsCount} Active Accounts
-            </Text>
+            <View style={styles.agentBadge}>
+              <Text style={styles.agentIcon}>👤</Text>
+              <Text style={styles.agentText}>{customerData.basicInfo.assignedAgent}</Text>
+            </View>
           </View>
         </View>
 
@@ -705,7 +797,7 @@ export default function EditCustomer() {
 
           <View style={styles.field}>
             <Text style={styles.label}>Assigned Route</Text>
-            <Pressable style={styles.dropdown}>
+            <Pressable onPress={() => openDropdown('route')} style={styles.dropdown}>
               <Text style={styles.dropdownText}>
                 {customerData.collectionMapping.routeId}: {customerData.collectionMapping.assignedRoute}
               </Text>
@@ -715,7 +807,7 @@ export default function EditCustomer() {
 
           <View style={styles.field}>
             <Text style={styles.label}>Primary Agent</Text>
-            <Pressable style={styles.dropdown}>
+            <Pressable onPress={() => openDropdown('agent')} style={styles.dropdown}>
               <Text style={styles.dropdownText}>
                 {customerData.collectionMapping.primaryAgent} (ID: {customerData.collectionMapping.agentId})
               </Text>
@@ -723,79 +815,50 @@ export default function EditCustomer() {
             </Pressable>
           </View>
         </View>
-
-        {/* KYC Documents */}
-        <View style={styles.kycSection}>
-          <View style={styles.kycHeader}>
-            <Text style={styles.kycTitle}>KYC DOCUMENTS</Text>
-            <Pressable>
-              <Text style={styles.historyLink}>History</Text>
-            </Pressable>
-          </View>
-
-          <View style={styles.kycList}>
-            {customerData.kycDocuments.map((doc) => (
-              <View key={doc.id} style={styles.kycItem}>
-                <View style={styles.kycIconContainer}>
-                  <Text style={styles.kycIcon}>📄</Text>
-                </View>
-                <View style={styles.kycInfo}>
-                  <Text style={styles.kycType}>{doc.type}</Text>
-                  <Text style={styles.kycDate}>Verified {doc.verifiedDate}</Text>
-                </View>
-                <Text style={styles.lockIcon}>🔒</Text>
-              </View>
-            ))}
-          </View>
-
-          <Pressable style={styles.uploadButton}>
-            <Text style={styles.uploadButtonIcon}>➕</Text>
-            <Text style={styles.uploadButtonText}>Upload New Document</Text>
+        <View style={styles.actionButtons}>
+          <Pressable
+            onPress={handleCancel}
+            style={({ pressed }) => [styles.cancelButton, { opacity: pressed ? 0.7 : 1 }]}
+          >
+            <Text style={styles.cancelButtonText}>Cancel</Text>
           </Pressable>
-        </View>
 
-        {/* Associated Accounts */}
-        <Text style={styles.sectionHeader}>ASSOCIATED ACCOUNTS</Text>
-        <View style={styles.accountsList}>
-          {customerData.associatedAccounts.map((account) => (
-            <Pressable
-              key={account.id}
-              onPress={() => handleAccountPress(account.id)}
-              style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1 }]}
-            >
-              <View style={styles.accountItem}>
-                <View style={[styles.accountIconContainer, { backgroundColor: `${account.iconColor}20` }]}>
-                  <Text style={styles.accountIcon}>{account.icon}</Text>
-                </View>
-                <View style={styles.accountInfo}>
-                  <Text style={styles.accountType}>{account.type}</Text>
-                  <Text style={styles.accountMeta}>
-                    Acc: {account.accountNumber} •{' '}
-                    <Text style={styles.accountStatus}>{account.status}</Text>
-                  </Text>
-                </View>
-                <Text style={styles.arrowIcon}>›</Text>
-              </View>
-            </Pressable>
-          ))}
+          <Pressable
+            onPress={handleUpdate}
+            style={({ pressed }) => [styles.updateButton, { opacity: pressed ? 0.8 : 1 }]}
+          >
+            <Text style={styles.updateButtonText}>Update Customer</Text>
+          </Pressable>
         </View>
       </ScrollView>
 
-      <View style={styles.actionButtons}>
-        <Pressable
-          onPress={handleCancel}
-          style={({ pressed }) => [styles.cancelButton, { opacity: pressed ? 0.7 : 1 }]}
-        >
-          <Text style={styles.cancelButtonText}>Cancel</Text>
-        </Pressable>
-
-        <Pressable
-          onPress={handleUpdate}
-          style={({ pressed }) => [styles.updateButton, { opacity: pressed ? 0.8 : 1 }]}
-        >
-          <Text style={styles.updateButtonText}>Update Customer</Text>
-        </Pressable>
-      </View>
+      <BottomSheet isOpen={isDropdownOpen} onClose={closeDropdown}>
+        <View style={styles.bottomSheetContent}>
+          <Text style={styles.bottomSheetTitle}>{getDropdownTitle()}</Text>
+          <View style={styles.optionsList}>
+            {getDropdownOptions().map((option) => (
+              <Pressable
+                key={option}
+                onPress={() => handleDropdownSelect(option)}
+                style={({ pressed }) => [
+                  styles.option,
+                  getDropdownValue() === option && styles.optionSelected,
+                  { opacity: pressed ? 0.7 : 1 },
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.optionText,
+                    getDropdownValue() === option && styles.optionTextSelected,
+                  ]}
+                >
+                  {option}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+        </View>
+      </BottomSheet>
     </SafeAreaView>
   );
 }

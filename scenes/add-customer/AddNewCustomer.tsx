@@ -9,27 +9,62 @@ import {
   Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useRouter } from 'expo-router';
+import { useSelector, useDispatch, useStore } from 'react-redux';
+import type { State, Dispatch } from '@/utils/store';
 import { useTheme, typography, spacing, radius } from '@/theme';
+import AddCustomerHeader from '@/components/elements/AddCustomerHeader';
+import BottomSheet from '@/components/elements/BottomSheet';
+import { selectAllRoutes, selectAllBranches, selectAllAgents } from '@/slices/settings.slice';
+import { addCustomer, persistCustomers } from '@/slices/customers.slice';
+import { addAccount, persistAccounts } from '@/slices/accounts.slice';
+import { CustomerStatus, AccountStatus } from '@/types';
 import type { AddCustomerFormData } from '@/types/AddCustomerData';
+
+const documentTypeOptions = [
+  'Aadhaar Card',
+  'PAN Card',
+  'Voter ID',
+  'Driving License',
+  'Passport',
+];
 
 export default function AddNewCustomer() {
   const router = useRouter();
+  const dispatch = useDispatch<Dispatch>();
+  const store = useStore<State>();
   const { theme } = useTheme();
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
+
+  // Get dropdown options from Redux
+  const allBranches = useSelector(selectAllBranches);
+  const allRoutes = useSelector(selectAllRoutes);
+  const allAgents = useSelector(selectAllAgents);
+
+  // Format options for dropdowns
+  const branchOptions = useMemo(() => {
+    return allBranches.map(b => b.name || 'Hangamai Main Branch');
+  }, [allBranches]);
+
+  const routeOptions = useMemo(() => {
+    return allRoutes.map(r => `${r.routeCode} - ${r.name}`);
+  }, [allRoutes]);
+
+  const agentOptions = useMemo(() => {
+    return allAgents.map(a => `${a.name || 'Agent'} (${a.id})`);
+  }, [allAgents]);
 
   const [formData, setFormData] = useState<AddCustomerFormData>({
     personal: {
       fullName: '',
       mobileNumber: '',
       customerId: 'PENDING:GEN',
+      accountNumber: '',
     },
     address: {
-      addressLine1: '',
-      addressLine2: '',
-      city: '',
-      pincode: '',
-      state: 'Karnataka',
+      fullAddress: '',
     },
     assignment: {
       branch: '',
@@ -54,36 +89,8 @@ export default function AddNewCustomer() {
       flex: 1,
       backgroundColor: theme.colors.background.app,
     },
-    header: {
-      backgroundColor: theme.colors.background.cardElevated,
-      paddingHorizontal: spacing(theme, 'screenPadding'),
-      paddingTop: spacing(theme, 'md'),
-      paddingBottom: spacing(theme, 'md'),
-      borderBottomWidth: 1,
-      borderBottomColor: theme.colors.background.divider,
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: spacing(theme, 'md'),
-    },
-    backButton: {
-      width: 40,
-      height: 40,
-      justifyContent: 'center',
-      alignItems: 'center',
-    },
-    backIcon: {
-      fontSize: 24,
-      color: theme.colors.text.primary,
-    },
-    title: {
-      ...typography(theme, 'pageTitle'),
-      fontSize: 18,
-      color: theme.colors.text.primary,
-      fontWeight: '700',
-    },
     scrollContent: {
-      paddingTop: spacing(theme, 'md'),
-      paddingBottom: spacing(theme, 'xxl') + 80,
+      paddingVertical: spacing(theme, 'lg'),
     },
     section: {
       marginBottom: spacing(theme, 'lg'),
@@ -126,6 +133,11 @@ export default function AddNewCustomer() {
       ...typography(theme, 'body'),
       color: theme.colors.text.primary,
       height: 48,
+    },
+    multilineInput: {
+      height: 80,
+      textAlignVertical: 'top',
+      paddingTop: spacing(theme, 'sm'),
     },
     inputWithIcon: {
       flexDirection: 'row',
@@ -182,6 +194,42 @@ export default function AddNewCustomer() {
     dropdownIcon: {
       fontSize: 12,
       color: theme.colors.text.muted,
+    },
+    bottomSheetContent: {
+      paddingHorizontal: spacing(theme, 'screenPadding'),
+      paddingTop: spacing(theme, 'md'),
+      paddingBottom: spacing(theme, 'xl'),
+    },
+    bottomSheetTitle: {
+      ...typography(theme, 'pageTitle'),
+      color: theme.colors.text.primary,
+      fontWeight: '700',
+      marginBottom: spacing(theme, 'lg'),
+      textAlign: 'center',
+    },
+    optionsList: {
+      gap: spacing(theme, 'xs'),
+    },
+    option: {
+      backgroundColor: theme.colors.background.cardElevated,
+      borderRadius: radius(theme, 'input'),
+      borderWidth: 1,
+      borderColor: theme.colors.background.divider,
+      paddingHorizontal: spacing(theme, 'md'),
+      paddingVertical: spacing(theme, 'md'),
+    },
+    optionSelected: {
+      backgroundColor: theme.colors.surfaceTint.primarySoft,
+      borderColor: theme.colors.brand.primary,
+    },
+    optionText: {
+      ...typography(theme, 'body'),
+      color: theme.colors.text.primary,
+      fontWeight: '500',
+    },
+    optionTextSelected: {
+      color: theme.colors.brand.primary,
+      fontWeight: '700',
     },
     infoBox: {
       flexDirection: 'row',
@@ -263,14 +311,7 @@ export default function AddNewCustomer() {
       color: theme.colors.text.muted,
     },
     actionButtons: {
-      position: 'absolute',
-      bottom: 0,
-      left: 0,
-      right: 0,
-      backgroundColor: theme.colors.background.card,
-      padding: spacing(theme, 'screenPadding'),
-      borderTopWidth: 1,
-      borderTopColor: theme.colors.background.divider,
+      paddingHorizontal: spacing(theme, 'screenPadding'),
       flexDirection: 'row',
       gap: spacing(theme, 'sm'),
     },
@@ -310,14 +351,83 @@ export default function AddNewCustomer() {
     },
   });
 
-  const handleBack = () => {
-    router.back();
-  };
+  const handleSave = async () => {
+    // Validate required fields
+    if (!formData.personal.fullName.trim()) {
+      Alert.alert('Validation Error', 'Please enter customer name');
+      return;
+    }
+    if (!formData.address.fullAddress.trim()) {
+      Alert.alert('Validation Error', 'Please enter address');
+      return;
+    }
+    if (!formData.assignment.branch) {
+      Alert.alert('Validation Error', 'Please select a branch');
+      return;
+    }
+    if (!formData.assignment.route) {
+      Alert.alert('Validation Error', 'Please select a route');
+      return;
+    }
+    if (!formData.assignment.primaryAgent) {
+      Alert.alert('Validation Error', 'Please select primary agent');
+      return;
+    }
 
-  const handleSave = () => {
-    console.log('Save customer:', formData);
-    // TODO: Validate and save customer
-    Alert.alert('Success', 'Customer added successfully!');
+    try {
+      console.log('Saving customer:', formData);
+
+      // Parse address into components (simplified - using full address as addressLine1)
+      const addressParts = formData.address.fullAddress.split(',').map(s => s.trim());
+
+      // Add customer to Redux
+      const customerAction = dispatch(
+        addCustomer({
+          branchId: formData.assignment.branch,
+          routeId: formData.assignment.route,
+          primaryAgentId: formData.assignment.primaryAgent,
+          fullName: formData.personal.fullName,
+          phone: formData.personal.mobileNumber,
+          addressLine1: formData.address.fullAddress,
+          addressLine2: '',
+          city: addressParts[addressParts.length - 2] || 'Mumbai',
+          pincode: addressParts[addressParts.length - 1] || '400001',
+          state: 'Maharashtra',
+          status: CustomerStatus.ACTIVE,
+        })
+      );
+
+      // Persist customers
+      await dispatch(persistCustomers());
+
+      // Get the created customer ID from state after adding
+      const state = store.getState();
+      const customers = state.customers?.customers?.allIds || [];
+      const lastCustomerId = customers[customers.length - 1];
+
+      // Create account if requested
+      if (formData.pigmyAccount.createAccount && lastCustomerId) {
+        dispatch(
+          addAccount({
+            customerId: lastCustomerId,
+            schemeId: 'scheme-pigmy-daily',
+            installmentAmount: formData.pigmyAccount.dailyAmount,
+            status: AccountStatus.ACTIVE,
+          })
+        );
+        await dispatch(persistAccounts());
+      }
+
+      Alert.alert('Success', 'Customer added successfully!', [
+        {
+          text: 'OK',
+          onPress: () => router.back(),
+        },
+      ]);
+    } catch (error) {
+      console.error('Error adding customer:', error);
+      Alert.alert('Error', 'Failed to add customer');
+    }
   };
 
   const handleCancel = () => {
@@ -335,14 +445,87 @@ export default function AddNewCustomer() {
     );
   };
 
+  const openDropdown = (dropdownName: string) => {
+    setActiveDropdown(dropdownName);
+    setIsDropdownOpen(true);
+  };
+
+  const closeDropdown = () => {
+    setIsDropdownOpen(false);
+    setActiveDropdown(null);
+  };
+
+  const handleDropdownSelect = (value: string) => {
+    if (activeDropdown === 'branch') {
+      // Find the branch ID from the name
+      const branch = allBranches.find(b => (b.name || 'Hangamai Main Branch') === value);
+      setFormData({
+        ...formData,
+        assignment: { ...formData.assignment, branch: branch?.id || value },
+      });
+    } else if (activeDropdown === 'route') {
+      // Extract route ID from "CODE - Name" format
+      const routeCode = value.split(' - ')[0];
+      const route = allRoutes.find(r => r.routeCode === routeCode);
+      setFormData({
+        ...formData,
+        assignment: { ...formData.assignment, route: route?.id || value },
+      });
+    } else if (activeDropdown === 'agent') {
+      // Extract agent ID from "Name (ID)" format
+      const agentId = value.match(/\(([^)]+)\)/)?.[1] || '';
+      setFormData({
+        ...formData,
+        assignment: { ...formData.assignment, primaryAgent: agentId },
+      });
+    } else if (activeDropdown === 'documentType') {
+      setFormData({ ...formData, kyc: { ...formData.kyc, documentType: value } });
+    }
+    closeDropdown();
+  };
+
+  const getDropdownOptions = () => {
+    switch (activeDropdown) {
+      case 'branch': return branchOptions;
+      case 'route': return routeOptions;
+      case 'agent': return agentOptions;
+      case 'documentType': return documentTypeOptions;
+      default: return [];
+    }
+  };
+
+  const getDropdownValue = () => {
+    switch (activeDropdown) {
+      case 'branch': {
+        const branch = allBranches.find(b => b.id === formData.assignment.branch);
+        return branch?.name || 'Hangamai Main Branch';
+      }
+      case 'route': {
+        const route = allRoutes.find(r => r.id === formData.assignment.route);
+        return route ? `${route.routeCode} - ${route.name}` : '';
+      }
+      case 'agent': {
+        const agent = allAgents.find(a => a.id === formData.assignment.primaryAgent);
+        return agent ? `${agent.name} (${agent.id})` : '';
+      }
+      case 'documentType': return formData.kyc.documentType;
+      default: return '';
+    }
+  };
+
+  const getDropdownTitle = () => {
+    switch (activeDropdown) {
+      case 'branch': return 'Select Branch';
+      case 'route': return 'Select Route';
+      case 'agent': return 'Select Primary Agent';
+      case 'documentType': return 'Select Document Type';
+      default: return '';
+    }
+  };
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      <View style={styles.header}>
-        <Pressable onPress={handleBack} style={styles.backButton}>
-          <Text style={styles.backIcon}>←</Text>
-        </Pressable>
-        <Text style={styles.title}>Add New Customer</Text>
-      </View>
+      <AddCustomerHeader />
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         {/* Personal Details */}
@@ -389,7 +572,6 @@ export default function AddNewCustomer() {
               />
               <Text style={styles.inputIcon}>📱</Text>
             </View>
-            <Text style={styles.helpText}>Used for transaction SMS alerts.</Text>
           </View>
 
           <View style={styles.field}>
@@ -403,94 +585,42 @@ export default function AddNewCustomer() {
               <Text style={styles.inputIcon}>🔒</Text>
             </View>
           </View>
-        </View>
 
-        {/* Address Details */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionIcon}>📍</Text>
-            <Text style={styles.sectionTitle}>Address Details</Text>
+          <View style={styles.field}>
+            <Text style={styles.label}>Account Number</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="e.g. PG-9902"
+              placeholderTextColor={theme.colors.text.muted}
+              value={formData.personal.accountNumber}
+              onChangeText={(text) =>
+                setFormData({
+                  ...formData,
+                  personal: { ...formData.personal, accountNumber: text },
+                })
+              }
+            />
           </View>
-
           <View style={styles.field}>
             <Text style={styles.label}>
-              Address Line 1 <Text style={styles.required}>*</Text>
+              Address <Text style={styles.required}>*</Text>
             </Text>
             <TextInput
-              style={styles.input}
-              placeholder="House No, Building Name"
+              style={[styles.input, styles.multilineInput]}
+              placeholder="House No, Building, Street, Area, City, Pincode"
               placeholderTextColor={theme.colors.text.muted}
-              value={formData.address.addressLine1}
+              multiline
+              numberOfLines={3}
+              value={formData.address.fullAddress}
               onChangeText={(text) =>
                 setFormData({
                   ...formData,
-                  address: { ...formData.address, addressLine1: text },
+                  address: { ...formData.address, fullAddress: text },
                 })
               }
             />
-          </View>
-
-          <View style={styles.field}>
-            <Text style={styles.label}>Address Line 2</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Street, Area"
-              placeholderTextColor={theme.colors.text.muted}
-              value={formData.address.addressLine2}
-              onChangeText={(text) =>
-                setFormData({
-                  ...formData,
-                  address: { ...formData.address, addressLine2: text },
-                })
-              }
-            />
-          </View>
-
-          <View style={styles.row}>
-            <View style={[styles.field, styles.halfWidth]}>
-              <Text style={styles.label}>City / Village</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="City"
-                placeholderTextColor={theme.colors.text.muted}
-                value={formData.address.city}
-                onChangeText={(text) =>
-                  setFormData({
-                    ...formData,
-                    address: { ...formData.address, city: text },
-                  })
-                }
-              />
-            </View>
-
-            <View style={[styles.field, styles.halfWidth]}>
-              <Text style={styles.label}>Pincode</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="000000"
-                placeholderTextColor={theme.colors.text.muted}
-                keyboardType="numeric"
-                maxLength={6}
-                value={formData.address.pincode}
-                onChangeText={(text) =>
-                  setFormData({
-                    ...formData,
-                    address: { ...formData.address, pincode: text },
-                  })
-                }
-              />
-            </View>
-          </View>
-
-          <View style={styles.field}>
-            <Text style={styles.label}>State</Text>
-            <Pressable style={styles.dropdown}>
-              <Text style={styles.dropdownText}>{formData.address.state}</Text>
-              <Text style={styles.dropdownIcon}>▼</Text>
-            </Pressable>
           </View>
         </View>
-
         {/* Assignment */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
@@ -502,9 +632,11 @@ export default function AddNewCustomer() {
             <Text style={styles.label}>
               Branch <Text style={styles.required}>*</Text>
             </Text>
-            <Pressable style={styles.dropdown}>
+            <Pressable onPress={() => openDropdown('branch')} style={styles.dropdown}>
               <Text style={formData.assignment.branch ? styles.dropdownText : styles.dropdownPlaceholder}>
-                {formData.assignment.branch || 'Select Branch'}
+                {formData.assignment.branch
+                  ? allBranches.find(b => b.id === formData.assignment.branch)?.name || 'Hangamai Main Branch'
+                  : 'Select Branch'}
               </Text>
               <Text style={styles.dropdownIcon}>▼</Text>
             </Pressable>
@@ -512,9 +644,14 @@ export default function AddNewCustomer() {
 
           <View style={styles.field}>
             <Text style={styles.label}>Route / Beat</Text>
-            <Pressable style={styles.dropdown}>
+            <Pressable onPress={() => openDropdown('route')} style={styles.dropdown}>
               <Text style={formData.assignment.route ? styles.dropdownText : styles.dropdownPlaceholder}>
-                {formData.assignment.route || 'Select Route'}
+                {formData.assignment.route
+                  ? (() => {
+                    const route = allRoutes.find(r => r.id === formData.assignment.route);
+                    return route ? `${route.routeCode} - ${route.name}` : 'Select Route';
+                  })()
+                  : 'Select Route'}
               </Text>
               <Text style={styles.dropdownIcon}>▼</Text>
             </Pressable>
@@ -522,13 +659,20 @@ export default function AddNewCustomer() {
 
           <View style={styles.field}>
             <Text style={styles.label}>Primary Agent</Text>
-            <Pressable style={styles.dropdown}>
+            <Pressable onPress={() => openDropdown('agent')} style={styles.dropdown}>
               <Text style={formData.assignment.primaryAgent ? styles.dropdownText : styles.dropdownPlaceholder}>
-                {formData.assignment.primaryAgent || 'Select Agent'}
+                {formData.assignment.primaryAgent
+                  ? (() => {
+                    const agent = allAgents.find(a => a.id === formData.assignment.primaryAgent);
+                    return agent ? `${agent.name} (${agent.id})` : 'Select Agent';
+                  })()
+                  : 'Select Agent'}
               </Text>
               <Text style={styles.dropdownIcon}>▼</Text>
             </Pressable>
+          </View>
 
+          <View style={styles.field}>
             <View style={styles.infoBox}>
               <Text style={styles.infoIcon}>ℹ️</Text>
               <Text style={styles.infoText}>
@@ -547,7 +691,7 @@ export default function AddNewCustomer() {
 
           <View style={styles.field}>
             <Text style={styles.label}>Document Type</Text>
-            <Pressable style={styles.dropdown}>
+            <Pressable onPress={() => openDropdown('documentType')} style={styles.dropdown}>
               <Text style={styles.dropdownText}>{formData.kyc.documentType}</Text>
               <Text style={styles.dropdownIcon}>▼</Text>
             </Pressable>
@@ -568,118 +712,51 @@ export default function AddNewCustomer() {
               }
             />
           </View>
-
-          <View style={styles.field}>
-            <Text style={styles.label}>Upload Document</Text>
-            <Pressable style={styles.uploadArea}>
-              <Text style={styles.uploadIcon}>☁️</Text>
-              <Text style={styles.uploadText}>
-                <Text style={styles.uploadLink}>Click to upload</Text> or drag and drop
-              </Text>
-              <Text style={styles.uploadHint}>SVG, PNG, JPG or PDF (MAX. 5MB)</Text>
-            </Pressable>
-          </View>
         </View>
+        <View style={styles.actionButtons}>
+          <Pressable
+            onPress={handleCancel}
+            style={({ pressed }) => [styles.cancelButton, { opacity: pressed ? 0.7 : 1 }]}
+          >
+            <Text style={styles.cancelButtonText}>Cancel</Text>
+          </Pressable>
 
-        {/* Create Pigmy Account */}
-        <View style={styles.section}>
-          <View style={styles.toggleSection}>
-            <View style={styles.toggleLeft}>
-              <Text style={styles.toggleIcon}>💰</Text>
-              <View style={styles.toggleContent}>
-                <Text style={styles.toggleTitle}>Create Pigmy Account</Text>
-                <Text style={styles.toggleSubtitle}>
-                  Start a collection scheme immediately
-                </Text>
-              </View>
-            </View>
-            <Switch
-              value={formData.pigmyAccount.createAccount}
-              onValueChange={(value) =>
-                setFormData({
-                  ...formData,
-                  pigmyAccount: { ...formData.pigmyAccount, createAccount: value },
-                })
-              }
-              trackColor={{ false: theme.colors.background.divider, true: theme.colors.brand.primary }}
-              thumbColor="#FFFFFF"
-            />
-          </View>
-
-          {formData.pigmyAccount.createAccount && (
-            <>
-              <View style={styles.field}>
-                <Text style={styles.label}>Scheme Type</Text>
-                <Pressable style={styles.dropdown}>
-                  <Text style={styles.dropdownText}>{formData.pigmyAccount.schemeType}</Text>
-                  <Text style={styles.dropdownIcon}>▼</Text>
-                </Pressable>
-              </View>
-
-              <View style={styles.row}>
-                <View style={[styles.field, styles.halfWidth]}>
-                  <Text style={styles.label}>Daily Amount</Text>
-                  <View style={styles.inputWithIcon}>
-                    <Text style={[styles.inputIcon, { marginRight: spacing(theme, 'xs') }]}>₹</Text>
-                    <TextInput
-                      style={styles.inputFlex}
-                      placeholder="500"
-                      placeholderTextColor={theme.colors.text.muted}
-                      keyboardType="numeric"
-                      value={formData.pigmyAccount.dailyAmount.toString()}
-                      onChangeText={(text) =>
-                        setFormData({
-                          ...formData,
-                          pigmyAccount: {
-                            ...formData.pigmyAccount,
-                            dailyAmount: parseInt(text) || 0,
-                          },
-                        })
-                      }
-                    />
-                  </View>
-                </View>
-
-                <View style={[styles.field, styles.halfWidth]}>
-                  <Text style={styles.label}>Start Date</Text>
-                  <View style={styles.inputWithIcon}>
-                    <TextInput
-                      style={styles.inputFlex}
-                      placeholder="10/27/2023"
-                      placeholderTextColor={theme.colors.text.muted}
-                      value={formData.pigmyAccount.startDate}
-                      onChangeText={(text) =>
-                        setFormData({
-                          ...formData,
-                          pigmyAccount: { ...formData.pigmyAccount, startDate: text },
-                        })
-                      }
-                    />
-                    <Text style={styles.inputIcon}>📅</Text>
-                  </View>
-                </View>
-              </View>
-            </>
-          )}
+          <Pressable
+            onPress={handleSave}
+            style={({ pressed }) => [styles.saveButton, { opacity: pressed ? 0.8 : 1 }]}
+          >
+            <Text style={styles.saveButtonIcon}>💾</Text>
+            <Text style={styles.saveButtonText}>Save Customer</Text>
+          </Pressable>
         </View>
       </ScrollView>
-
-      <View style={styles.actionButtons}>
-        <Pressable
-          onPress={handleCancel}
-          style={({ pressed }) => [styles.cancelButton, { opacity: pressed ? 0.7 : 1 }]}
-        >
-          <Text style={styles.cancelButtonText}>Cancel</Text>
-        </Pressable>
-
-        <Pressable
-          onPress={handleSave}
-          style={({ pressed }) => [styles.saveButton, { opacity: pressed ? 0.8 : 1 }]}
-        >
-          <Text style={styles.saveButtonIcon}>💾</Text>
-          <Text style={styles.saveButtonText}>Save Customer</Text>
-        </Pressable>
-      </View>
+      <BottomSheet isOpen={isDropdownOpen} onClose={closeDropdown}>
+        <View style={styles.bottomSheetContent}>
+          <Text style={styles.bottomSheetTitle}>{getDropdownTitle()}</Text>
+          <View style={styles.optionsList}>
+            {getDropdownOptions().map((option) => (
+              <Pressable
+                key={option}
+                onPress={() => handleDropdownSelect(option)}
+                style={({ pressed }) => [
+                  styles.option,
+                  getDropdownValue() === option && styles.optionSelected,
+                  { opacity: pressed ? 0.7 : 1 },
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.optionText,
+                    getDropdownValue() === option && styles.optionTextSelected,
+                  ]}
+                >
+                  {option}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+        </View>
+      </BottomSheet>
     </SafeAreaView>
   );
 }

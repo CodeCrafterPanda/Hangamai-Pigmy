@@ -7,6 +7,8 @@ interface CustomerCollectionCardProps {
   onCollect?: (customerId: string) => void;
   onCollectAll?: (customerId: string) => void;
   onReceipt?: (customerId: string) => void;
+  onEdit?: (customerId: string) => void;
+  onDelete?: (customerId: string) => void;
 }
 
 export default function CustomerCollectionCard({
@@ -14,6 +16,8 @@ export default function CustomerCollectionCard({
   onCollect,
   onCollectAll,
   onReceipt,
+  onEdit,
+  onDelete,
 }: CustomerCollectionCardProps) {
   const { theme } = useTheme();
 
@@ -185,6 +189,54 @@ export default function CustomerCollectionCard({
       color: theme.colors.status.success,
       fontWeight: '600',
     },
+    actionButtons: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginTop: spacing(theme, 'xxs'),
+    },
+    editButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 2,
+      paddingHorizontal: spacing(theme, 'xs'),
+      paddingVertical: 4,
+      backgroundColor: theme.colors.surfaceTint.primarySoft,
+      borderRadius: radius(theme, 'action'),
+      borderWidth: 1,
+      borderColor: theme.colors.brand.primary,
+    },
+    editButtonIcon: {
+      fontSize: 10,
+      color: theme.colors.brand.primary,
+    },
+    editButtonText: {
+      ...typography(theme, 'caption'),
+      color: theme.colors.brand.primary,
+      fontWeight: '600',
+      fontSize: 10,
+    },
+    deleteButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 2,
+      paddingHorizontal: spacing(theme, 'xs'),
+      paddingVertical: 4,
+      backgroundColor: theme.colors.surfaceTint.errorSoft,
+      borderRadius: radius(theme, 'action'),
+      borderWidth: 1,
+      borderColor: theme.colors.status.error,
+    },
+    deleteButtonIcon: {
+      fontSize: 10,
+      color: theme.colors.status.error,
+    },
+    deleteButtonText: {
+      ...typography(theme, 'caption'),
+      color: theme.colors.status.error,
+      fontWeight: '600',
+      fontSize: 10,
+    },
   });
 
   const renderActionButton = () => {
@@ -236,19 +288,6 @@ export default function CustomerCollectionCard({
       <View style={styles.content}>
         <View style={styles.header}>
           <View style={styles.leftSection}>
-            <View
-              style={[
-                styles.avatar,
-                customer.status === 'collected' && styles.avatarCollected,
-              ]}
-            >
-              {customer.status === 'collected' ? (
-                <Text style={styles.avatarIcon}>✓</Text>
-              ) : (
-                <Text style={styles.avatarText}>{customer.initials}</Text>
-              )}
-            </View>
-
             <View style={styles.customerInfo}>
               <Text
                 style={[
@@ -265,35 +304,32 @@ export default function CustomerCollectionCard({
           </View>
 
           <View style={styles.statusBadge}>
-            {customer.status === 'collected' ? (
-              <Text style={styles.collectedLabel}>Collected</Text>
-            ) : (
-              <View style={styles.statusDot} />
+            {renderActionButton()}
+          </View>
+        </View>
+
+        {(onEdit || onDelete) && (
+          <View style={styles.actionButtons}>
+            {onEdit && (
+              <Pressable
+                onPress={() => onEdit(customer.id)}
+                style={({ pressed }) => [styles.editButton, { opacity: pressed ? 0.7 : 1 }]}
+              >
+                <Text style={styles.editButtonIcon}>✏️</Text>
+                <Text style={styles.editButtonText}>Edit</Text>
+              </Pressable>
+            )}
+            {onDelete && (
+              <Pressable
+                onPress={() => onDelete(customer.id)}
+                style={({ pressed }) => [styles.deleteButton, { opacity: pressed ? 0.7 : 1 }]}
+              >
+                <Text style={styles.deleteButtonIcon}>🗑️</Text>
+                <Text style={styles.deleteButtonText}>Delete</Text>
+              </Pressable>
             )}
           </View>
-        </View>
-
-        <View style={styles.amountSection}>
-          <View style={styles.amountInfo}>
-            <Text style={styles.amountLabel}>
-              {customer.status === 'overdue'
-                ? 'Total Overdue'
-                : customer.status === 'collected'
-                  ? 'Collected'
-                  : 'Daily Due Amount'}
-            </Text>
-            <Text style={styles.amount}>
-              ₹
-              {customer.status === 'overdue'
-                ? customer.totalOverdue?.toLocaleString('en-IN')
-                : customer.status === 'collected'
-                  ? customer.collectedAmount?.toLocaleString('en-IN')
-                  : customer.dailyDueAmount?.toLocaleString('en-IN')}
-            </Text>
-          </View>
-
-          {renderActionButton()}
-        </View>
+        )}
       </View>
     </View>
   );

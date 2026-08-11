@@ -1,75 +1,176 @@
 import { View, Text, StyleSheet, ScrollView, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useState } from 'react';
-import { useRouter } from 'expo-router';
+import { useState, useMemo } from 'react';
+import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useSelector } from 'react-redux';
+import type { State } from '@/utils/store';
 import { useTheme, typography, spacing, radius } from '@/theme';
+import MonthlyCollectionsHeader from '@/components/elements/MonthlyCollectionsHeader';
+import BottomSheet from '@/components/elements/BottomSheet';
+import { selectAllCollections } from '@/slices/collections.slice';
+import { selectAllCustomers, selectCustomersByAgent } from '@/slices/customers.slice';
+import { selectSession } from '@/slices/settings.slice';
+import { getBusinessDate } from '@/utils/businessLogic';
 import type { MonthlyCollectionsData, FilterOption } from '@/types/MonthlyCollectionsData';
 
 export default function MonthlyCollections() {
   const router = useRouter();
   const { theme } = useTheme();
-  const [filters, setFilters] = useState<FilterOption>({
-    agent: 'All',
-    route: '12B',
-    status: 'Active',
+  const { month } = useLocalSearchParams<{ month?: string }>();
+  const [isMonthPickerOpen, setIsMonthPickerOpen] = useState(false);
+  const [selectedMonth, setSelectedMonth] = useState<Date | null>(null);
+
+  // Get session
+  const session = useSelector(selectSession);
+  const timezone = useSelector((state: State) => state.settings.branchSettings.timezone);
+  const agentId = session.agentId || 'demo-agent';
+
+  // Get data from Redux - only PRIMARY customers (not delegated)
+  const allCollections = useSelector(selectAllCollections);
+  const myPrimaryCustomers = useSelector((state: State) =>
+    selectCustomersByAgent(state, agentId)
+  );
+  const myPrimaryCustomerIds = useMemo(() => {
+    return new Set(myPrimaryCustomers.map(c => c.id));
+  }, [myPrimaryCustomers]);
+
+  // Use selected month, or parse from URL, or use current
+  const now = new Date();
+  let currentDate = selectedMonth || now;
+
+  if (!selectedMonth && month) {
+    // Parse "Month Year" format (e.g., "December 2025" or "October 2023")
+    const parts = month.split(' ');
+    if (parts.length === 2) {
+      const monthName = parts[0];
+      const year = parseInt(parts[1], 10);
+      // Try to parse the month
+      const testDate = new Date(`${monthName} 1, ${year}`);
+      if (!isNaN(testDate.getTime())) {
+        const monthIndex = testDate.getMonth();
+        currentDate = new Date(year, monthIndex, 1);
+      }
+    }
+  }
+
+  // Validate currentDate and fall back to now if invalid
+  if (isNaN(currentDate.getTime())) {
+    currentDate = now;
+  }
+
+  const currentMonth = currentDate.getMonth();
+  const currentYear = currentDate.getFullYear();
+  const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+
+  console.log('[MonthlyCollections] Date info:', {
+    monthParam: month,
+    currentMonth: currentMonth + 1,
+    currentYear,
+    daysInMonth,
+    agentId,
+    dateIsValid: !isNaN(currentDate.getTime()),
   });
 
-  // Mock data - replace with actual data from Redux/API
+  // Get collections for this month (only primary customers)
+  const monthCollections = useMemo(() => {
+    return allCollections.filter(c => {
+      const collectionDate = new Date(c.collectedAt);
+      return (
+        c.collectedByAgentId === agentId &&
+        myPrimaryCustomerIds.has(c.customerId) && // Only primary customers
+        collectionDate.getMonth() === currentMonth &&
+        collectionDate.getFullYear() === currentYear &&
+        c.status !== 'REVERSED'
+      );
+    });
+  }, [allCollections, agentId, myPrimaryCustomerIds, currentMonth, currentYear]);
+
+  // Build customer data with daily collections
+  const customers = useMemo(() => {
+    console.log('[MonthlyCollections] Building customer data:', {
+      customersCount: myPrimaryCustomers.length,
+      collectionsCount: monthCollections.length,
+    });
+
+    return myPrimaryCustomers.map(customer => {
+      const dailyCollections: Record<string, number | null> = {};
+      let monthlyTotal = 0;
+
+      // Check each day of the month
+      for (let day = 1; day <= daysInMonth; day++) {
+        const dayDate = new Date(currentYear, currentMonth, day);
+        const businessDate = getBusinessDate(dayDate.toISOString(), timezone);
+
+        const dayCollection = monthCollections.find(
+          c => c.customerId === customer.id && c.businessDate === businessDate
+        );
+
+        if (dayCollection) {
+          const amount = dayCollection.amount + dayCollection.penaltyAmount;
+          dailyCollections[day.toString()] = amount;
+          monthlyTotal += amount;
+        } else {
+          dailyCollections[day.toString()] = null;
+        }
+      }
+
+      console.log(`[MonthlyCollections] Customer ${customer.fullName}:`, {
+        monthlyTotal,
+        hasCollections: Object.values(dailyCollections).some(v => v !== null),
+      });
+
+      return {
+        accountNumber: customer.customerCode,
+        name: customer.fullName,
+        dailyCollections,
+        monthlyTotal,
+      };
+    });
+  }, [myPrimaryCustomers, monthCollections, daysInMonth, currentYear, currentMonth, timezone]);
+
+  // Calculate daily totals
+  const dailyTotals: Record<string, number> = {};
+  let grandTotal = 0;
+
+  for (let day = 1; day <= daysInMonth; day++) {
+    let dayTotal = 0;
+    customers.forEach(c => {
+      const amount = c.dailyCollections[day.toString()];
+      if (amount) dayTotal += amount;
+    });
+    dailyTotals[day.toString()] = dayTotal;
+    grandTotal += dayTotal;
+  }
+
   const monthlyData: MonthlyCollectionsData = {
-    month: 'Oct',
-    year: 2023,
-    branch: 'Shivaji Nagar Branch',
-    selectedRoute: '12B',
-    selectedAgent: 'All',
+    month: currentDate.toLocaleDateString('en-US', { month: 'short' }),
+    year: currentYear,
+    branch: 'Hangamai Main Branch',
+    selectedRoute: '',
+    selectedAgent: 'Self',
     status: 'Active',
-    daysInMonth: 4,
-    customers: [
-      {
-        accountNumber: 'SB-1874',
-        name: 'Ramesh K.',
-        dailyCollections: { '1': 500, '2': 500, '3': null, '4': 500 },
-        monthlyTotal: 3000,
-      },
-      {
-        accountNumber: 'SB-1845',
-        name: 'Anita Desai',
-        dailyCollections: { '1': 200, '2': 200, '3': 200, '4': 200 },
-        monthlyTotal: 1200,
-      },
-      {
-        accountNumber: 'RK-282',
-        name: 'Vijay M.',
-        dailyCollections: { '1': null, '2': null, '3': 100, '4': null },
-        monthlyTotal: 200,
-      },
-      {
-        accountNumber: 'CHECK',
-        name: 'Suresh P.',
-        dailyCollections: { '1': 1000, '2': 1000, '3': 1000, '4': 1000 },
-        monthlyTotal: 6000,
-      },
-      {
-        accountNumber: 'SB-1182',
-        name: 'Meera S.',
-        dailyCollections: { '1': 300, '2': 300, '3': null, '4': null },
-        monthlyTotal: 900,
-      },
-      {
-        accountNumber: 'SB-6999',
-        name: 'New User',
-        dailyCollections: { '1': null, '2': null, '3': null, '4': null },
-        monthlyTotal: 0,
-      },
-    ],
-    dailyTotals: { '1': 2000, '2': 2000, '3': 1300, '4': 1700 },
-    grandTotal: 11200,
+    daysInMonth: daysInMonth, // Actual days in the month
+    customers: customers, // Show all customers
+    dailyTotals,
+    grandTotal,
     isAuditSuccessful: true,
   };
+
+  const [filters, setFilters] = useState<FilterOption>({
+    agent: 'All',
+    route: '',
+    status: 'Active',
+  });
 
   const styles = StyleSheet.create({
     container: {
       flex: 1,
       backgroundColor: theme.colors.background.app,
+    },
+    controlsContainer: {
+      backgroundColor: theme.colors.background.app,
+      paddingHorizontal: spacing(theme, 'screenPadding'),
+      paddingBottom: spacing(theme, 'sm'),
     },
     header: {
       backgroundColor: theme.colors.background.app,
@@ -370,15 +471,64 @@ export default function MonthlyCollections() {
       ...typography(theme, 'body'),
       color: theme.colors.text.primary,
     },
+    monthPickerContent: {
+      paddingHorizontal: spacing(theme, 'screenPadding'),
+      paddingTop: spacing(theme, 'md'),
+      paddingBottom: spacing(theme, 'xl'),
+    },
+    monthPickerTitle: {
+      ...typography(theme, 'pageTitle'),
+      color: theme.colors.text.primary,
+      fontWeight: '700',
+      marginBottom: spacing(theme, 'lg'),
+      textAlign: 'center',
+    },
+    monthOptionsList: {
+      gap: spacing(theme, 'xs'),
+    },
+    monthOption: {
+      backgroundColor: theme.colors.background.cardElevated,
+      borderRadius: radius(theme, 'input'),
+      borderWidth: 1,
+      borderColor: theme.colors.background.divider,
+      paddingHorizontal: spacing(theme, 'md'),
+      paddingVertical: spacing(theme, 'md'),
+    },
+    monthOptionSelected: {
+      backgroundColor: theme.colors.surfaceTint.primarySoft,
+      borderColor: theme.colors.brand.primary,
+    },
+    monthOptionText: {
+      ...typography(theme, 'body'),
+      color: theme.colors.text.primary,
+      fontWeight: '500',
+    },
+    monthOptionTextSelected: {
+      color: theme.colors.brand.primary,
+      fontWeight: '700',
+    },
   });
-
-  const handleBack = () => {
-    router.back();
-  };
 
   const handleRemoveRouteFilter = () => {
     setFilters({ ...filters, route: null });
   };
+
+  const handleMonthChange = (newMonth: Date) => {
+    setSelectedMonth(newMonth);
+    setIsMonthPickerOpen(false);
+  };
+
+  // Generate month options: last 6 months + current + next 6 months
+  const monthOptions = useMemo(() => {
+    const options = [];
+    const today = new Date();
+    // Start from 6 months ago
+    for (let i = 9; i >= -3; i--) {
+      const date = new Date(today.getFullYear(), today.getMonth() - i, 1);
+      options.push(date);
+    }
+    return options;
+  }, []);
 
   const getDayOfWeek = (day: number) => {
     const date = new Date(monthlyData.year, getMonthIndex(monthlyData.month), day);
@@ -392,32 +542,20 @@ export default function MonthlyCollections() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      <View style={styles.header}>
-        <View style={styles.headerTop}>
-          <View style={styles.headerLeft}>
-            <Pressable onPress={handleBack} style={styles.backButton}>
-              <Text style={styles.backIcon}>←</Text>
-            </Pressable>
-            <View style={styles.headerTitles}>
-              <Text style={styles.title}>Monthly Collections</Text>
-              <Text style={styles.subtitle}>{monthlyData.branch}</Text>
-            </View>
-          </View>
-          <Pressable style={styles.infoButton}>
-            <Text style={styles.infoIcon}>ℹ️</Text>
-          </Pressable>
-        </View>
+      <MonthlyCollectionsHeader
+        month="Monthly Collections"
+        branchName={monthlyData.branch}
+      />
 
+      <View style={styles.controlsContainer}>
         <View style={styles.controlsRow}>
-          <Pressable style={styles.dateButton}>
+          <Pressable onPress={() => setIsMonthPickerOpen(true)} style={styles.dateButton}>
             <Text style={styles.dateText}>{`${monthlyData.month} ${monthlyData.year}`}</Text>
             <Text style={styles.dateIcon}>📅</Text>
           </Pressable>
 
           <View style={styles.actionButtons}>
-            <Pressable style={styles.iconButton}>
-              <Text style={styles.iconButtonIcon}>🔍</Text>
-            </Pressable>
+
             <Pressable style={[styles.iconButton, styles.iconButtonPrimary]}>
               <Text style={[styles.iconButtonIcon, styles.iconButtonIconPrimary]}>📤</Text>
             </Pressable>
@@ -452,22 +590,12 @@ export default function MonthlyCollections() {
               <View style={[styles.columnHeader, styles.customerColumn]}>
                 <Text style={styles.columnHeaderText}>Customer</Text>
               </View>
-              <View style={[styles.columnHeader, styles.dayColumn]}>
-                <Text style={styles.dayHeaderText}>01</Text>
-                <Text style={styles.daySubText}>{getDayOfWeek(1)}</Text>
-              </View>
-              <View style={[styles.columnHeader, styles.dayColumn]}>
-                <Text style={styles.dayHeaderText}>02</Text>
-                <Text style={styles.daySubText}>{getDayOfWeek(2)}</Text>
-              </View>
-              <View style={[styles.columnHeader, styles.dayColumn]}>
-                <Text style={styles.dayHeaderText}>03</Text>
-                <Text style={styles.daySubText}>{getDayOfWeek(3)}</Text>
-              </View>
-              <View style={[styles.columnHeader, styles.dayColumn]}>
-                <Text style={styles.dayHeaderText}>04</Text>
-                <Text style={styles.daySubText}>{getDayOfWeek(4)}</Text>
-              </View>
+              {Array.from({ length: daysInMonth }, (_, i) => i + 1).map(day => (
+                <View key={day} style={[styles.columnHeader, styles.dayColumn]}>
+                  <Text style={styles.dayHeaderText}>{day.toString().padStart(2, '0')}</Text>
+                  <Text style={styles.daySubText}>{getDayOfWeek(day)}</Text>
+                </View>
+              ))}
               <View style={[styles.columnHeader, styles.totalColumn]}>
                 <Text style={styles.totalHeaderText}>Total</Text>
               </View>
@@ -483,29 +611,19 @@ export default function MonthlyCollections() {
                       <Text style={styles.customerAcctNo}>{customer.accountNumber}</Text>
                     </View>
                   </View>
-                  <View style={[styles.tableCell, styles.dayColumn]}>
-                    <Text style={customer.dailyCollections['1'] ? styles.cellTextAmount : styles.cellTextEmpty}>
-                      {customer.dailyCollections['1'] || '—'}
-                    </Text>
-                  </View>
-                  <View style={[styles.tableCell, styles.dayColumn]}>
-                    <Text style={customer.dailyCollections['2'] ? styles.cellTextAmount : styles.cellTextEmpty}>
-                      {customer.dailyCollections['2'] || '—'}
-                    </Text>
-                  </View>
-                  <View style={[styles.tableCell, styles.dayColumn]}>
-                    <Text style={customer.dailyCollections['3'] ? styles.cellTextAmount : styles.cellTextEmpty}>
-                      {customer.dailyCollections['3'] || '—'}
-                    </Text>
-                  </View>
-                  <View style={[styles.tableCell, styles.dayColumn]}>
-                    <Text style={customer.dailyCollections['4'] ? styles.cellTextAmount : styles.cellTextEmpty}>
-                      {customer.dailyCollections['4'] || '—'}
-                    </Text>
-                  </View>
+                  {Array.from({ length: daysInMonth }, (_, i) => i + 1).map(day => {
+                    const dayAmount = customer.dailyCollections[day.toString()];
+                    return (
+                      <View key={day} style={[styles.tableCell, styles.dayColumn]}>
+                        <Text style={dayAmount ? styles.cellTextAmount : styles.cellTextEmpty}>
+                          {dayAmount || '—'}
+                        </Text>
+                      </View>
+                    );
+                  })}
                   <View style={[styles.tableCell, styles.totalColumn]}>
                     <Text style={styles.cellTextTotal}>
-                      {customer.monthlyTotal.toLocaleString('en-IN')}
+                      {(customer.monthlyTotal || 0).toLocaleString('en-IN')}
                     </Text>
                   </View>
                 </View>
@@ -516,20 +634,17 @@ export default function MonthlyCollections() {
                 <View style={[styles.tableCell, styles.customerColumn]}>
                   <Text style={styles.totalLabel}>DAILY TOTAL</Text>
                 </View>
-                <View style={[styles.tableCell, styles.dayColumn]}>
-                  <Text style={styles.totalAmount}>{monthlyData.dailyTotals['1'].toLocaleString('en-IN')}</Text>
-                </View>
-                <View style={[styles.tableCell, styles.dayColumn]}>
-                  <Text style={styles.totalAmount}>{monthlyData.dailyTotals['2'].toLocaleString('en-IN')}</Text>
-                </View>
-                <View style={[styles.tableCell, styles.dayColumn]}>
-                  <Text style={styles.totalAmount}>{monthlyData.dailyTotals['3'].toLocaleString('en-IN')}</Text>
-                </View>
-                <View style={[styles.tableCell, styles.dayColumn]}>
-                  <Text style={styles.totalAmount}>{monthlyData.dailyTotals['4'].toLocaleString('en-IN')}</Text>
-                </View>
+                {Array.from({ length: daysInMonth }, (_, i) => i + 1).map(day => (
+                  <View key={day} style={[styles.tableCell, styles.dayColumn]}>
+                    <Text style={styles.totalAmount}>
+                      {(monthlyData.dailyTotals[day.toString()] || 0).toLocaleString('en-IN')}
+                    </Text>
+                  </View>
+                ))}
                 <View style={[styles.tableCell, styles.totalColumn]}>
-                  <Text style={styles.totalAmountGrand}>{monthlyData.grandTotal.toLocaleString('en-IN')}</Text>
+                  <Text style={styles.totalAmountGrand}>
+                    {(monthlyData.grandTotal || 0).toLocaleString('en-IN')}
+                  </Text>
                 </View>
               </View>
             </ScrollView>
@@ -537,19 +652,40 @@ export default function MonthlyCollections() {
         </ScrollView>
       </View>
 
-      {monthlyData.isAuditSuccessful && (
-        <View style={styles.auditBanner}>
-          <View style={styles.auditIconContainer}>
-            <Text style={styles.auditIcon}>✓</Text>
-          </View>
-          <View style={styles.auditContent}>
-            <Text style={styles.auditTitle}>AUDIT SUCCESSFUL</Text>
-            <Text style={styles.auditMessage}>
-              Daily totals and monthly totals are reconciled.
-            </Text>
+      <BottomSheet isOpen={isMonthPickerOpen} onClose={() => setIsMonthPickerOpen(false)}>
+        <View style={styles.monthPickerContent}>
+          <Text style={styles.monthPickerTitle}>Select Month</Text>
+          <View style={styles.monthOptionsList}>
+            {monthOptions.map((date, index) => {
+              const optionMonth = date.getMonth();
+              const optionYear = date.getFullYear();
+              const isSelected = optionMonth === currentMonth && optionYear === currentYear;
+              const label = date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+
+              return (
+                <Pressable
+                  key={index}
+                  onPress={() => handleMonthChange(date)}
+                  style={({ pressed }) => [
+                    styles.monthOption,
+                    isSelected && styles.monthOptionSelected,
+                    { opacity: pressed ? 0.7 : 1 },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.monthOptionText,
+                      isSelected && styles.monthOptionTextSelected,
+                    ]}
+                  >
+                    {label}
+                  </Text>
+                </Pressable>
+              );
+            })}
           </View>
         </View>
-      )}
+      </BottomSheet>
     </SafeAreaView>
   );
 }

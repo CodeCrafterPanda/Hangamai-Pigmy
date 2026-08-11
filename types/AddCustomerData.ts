@@ -6,14 +6,11 @@ export interface PersonalDetails {
   fullName: string;
   mobileNumber: string;
   customerId: string;
+  accountNumber: string;
 }
 
 export interface AddressDetails {
-  addressLine1: string;
-  addressLine2: string;
-  city: string;
-  pincode: string;
-  state: string;
+  fullAddress: string;
 }
 
 export interface Assignment {

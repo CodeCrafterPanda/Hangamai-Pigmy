@@ -1,21 +1,52 @@
-import { View, Text, StyleSheet, ScrollView, Pressable, Image } from 'react-native';
+import { View, Text, StyleSheet, Pressable, Image, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useState } from 'react';
 import { useRouter } from 'expo-router';
+import { useDispatch, useSelector } from 'react-redux';
+import type { State, Dispatch } from '@/utils/store';
 import { useTheme, typography, spacing, radius } from '@/theme';
 import InfoCard from '@/components/elements/InfoCard';
 import AmountSelector from '@/components/elements/AmountSelector';
 import PaymentModeSelector from '@/components/elements/PaymentModeSelector';
+import { createCollection } from '@/slices/collections.slice';
+import { persistCollections } from '@/slices/collections.slice';
+import { selectSession } from '@/slices/settings.slice';
 import type { CollectDepositData, PaymentMode } from '@/types/CollectDepositData';
+import type { Customer, Account } from '@/types';
 
-export default function CollectDeposit() {
+interface CollectDepositProps {
+  onClose?: () => void;
+  customer?: Customer;
+  account?: Account;
+  delegationId?: string;
+}
+
+export default function CollectDeposit({ onClose, customer, account, delegationId }: CollectDepositProps) {
   const router = useRouter();
+  const dispatch = useDispatch<Dispatch>();
   const { theme } = useTheme();
-  const [amount, setAmount] = useState(500);
+  const [amount, setAmount] = useState(0);
   const [paymentMode, setPaymentMode] = useState<PaymentMode>('cash');
 
-  // Mock data - replace with actual data from Redux/API
-  const depositData: CollectDepositData = {
+  // Get session data
+  const session = useSelector(selectSession);
+  const timezone = useSelector((state: State) => state.settings.branchSettings.timezone);
+
+  // Use real data if provided, otherwise fall back to mock
+  const depositData: CollectDepositData = customer && account ? {
+    customer: {
+      id: customer.id,
+      name: customer.fullName,
+      accountNumber: account.accountNumber,
+      avatarUrl: undefined,
+      isOnline: true,
+    },
+    depositInfo: {
+      dueAmount: account.installmentAmount,
+      missedDays: 0, // TODO: Calculate from account
+      penaltyAmount: 0, // TODO: Calculate from missed days
+    },
+  } : {
     customer: {
       id: 'CUST-001',
       name: 'Rajesh Kumar',
@@ -35,40 +66,11 @@ export default function CollectDeposit() {
 
   const styles = StyleSheet.create({
     container: {
-      flex: 1,
       backgroundColor: theme.colors.background.app,
     },
-    header: {
-      backgroundColor: theme.colors.background.cardElevated,
-      paddingHorizontal: spacing(theme, 'screenPadding'),
+    content: {
       paddingTop: spacing(theme, 'md'),
       paddingBottom: spacing(theme, 'md'),
-      borderBottomWidth: 1,
-      borderBottomColor: theme.colors.background.divider,
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: spacing(theme, 'md'),
-    },
-    backButton: {
-      width: 40,
-      height: 40,
-      justifyContent: 'center',
-      alignItems: 'center',
-    },
-    backIcon: {
-      fontSize: 24,
-      color: theme.colors.text.primary,
-    },
-    title: {
-      ...typography(theme, 'pageTitle'),
-      fontSize: 20,
-      color: theme.colors.text.primary,
-      fontWeight: '700',
-      flex: 1,
-    },
-    scrollContent: {
-      paddingTop: spacing(theme, 'md'),
-      paddingBottom: spacing(theme, 'xxl') + 100,
     },
     customerCard: {
       backgroundColor: theme.colors.background.card,
@@ -128,61 +130,56 @@ export default function CollectDeposit() {
       marginBottom: spacing(theme, 'xl'),
     },
     amountSection: {
-      paddingHorizontal: spacing(theme, 'screenPadding'),
       marginBottom: spacing(theme, 'xl'),
     },
     paymentModeSection: {
       paddingHorizontal: spacing(theme, 'screenPadding'),
       marginBottom: spacing(theme, 'md'),
     },
+    actionButtonsContainer: {
+      paddingHorizontal: spacing(theme, 'screenPadding'),
+      marginTop: spacing(theme, 'md'),
+    },
     actionButtons: {
-      position: 'absolute',
-      bottom: 0,
-      left: 0,
-      right: 0,
-      backgroundColor: theme.colors.background.card,
-      padding: spacing(theme, 'screenPadding'),
-      borderTopWidth: 1,
-      borderTopColor: theme.colors.background.divider,
+      flexDirection: 'row',
       gap: spacing(theme, 'sm'),
     },
-    primaryButton: {
-      backgroundColor: theme.colors.brand.primary,
-      borderRadius: theme.radius.button,
-      paddingVertical: spacing(theme, 'md'),
+    actionButton: {
+      flex: 1,
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
       gap: spacing(theme, 'xs'),
-    },
-    primaryButtonIcon: {
-      fontSize: 20,
-      color: '#FFFFFF',
-    },
-    primaryButtonText: {
-      ...typography(theme, 'sectionTitle'),
-      color: '#FFFFFF',
-      fontWeight: '600',
-    },
-    secondaryButton: {
-      backgroundColor: theme.colors.background.cardElevated,
-      borderRadius: theme.radius.button,
+      paddingVertical: spacing(theme, 'sm'),
+      borderRadius: radius(theme, 'button'),
       borderWidth: 1,
-      borderColor: theme.colors.background.divider,
-      paddingVertical: spacing(theme, 'md'),
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: spacing(theme, 'xs'),
     },
-    secondaryButtonIcon: {
+    collectButton: {
+      backgroundColor: theme.colors.status.success,
+      borderColor: theme.colors.status.success,
+    },
+    cancelButton: {
+      backgroundColor: theme.colors.background.cardElevated,
+      borderColor: theme.colors.status.error,
+    },
+    buttonIcon: {
       fontSize: 20,
-      color: theme.colors.text.primary,
     },
-    secondaryButtonText: {
+    collectButtonIcon: {
+      color: '#FFFFFF',
+    },
+    cancelButtonIcon: {
+      color: theme.colors.status.error,
+    },
+    buttonText: {
       ...typography(theme, 'sectionTitle'),
-      color: theme.colors.text.primary,
       fontWeight: '600',
+    },
+    collectButtonText: {
+      color: '#FFFFFF',
+    },
+    cancelButtonText: {
+      color: theme.colors.status.error,
     },
   });
 
@@ -190,22 +187,69 @@ export default function CollectDeposit() {
     router.back();
   };
 
-  const handleGenerateReceipt = () => {
-    console.log('Generate receipt pressed', {
-      amount,
-      paymentMode,
-      customer: depositData.customer.id,
-    });
-    // TODO: Generate receipt and navigate to receipt screen
+  const handleCollect = async () => {
+    if (amount <= 0) {
+      Alert.alert('Invalid Amount', 'Please enter an amount greater than 0');
+      return;
+    }
+
+    if (!customer || !account) {
+      Alert.alert('Error', 'Customer or account data missing');
+      return;
+    }
+
+    try {
+      // Create collection record
+      dispatch(
+        createCollection({
+          branchId: session.branchId || 'demo-branch',
+          customerId: customer.id,
+          accountId: account.id,
+          primaryAgentId: customer.primaryAgentId,
+          collectedByAgentId: session.agentId || 'demo-agent',
+          delegationId: delegationId,
+          amount: amount,
+          penaltyAmount: depositData.depositInfo.penaltyAmount,
+          mode: paymentMode === 'cash' ? 'CASH' : 'UPI',
+          collectedAt: new Date().toISOString(),
+          timezone: timezone,
+          deviceFingerprint: session.deviceFingerprint || 'demo-device',
+        })
+      );
+
+      // Persist to storage
+      await dispatch(persistCollections());
+
+      Alert.alert('Success', `₹${amount} collected successfully!`, [
+        {
+          text: 'OK',
+          onPress: () => {
+            // Clear state and close
+            setAmount(0);
+            setPaymentMode('cash');
+            if (onClose) {
+              onClose();
+            }
+          },
+        },
+      ]);
+    } catch (error) {
+      console.error('Collection error:', error);
+      Alert.alert('Error', 'Failed to process collection');
+    }
   };
 
-  const handleSaveOffline = () => {
-    console.log('Save offline pressed', {
-      amount,
-      paymentMode,
-      customer: depositData.customer.id,
-    });
-    // TODO: Save transaction offline
+  const handleCancel = () => {
+    console.log('Cancel pressed');
+    // Clear state
+    setAmount(0);
+    setPaymentMode('cash');
+    // Close bottom sheet
+    if (onClose) {
+      onClose();
+    } else {
+      router.back();
+    }
   };
 
   // Get initials from name
@@ -218,15 +262,8 @@ export default function CollectDeposit() {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      {/* <View style={styles.header}>
-        <Pressable onPress={handleBack} style={styles.backButton}>
-          <Text style={styles.backIcon}>←</Text>
-        </Pressable>
-        <Text style={styles.title}>Collect Deposit</Text>
-      </View> */}
-
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+    <View style={styles.container}>
+      <View style={styles.content}>
         <View style={styles.customerCard}>
           <View style={styles.avatarContainer}>
             {depositData.customer.avatarUrl ? (
@@ -265,26 +302,6 @@ export default function CollectDeposit() {
             <Text style={styles.accountNumber}>A/C: {depositData.customer.accountNumber}</Text>
           </View>
         </View>
-
-        <View style={styles.infoCardsRow}>
-          <InfoCard
-            variant="due"
-            label="DUE"
-            value={`₹${depositData.depositInfo.dueAmount}`}
-          />
-          <InfoCard
-            variant="missed"
-            label="MISSED"
-            value={`${depositData.depositInfo.missedDays} Days`}
-            showIndicator
-          />
-          <InfoCard
-            variant="penalty"
-            label="PENALTY"
-            value={`+₹${depositData.depositInfo.penaltyAmount}`}
-          />
-        </View>
-
         <View style={styles.amountSection}>
           <AmountSelector
             amount={amount}
@@ -296,26 +313,36 @@ export default function CollectDeposit() {
         <View style={styles.paymentModeSection}>
           <PaymentModeSelector selectedMode={paymentMode} onModeChange={setPaymentMode} />
         </View>
-      </ScrollView>
 
-      <View style={styles.actionButtons}>
-        <Pressable
-          onPress={handleGenerateReceipt}
-          style={({ pressed }) => [styles.primaryButton, { opacity: pressed ? 0.8 : 1 }]}
-        >
-          <Text style={styles.primaryButtonIcon}>🧾</Text>
-          <Text style={styles.primaryButtonText}>Generate Receipt</Text>
-        </Pressable>
+        <View style={styles.actionButtonsContainer}>
+          <View style={styles.actionButtons}>
+            <Pressable
+              onPress={handleCollect}
+              style={({ pressed }) => [
+                styles.actionButton,
+                styles.collectButton,
+                { opacity: pressed ? 0.8 : 1 },
+              ]}
+            >
+              <Text style={[styles.buttonIcon, styles.collectButtonIcon]}>✓</Text>
+              <Text style={[styles.buttonText, styles.collectButtonText]}>Collect</Text>
+            </Pressable>
 
-        <Pressable
-          onPress={handleSaveOffline}
-          style={({ pressed }) => [styles.secondaryButton, { opacity: pressed ? 0.7 : 1 }]}
-        >
-          <Text style={styles.secondaryButtonIcon}>📴</Text>
-          <Text style={styles.secondaryButtonText}>Save Offline</Text>
-        </Pressable>
+            <Pressable
+              onPress={handleCancel}
+              style={({ pressed }) => [
+                styles.actionButton,
+                styles.cancelButton,
+                { opacity: pressed ? 0.8 : 1 },
+              ]}
+            >
+              <Text style={[styles.buttonIcon, styles.cancelButtonIcon]}>✕</Text>
+              <Text style={[styles.buttonText, styles.cancelButtonText]}>Cancel</Text>
+            </Pressable>
+          </View>
+        </View>
       </View>
-    </SafeAreaView>
+    </View>
   );
 }
 

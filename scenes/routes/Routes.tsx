@@ -1,52 +1,94 @@
 import { View, Text, StyleSheet, ScrollView, TextInput } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useRouter } from 'expo-router';
+import { useSelector } from 'react-redux';
+import type { State } from '@/utils/store';
 import { useTheme, typography, spacing, radius } from '@/theme';
 import RouteCard from '@/components/elements/RouteCard';
 import FloatingActionButton from '@/components/elements/FloatingActionButton';
-import type { Route, RoutesHeader } from '@/types/RouteData';
+import { selectAllRoutes, selectSession } from '@/slices/settings.slice';
+import { selectAllCustomers, selectCustomersByAgent } from '@/slices/customers.slice';
+import { selectTodayCollectionsByAgent } from '@/slices/collections.slice';
+import { selectDelegationsBySecondaryAgent } from '@/slices/delegations.slice';
+import type { Route } from '@/types/RouteData';
 
 export default function Routes() {
   const router = useRouter();
   const { theme } = useTheme();
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Mock data - replace with actual data from Redux/API
-  const headerData: RoutesHeader = {
-    date: 'Oct 24, 2023',
-    isOnline: true,
-  };
+  // Get session and settings
+  const session = useSelector(selectSession);
+  const timezone = useSelector((state: State) => state.settings.branchSettings.timezone);
+  const agentId = session.agentId || 'demo-agent';
 
-  const routes: Route[] = [
-    {
-      id: '1',
-      routeId: 'R-1024',
-      name: 'Market Area - Zone A',
-      status: 'in_progress',
-      progress: 68,
-      totalCustomers: 45,
-      pendingCustomers: 12,
-    },
-    {
-      id: '2',
-      routeId: 'R-2055',
-      name: 'Industrial Estate',
-      status: 'completed',
-      progress: 100,
-      totalCustomers: 30,
-      pendingCustomers: 0,
-    },
-    {
-      id: '3',
-      routeId: 'R-3100',
-      name: 'North Extension',
-      status: 'not_started',
-      progress: 0,
-      totalCustomers: 52,
-      pendingCustomers: 52,
-    },
-  ];
+  // Get data from Redux
+  const allRoutes = useSelector(selectAllRoutes);
+  const allCustomers = useSelector(selectAllCustomers);
+  const todayCollections = useSelector((state: State) =>
+    selectTodayCollectionsByAgent(state, agentId, timezone)
+  );
+
+  // Get customers assigned to logged-in agent (primary + delegated)
+  const primaryCustomers = useSelector((state: State) => selectCustomersByAgent(state, agentId));
+  const myDelegations = useSelector((state: State) => 
+    selectDelegationsBySecondaryAgent(state, agentId)
+  );
+  const delegatedCustomerIds = useMemo(() => {
+    return myDelegations.map(d => d.customerId);
+  }, [myDelegations]);
+  
+  const myCustomerIds = useMemo(() => {
+    const primary = primaryCustomers.map(c => c.id);
+    return new Set([...primary, ...delegatedCustomerIds]);
+  }, [primaryCustomers, delegatedCustomerIds]);
+
+  // Calculate route statistics
+  const routes: Route[] = useMemo(() => {
+    return allRoutes
+      .map(route => {
+        // Get customers in this route that are assigned to logged-in agent
+        const routeCustomers = allCustomers.filter(
+          c => c.routeId === route.id && myCustomerIds.has(c.id)
+        );
+        const totalCustomers = routeCustomers.length;
+
+      // Get collected customer IDs today
+      const collectedCustomerIds = new Set(
+        todayCollections
+          .filter(c => c.status !== 'REVERSED')
+          .map(c => c.customerId)
+      );
+
+      // Count pending customers (not collected today)
+      const pendingCustomers = routeCustomers.filter(
+        c => !collectedCustomerIds.has(c.id)
+      ).length;
+
+      // Calculate progress
+      const collectedCount = totalCustomers - pendingCustomers;
+      const progress = totalCustomers > 0 ? Math.round((collectedCount / totalCustomers) * 100) : 0;
+
+      // Determine status
+      let status: 'not_started' | 'in_progress' | 'completed' = 'not_started';
+      if (progress === 100) {
+        status = 'completed';
+      } else if (progress > 0) {
+        status = 'in_progress';
+      }
+
+      return {
+        id: route.id,
+        routeId: route.routeCode,
+        name: route.name,
+        status,
+        progress,
+        totalCustomers,
+        pendingCustomers,
+      };
+    })
+    .filter(route => route.totalCustomers > 0); // Only show routes with customers assigned to this agent
+  }, [allRoutes, allCustomers, todayCollections, myCustomerIds]);
 
   const filteredRoutes = routes.filter(
     (route) =>
@@ -60,52 +102,7 @@ export default function Routes() {
       backgroundColor: theme.colors.background.app,
     },
     scrollContent: {
-      paddingBottom: spacing(theme, 'xxl') + 80, // Extra space for FAB
-    },
-    header: {
-      paddingHorizontal: spacing(theme, 'screenPadding'),
-      paddingTop: spacing(theme, 'md'),
-      paddingBottom: spacing(theme, 'md'),
-      gap: spacing(theme, 'xxs'),
-    },
-    headerTop: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-    },
-    title: {
-      ...typography(theme, 'displayXL'),
-      fontSize: 28,
-      color: theme.colors.text.primary,
-      fontWeight: '700',
-    },
-    headerRight: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: spacing(theme, 'sm'),
-    },
-    onlineStatus: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: spacing(theme, 'xxs'),
-    },
-    onlineDot: {
-      width: 8,
-      height: 8,
-      borderRadius: 4,
-      backgroundColor: theme.colors.status.success,
-    },
-    onlineText: {
-      ...typography(theme, 'body'),
-      color: theme.colors.status.success,
-      fontWeight: '600',
-    },
-    syncIcon: {
-      fontSize: 20,
-    },
-    date: {
-      ...typography(theme, 'body'),
-      color: theme.colors.text.muted,
+      paddingVertical: spacing(theme, 'xl'),
     },
     searchContainer: {
       paddingHorizontal: spacing(theme, 'screenPadding'),
@@ -153,8 +150,7 @@ export default function Routes() {
   });
 
   const handleRoutePress = (routeId: string) => {
-    console.log('Route pressed:', routeId);
-    // TODO: Navigate to route details
+    router.push(`/(app)/(route)/route-customers/${routeId}`);
   };
 
   const handleAddRoute = () => {
@@ -163,35 +159,8 @@ export default function Routes() {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <View style={styles.container}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-        <View style={styles.header}>
-          <View style={styles.headerTop}>
-            <Text style={styles.title}>My Routes</Text>
-            <View style={styles.headerRight}>
-              <View style={styles.onlineStatus}>
-                <View style={styles.onlineDot} />
-                <Text style={styles.onlineText}>ONLINE</Text>
-              </View>
-              <Text style={styles.syncIcon}>🔄</Text>
-            </View>
-          </View>
-          <Text style={styles.date}>{headerData.date}</Text>
-        </View>
-
-        <View style={styles.searchContainer}>
-          <View style={styles.searchInputWrapper}>
-            <Text style={styles.searchIcon}>🔍</Text>
-            <TextInput
-              style={styles.searchInput}
-              placeholder="Search Route ID or Name"
-              placeholderTextColor={theme.colors.text.muted}
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-            />
-          </View>
-        </View>
-
         <View style={styles.routesList}>
           {filteredRoutes.length > 0 ? (
             filteredRoutes.map((route) => (
@@ -207,9 +176,7 @@ export default function Routes() {
           )}
         </View>
       </ScrollView>
-
-      <FloatingActionButton onPress={handleAddRoute} />
-    </SafeAreaView>
+    </View>
   );
 }
 

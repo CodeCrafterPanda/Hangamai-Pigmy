@@ -28,6 +28,7 @@ export function radius(theme: Theme, key: RadiusKey): number {
 export function typography(theme: Theme, variant: TypographyVariant): TextStyle {
   const scale = theme.typography.scale[variant];
   return {
+    fontFamily: theme.typography.fontFamily.primary,
     fontSize: scale.fontSize,
     lineHeight: scale.lineHeight,
     fontWeight: scale.fontWeight,

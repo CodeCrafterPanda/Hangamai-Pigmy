@@ -1,76 +1,147 @@
-import { Fragment, useState, useEffect } from 'react';
+import { useEffect } from 'react';
 import * as SplashScreen from 'expo-splash-screen';
-import BottomSheetContents from '@/components/layouts/BottomSheetContents';
-import BottomSheet from '@/components/elements/BottomSheet';
-import { useDataPersist, DataPersistKeys } from '@/hooks';
-import { loadImages, loadFonts, useTheme } from '@/theme';
-import { Slot } from 'expo-router';
+import { loadImages, loadFonts } from '@/theme';
+import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useAppSlice } from '@/slices';
-import { getUserAsync } from '@/services';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { initializeStorage } from '@/utils/storage';
+import { seedDummyData } from '@/utils/seedData';
+import { useDispatch, useSelector, useStore } from 'react-redux';
+import type { State, Dispatch } from '@/utils/store';
+import { setLoggedIn } from '@/slices/app.slice';
+import {
+  hydrateSettings,
+  hydrateCustomers,
+  hydrateAccounts,
+  hydrateDelegations,
+  hydrateCollections,
+  hydrateLedger,
+  hydrateSettlements,
+  hydrateSyncQueue,
+  hydrateAuditLogs,
+} from '@/slices';
+import { selectSession } from '@/slices/settings.slice';
 import Provider from '@/providers';
-import { User } from '@/types';
+import { useTheme } from '@/theme';
 
-// keep the splash screen visible while complete fetching resources
+// Keep the splash screen visible while loading resources
 SplashScreen.preventAutoHideAsync();
 
 function Router() {
   const { isDark } = useTheme();
-  const { dispatch, setUser, setLoggedIn } = useAppSlice();
-  const { setPersistData, getPersistData } = useDataPersist();
-  const [isOpen, setOpen] = useState(false);
+  const dispatch = useDispatch<Dispatch>();
+  const store = useStore<State>();
+  const session = useSelector(selectSession);
 
   /**
-   * preload assets and user info
+   * Initialize app: Load assets and hydrate data stores
    */
   useEffect(() => {
-    (async () => {
+    let timeoutId: NodeJS.Timeout;
+
+    async function initializeApp() {
       try {
-        // preload assets
+        console.log('[App] Starting initialization...');
+
+        // Set timeout to ensure we don't hang forever
+        timeoutId = setTimeout(() => {
+          console.warn('[App] Initialization timeout - forcing to auth screen');
+          dispatch(setLoggedIn(false));
+          SplashScreen.hideAsync();
+        }, 10000); // 10 second timeout
+
+        // Load assets
+        console.log('[App] Loading assets...');
         await Promise.all([loadImages(), loadFonts()]);
+        console.log('[App] Assets loaded');
 
-        // fetch & store user data to store (fake promise function to simulate async function)
-        const user = await getUserAsync();
-        dispatch(setUser(user));
-        dispatch(setLoggedIn(!!user));
-        if (user) setPersistData<User>(DataPersistKeys.USER, user);
+        // Initialize storage schema
+        console.log('[App] Initializing storage...');
+        await initializeStorage();
+        console.log('[App] Storage initialized');
 
-        // hide splash screen
-        SplashScreen.hideAsync();
-        setOpen(true);
-      } catch {
-        // if preload failed, try to get user data from persistent storage
-        getPersistData<User>(DataPersistKeys.USER)
-          .then(user => {
-            if (user) dispatch(setUser(user));
-            dispatch(setLoggedIn(!!user));
-          })
-          .finally(() => {
-            // hide splash screen
-            SplashScreen.hideAsync();
+        // Hydrate all slices from AsyncStorage
+        console.log('[App] Hydrating slices...');
+        const hydrateResults = await Promise.allSettled([
+          dispatch(hydrateSettings()),
+          dispatch(hydrateCustomers()),
+          dispatch(hydrateAccounts()),
+          dispatch(hydrateDelegations()),
+          dispatch(hydrateCollections()),
+          dispatch(hydrateLedger()),
+          dispatch(hydrateSettlements()),
+          dispatch(hydrateSyncQueue()),
+          dispatch(hydrateAuditLogs()),
+        ]);
 
-            // show bottom sheet
-            setOpen(true);
-          });
+        // Log any failed hydrations
+        hydrateResults.forEach((result, index) => {
+          if (result.status === 'rejected') {
+            console.error(`[App] Slice ${index} hydration failed:`, result.reason);
+          }
+        });
+        console.log('[App] Slices hydrated');
+
+        // Clear timeout
+        clearTimeout(timeoutId);
+
+        // Seed dummy data for development
+        console.log('[App] Seeding dummy data...');
+        await seedDummyData(dispatch, store.getState);
+        console.log('[App] Dummy data seeded');
+
+        // TODO: Auth temporarily disabled - always set logged in to true
+        // When re-enabling auth, uncomment the session check below:
+        /*
+        // Check session and set logged in state
+        console.log('[App] Checking session:', session);
+        if (session?.agentId && session?.branchId) {
+          console.log('[App] User is logged in');
+          dispatch(setLoggedIn(true));
+        } else {
+          console.log('[App] User is not logged in');
+          dispatch(setLoggedIn(false));
+        }
+        */
+
+        // For now: Skip auth and set as logged in
+        console.log('[App] Auth disabled - setting logged in to true');
+        dispatch(setLoggedIn(true));
+
+        // Hide splash screen
+        console.log('[App] Hiding splash screen');
+        await SplashScreen.hideAsync();
+        console.log('[App] Initialization complete');
+      } catch (error) {
+        console.error('[App] Initialization error:', error);
+        clearTimeout(timeoutId);
+        // Always set checked to true even on error
+        dispatch(setLoggedIn(false));
+        await SplashScreen.hideAsync();
       }
-    })();
+    }
+
+    initializeApp();
+
+    return () => {
+      if (timeoutId) clearTimeout(timeoutId);
+    };
   }, []);
 
   return (
-    <Fragment>
-      <Slot />
-      <StatusBar style={isDark ? 'light' : 'dark'} />
-      <BottomSheet isOpen={isOpen} initialOpen>
-        <BottomSheetContents onClose={() => setOpen(false)} />
-      </BottomSheet>
-    </Fragment>
+    <>
+      <StatusBar style={isDark ? 'light' : 'dark'} translucent={false} />
+      <Stack screenOptions={{ headerShown: false }} />
+    </>
   );
 }
 
 export default function RootLayout() {
   return (
-    <Provider>
-      <Router />
-    </Provider>
+    <SafeAreaProvider>
+      <Provider>
+        <Router />
+      </Provider>
+    </SafeAreaProvider>
   );
 }

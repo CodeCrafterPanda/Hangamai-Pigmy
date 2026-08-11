@@ -1,15 +1,62 @@
 import { View, Text, StyleSheet, Pressable, ScrollView, Share } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import { useSelector } from 'react-redux';
+import type { State } from '@/utils/store';
 import { useTheme, typography, spacing, radius } from '@/theme';
 import type { ReceiptData, ShareMethod } from '@/types/ReceiptData';
 
-export default function Receipt() {
+interface ReceiptProps {
+  collectionId?: string;
+  onClose?: () => void;
+}
+
+export default function Receipt({ collectionId, onClose }: ReceiptProps) {
   const router = useRouter();
   const { theme } = useTheme();
 
-  // Mock data - replace with actual data from Redux/API/route params
-  const receiptData: ReceiptData = {
+  // Get collection data from Redux
+  const collection = useSelector((state: State) =>
+    collectionId ? state.collections.collections.byId[collectionId] : null
+  );
+
+  const customer = useSelector((state: State) =>
+    collection ? state.customers.customers.byId[collection.customerId] : null
+  );
+
+  const account = useSelector((state: State) =>
+    collection ? state.accounts.accounts.byId[collection.accountId] : null
+  );
+
+  // Get initials helper
+  const getInitials = (name: string) => {
+    const parts = name.split(' ');
+    if (parts.length >= 2) {
+      return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
+    }
+    return name.substring(0, 2).toUpperCase();
+  };
+
+  // Use real data if collection is provided, otherwise mock data
+  const receiptData: ReceiptData = collection && customer && account ? {
+    receiptNumber: collection.receiptNo,
+    totalAmount: collection.amount + collection.penaltyAmount,
+    customerName: customer.fullName,
+    accountNumber: account.accountNumber.slice(-4),
+    accountNumberMasked: `•••• •••• ${account.accountNumber.slice(-4)}`,
+    date: new Date(collection.collectedAt).toLocaleDateString('en-IN', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+    }),
+    time: new Date(collection.collectedAt).toLocaleTimeString('en-IN', {
+      hour: '2-digit',
+      minute: '2-digit',
+    }),
+    paymentMode: collection.mode === 'CASH' ? 'Cash Deposit' : 'UPI Payment',
+    agentId: collection.collectedByAgentId,
+    isSavedLocally: collection.status === 'CREATED',
+    initials: getInitials(customer.fullName),
+  } : {
     receiptNumber: 'RCPT-2023-8892',
     totalAmount: 2000.0,
     customerName: 'Rajesh Kumar',
@@ -25,97 +72,19 @@ export default function Receipt() {
 
   const styles = StyleSheet.create({
     container: {
-      flex: 1,
       backgroundColor: theme.colors.background.app,
     },
-    header: {
-      backgroundColor: theme.colors.background.cardElevated,
-      paddingHorizontal: spacing(theme, 'screenPadding'),
-      paddingTop: spacing(theme, 'md'),
-      paddingBottom: spacing(theme, 'md'),
-      borderBottomWidth: 1,
-      borderBottomColor: theme.colors.background.divider,
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
+    content: {
+      // paddingTop: spacing(theme, 'xl'),
+      padding: spacing(theme, 'screenPadding'),
     },
-    closeButton: {
-      width: 40,
-      height: 40,
-      justifyContent: 'center',
-      alignItems: 'center',
-    },
-    closeIcon: {
-      fontSize: 24,
-      color: theme.colors.text.primary,
-    },
-    title: {
-      ...typography(theme, 'pageTitle'),
-      fontSize: 20,
-      color: theme.colors.text.primary,
-      fontWeight: '700',
-      flex: 1,
-      textAlign: 'center',
-    },
-    printButton: {
-      width: 40,
-      height: 40,
-      justifyContent: 'center',
-      alignItems: 'center',
-    },
-    printText: {
-      ...typography(theme, 'body'),
-      color: theme.colors.brand.primary,
-      fontWeight: '600',
-    },
-    scrollContent: {
-      paddingTop: spacing(theme, 'xl'),
-      paddingBottom: spacing(theme, 'xxl'),
-    },
-    successSection: {
-      alignItems: 'center',
-      gap: spacing(theme, 'lg'),
-      marginBottom: spacing(theme, 'xl'),
-    },
-    successIcon: {
-      width: 100,
-      height: 100,
-      borderRadius: 50,
-      backgroundColor: 'rgba(46, 212, 122, 0.15)',
-      justifyContent: 'center',
-      alignItems: 'center',
-      position: 'relative',
-    },
-    successIconInner: {
-      width: 70,
-      height: 70,
-      borderRadius: 35,
-      backgroundColor: theme.colors.status.success,
-      justifyContent: 'center',
-      alignItems: 'center',
-    },
-    checkIcon: {
-      fontSize: 36,
-      color: '#FFFFFF',
-    },
-    successTitle: {
-      ...typography(theme, 'displayXL'),
-      fontSize: 28,
-      color: theme.colors.text.primary,
-      fontWeight: '700',
-      textAlign: 'center',
-    },
-    successSubtitle: {
-      ...typography(theme, 'body'),
-      color: theme.colors.text.muted,
-      textAlign: 'center',
-    },
+
+
     receiptCard: {
       backgroundColor: theme.colors.background.card,
       borderRadius: radius(theme, 'card'),
       borderWidth: 1,
       borderColor: theme.colors.background.divider,
-      marginHorizontal: spacing(theme, 'screenPadding'),
       overflow: 'hidden',
       borderTopWidth: 3,
       borderTopColor: theme.colors.brand.primary,
@@ -324,7 +293,9 @@ export default function Receipt() {
   });
 
   const handleClose = () => {
-    router.back();
+    if (onClose) {
+      onClose();
+    }
   };
 
   const handlePrint = () => {
@@ -340,7 +311,7 @@ export default function Receipt() {
   const handleShare = (method: ShareMethod) => {
     console.log('Share via:', method);
     const message = `Receipt: ${receiptData.receiptNumber}\nAmount: ₹${receiptData.totalAmount.toLocaleString('en-IN')}\nCustomer: ${receiptData.customerName}`;
-    
+
     if (method === 'whatsapp' || method === 'sms') {
       Share.share({ message });
     } else if (method === 'pdf') {
@@ -349,33 +320,10 @@ export default function Receipt() {
     }
   };
 
-  const handleBackToHome = () => {
-    router.push('/(main)/(tabs)/home');
-  };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      <View style={styles.header}>
-        <Pressable onPress={handleClose} style={styles.closeButton}>
-          <Text style={styles.closeIcon}>✕</Text>
-        </Pressable>
-        <Text style={styles.title}>Receipt</Text>
-        <Pressable onPress={handlePrint} style={styles.printButton}>
-          <Text style={styles.printText}>Print</Text>
-        </Pressable>
-      </View>
-
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-        <View style={styles.successSection}>
-          <View style={styles.successIcon}>
-            <View style={styles.successIconInner}>
-              <Text style={styles.checkIcon}>✓</Text>
-            </View>
-          </View>
-          <Text style={styles.successTitle}>Transaction Successful</Text>
-          <Text style={styles.successSubtitle}>Funds added to pigmy account</Text>
-        </View>
-
+    <View style={styles.container}>
+      <View style={styles.content}>
         <View style={styles.receiptCard}>
           <View style={styles.cardContent}>
             <View style={styles.amountSection}>
@@ -435,50 +383,8 @@ export default function Receipt() {
             )}
           </View>
         </View>
-
-        <View style={styles.shareSection}>
-          <View style={styles.shareButtons}>
-            <Pressable
-              onPress={() => handleShare('whatsapp')}
-              style={({ pressed }) => [styles.shareButton, { opacity: pressed ? 0.7 : 1 }]}
-            >
-              <View style={[styles.shareIconContainer, styles.whatsappBg]}>
-                <Text style={styles.shareIcon}>💬</Text>
-              </View>
-              <Text style={styles.shareLabel}>WhatsApp</Text>
-            </Pressable>
-
-            <Pressable
-              onPress={() => handleShare('sms')}
-              style={({ pressed }) => [styles.shareButton, { opacity: pressed ? 0.7 : 1 }]}
-            >
-              <View style={[styles.shareIconContainer, styles.smsBg]}>
-                <Text style={styles.shareIcon}>💬</Text>
-              </View>
-              <Text style={styles.shareLabel}>SMS</Text>
-            </Pressable>
-
-            <Pressable
-              onPress={() => handleShare('pdf')}
-              style={({ pressed }) => [styles.shareButton, { opacity: pressed ? 0.7 : 1 }]}
-            >
-              <View style={[styles.shareIconContainer, styles.pdfBg]}>
-                <Text style={styles.shareIcon}>📄</Text>
-              </View>
-              <Text style={styles.shareLabel}>PDF</Text>
-            </Pressable>
-          </View>
-        </View>
-
-        <Pressable
-          onPress={handleBackToHome}
-          style={({ pressed }) => [styles.backButton, { opacity: pressed ? 0.8 : 1 }]}
-        >
-          <Text style={styles.backButtonText}>Back to Home</Text>
-          <Text style={styles.backButtonIcon}>→</Text>
-        </Pressable>
-      </ScrollView>
-    </SafeAreaView>
+      </View>
+    </View>
   );
 }
 

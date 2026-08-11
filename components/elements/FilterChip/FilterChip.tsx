@@ -65,7 +65,7 @@ export default function FilterChip({
       paddingHorizontal: spacing(theme, 'md'),
       paddingVertical: spacing(theme, 'sm'),
       backgroundColor: isActive ? config.activeBackground : config.inactiveBackground,
-      borderRadius: radius(theme, 'chip') + 8,
+      borderRadius: radius(theme, 'chip'),
       borderWidth: 1,
       borderColor: isActive ? config.activeBorderColor : config.inactiveBorderColor,
     },

@@ -15,27 +15,27 @@ export default function ProfileHeader({ profile }: ProfileHeaderProps) {
       alignItems: 'center',
       justifyContent: 'space-between',
       paddingHorizontal: spacing(theme, 'screenPadding'),
-      paddingTop: spacing(theme, 'md'),
-      paddingBottom: spacing(theme, 'md'),
+      paddingTop: spacing(theme, 'xs'),
+      paddingBottom: spacing(theme, 'xs'),
     },
     leftSection: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: spacing(theme, 'sm'),
+      gap: spacing(theme, 'xs'),
     },
     avatarContainer: {
       position: 'relative',
     },
     avatar: {
-      width: 56,
-      height: 56,
-      borderRadius: 28,
+      width: 48,
+      height: 48,
+      borderRadius: 24,
       backgroundColor: theme.colors.background.cardElevated,
       justifyContent: 'center',
       alignItems: 'center',
     },
     avatarText: {
-      ...typography(theme, 'pageTitle'),
+      ...typography(theme, 'sectionTitle'),
       color: theme.colors.text.primary,
     },
     onlineIndicator: {
@@ -53,18 +53,18 @@ export default function ProfileHeader({ profile }: ProfileHeaderProps) {
       gap: spacing(theme, 'xxs'),
     },
     userName: {
-      ...typography(theme, 'pageTitle'),
+      ...typography(theme, 'sectionTitle'),
       color: theme.colors.text.primary,
     },
     branch: {
-      ...typography(theme, 'body'),
+      ...typography(theme, 'caption'),
       color: theme.colors.text.secondary,
     },
     onlineStatus: {
       flexDirection: 'row',
       alignItems: 'center',
       gap: spacing(theme, 'xs'),
-      paddingHorizontal: spacing(theme, 'sm'),
+      paddingHorizontal: spacing(theme, 'xs'),
       paddingVertical: spacing(theme, 'xxs'),
       backgroundColor: theme.colors.surfaceTint.successSoft,
       borderRadius: radius(theme, 'chip'),
@@ -84,25 +84,10 @@ export default function ProfileHeader({ profile }: ProfileHeaderProps) {
     },
   });
 
-  // Get initials from name
-  const getInitials = (name: string) => {
-    const parts = name.split(' ');
-    if (parts.length >= 2) {
-      return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
-    }
-    return name.substring(0, 2).toUpperCase();
-  };
 
   return (
     <View style={styles.container}>
       <View style={styles.leftSection}>
-        <View style={styles.avatarContainer}>
-          <View style={styles.avatar}>
-            <Text style={styles.avatarText}>{getInitials(profile.name)}</Text>
-          </View>
-          {profile.isOnline && <View style={styles.onlineIndicator} />}
-        </View>
-
         <View style={styles.userInfo}>
           <Text style={styles.userName}>{profile.name}</Text>
           <Text style={styles.branch}>{profile.branch}</Text>

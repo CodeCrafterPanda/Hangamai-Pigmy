@@ -1,5 +1,6 @@
 export * from './env';
 export * from './user';
+export * from './entities';
 export * from './HomeData';
 export * from './RouteData';
 export * from './CollectionData';

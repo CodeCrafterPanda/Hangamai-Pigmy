@@ -34,7 +34,7 @@ export default function PaymentModeSelector({
       alignItems: 'center',
       justifyContent: 'center',
       gap: spacing(theme, 'xs'),
-      paddingVertical: spacing(theme, 'md'),
+      paddingVertical: spacing(theme, 'sm'),
       borderRadius: radius(theme, 'button'),
       borderWidth: 1,
     },

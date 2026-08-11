@@ -71,7 +71,9 @@ export default function StatCard({ type, value, onPress }: StatCardProps) {
 
   const formattedValue =
     typeof value === 'number' && type === 'inHand'
-      ? `₹ ${(value / 1000).toFixed(0)}k`
+      ? value >= 1000
+        ? `₹ ${(value / 1000).toFixed(1)}k`
+        : `₹ ${value}`
       : value.toString();
 
   const content = (

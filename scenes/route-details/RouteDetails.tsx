@@ -1,89 +1,146 @@
 import { View, Text, StyleSheet, ScrollView, TextInput, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useRouter } from 'expo-router';
+import { useSelector } from 'react-redux';
+import type { State } from '@/utils/store';
 import { useTheme, typography, spacing, radius } from '@/theme';
 import FilterChip from '@/components/elements/FilterChip';
 import CustomerCollectionCard from '@/components/elements/CustomerCollectionCard';
+import RouteDetailsHeader from '@/components/elements/RouteDetailsHeader';
+import BottomSheet from '@/components/elements/BottomSheet';
+import CollectDeposit from '@/scenes/collect-deposit';
+import Receipt from '@/scenes/receipt';
+import FloatingActionButton from '@/components/elements/FloatingActionButton';
+import {
+  selectTodayCollectionsByAgent,
+  selectCollectionsNeedingSync,
+} from '@/slices/collections.slice';
+import { selectCustomersByAgent, selectAllCustomers } from '@/slices/customers.slice';
+import { selectDelegationsBySecondaryAgent } from '@/slices/delegations.slice';
+import { selectAllAccounts } from '@/slices/accounts.slice';
+import { selectSession } from '@/slices/settings.slice';
 import type {
   CustomerCollection,
-  RouteDetailsHeader,
-  CollectionFilters,
+  RouteDetailsHeader as RouteDetailsHeaderType,
   CollectionStatus,
 } from '@/types/CollectionData';
 
-export default function RouteDetails() {
+interface RouteDetailsProps {
+  routeId?: string;
+}
+
+export default function RouteDetails({ routeId }: RouteDetailsProps) {
   const router = useRouter();
   const { theme } = useTheme();
   const [searchQuery, setSearchQuery] = useState('');
-  const [activeFilter, setActiveFilter] = useState<CollectionStatus | 'all'>('all');
+  const [activeFilter, setActiveFilter] = useState<'pending' | 'collected' | 'all'>('all');
+  const [isBottomSheetOpen, setIsBottomSheetOpen] = useState(false);
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
+  const [isReceiptOpen, setIsReceiptOpen] = useState(false);
+  const [selectedCollectionId, setSelectedCollectionId] = useState<string | null>(null);
 
-  // Mock data - replace with actual data from Redux/API
-  const headerData: RouteDetailsHeader = {
+  // Get session and settings
+  const session = useSelector(selectSession);
+  const timezone = useSelector((state: State) => state.settings.branchSettings.timezone);
+  const agentId = session.agentId || 'demo-agent';
+
+  // Get all customers (both primary and delegated) for this route
+  const primaryCustomers = useSelector((state: State) => selectCustomersByAgent(state, agentId));
+
+  // Get delegations where logged-in agent is the secondary agent
+  const myDelegations = useSelector((state: State) =>
+    selectDelegationsBySecondaryAgent(state, agentId)
+  );
+
+  // Get delegated customers
+  const allCustomersData = useSelector(selectAllCustomers);
+  const delegatedCustomers = useMemo(() => {
+    const delegatedCustomerIds = myDelegations.map(d => d.customerId);
+    return allCustomersData.filter(c => delegatedCustomerIds.includes(c.id));
+  }, [myDelegations, allCustomersData]);
+
+  // Combine primary and delegated customers for this route
+  const allRouteCustomers = useMemo(() => {
+    return [...primaryCustomers, ...delegatedCustomers].filter(
+      c => !routeId || c.routeId === routeId
+    );
+  }, [primaryCustomers, delegatedCustomers, routeId]);
+
+  // Get all accounts
+  const allAccounts = useSelector(selectAllAccounts);
+
+  // Get today's collections
+  const todayCollections = useSelector((state: State) =>
+    selectTodayCollectionsByAgent(state, agentId, timezone)
+  );
+
+  // Use all route customers (no tab filtering)
+  const activeCustomers = allRouteCustomers;
+
+  // Mock header data - TODO: Get from route params
+  const headerData: RouteDetailsHeaderType = {
     routeName: 'Market Road Route',
     routeNumber: '04',
-    totalStops: 24,
+    totalStops: activeCustomers.length,
     isOnline: true,
   };
 
-  const filters: CollectionFilters = {
-    dueToday: 18,
-    overdue: 4,
-    collected: 2,
-  };
+  // Convert to CustomerCollection format with real data
+  const customers: CustomerCollection[] = useMemo(() => {
+    return activeCustomers.map(customer => {
+      // Find customer's active accounts
+      const customerAccounts = allAccounts.filter(
+        a => a.customerId === customer.id && a.status === 'ACTIVE'
+      );
+      const firstAccount = customerAccounts[0];
 
-  const customers: CustomerCollection[] = [
-    {
-      id: '1',
-      customerId: 'PG-9902',
-      customerName: 'Ramesh General Stores',
-      accountType: 'Pigmy',
-      accountNumber: 'PG-9902',
-      status: 'pending',
-      dailyDueAmount: 500,
-      initials: 'R',
-    },
-    {
-      id: '2',
-      customerId: 'PG-4421',
-      customerName: 'Suresh Textiles',
-      accountType: 'Pigmy',
-      accountNumber: 'PG-4421',
-      status: 'overdue',
-      totalOverdue: 1200,
-      initials: 'S',
-    },
-    {
-      id: '3',
-      customerId: 'PG-3205',
-      customerName: 'Anjali Flower Shop',
-      accountType: 'Pigmy',
-      accountNumber: 'PG-3205',
-      status: 'pending',
-      dailyDueAmount: 200,
-      initials: 'A',
-    },
-    {
-      id: '4',
-      customerId: 'PG-1102',
-      customerName: 'City Bakery',
-      accountType: 'Pigmy',
-      accountNumber: 'PG-1102',
-      status: 'collected',
-      collectedAmount: 300,
-      initials: 'C',
-    },
-  ];
+      // Check if customer was collected today
+      const todayCollection = firstAccount
+        ? todayCollections.find(
+          c =>
+            c.customerId === customer.id &&
+            c.accountId === firstAccount.id &&
+            c.status !== 'REVERSED'
+        )
+        : null;
+
+      const getInitials = (name: string) => {
+        const parts = name.split(' ');
+        if (parts.length >= 2) {
+          return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
+        }
+        return name.substring(0, 2).toUpperCase();
+      };
+
+      return {
+        id: customer.id,
+        customerId: customer.customerCode,
+        customerName: customer.fullName,
+        accountType: 'Pigmy',
+        accountNumber: firstAccount?.accountNumber || 'N/A',
+        status: todayCollection ? 'collected' : 'pending',
+        dailyDueAmount: firstAccount?.installmentAmount || 0,
+        collectedAmount: todayCollection ? todayCollection.amount : undefined,
+        initials: getInitials(customer.fullName),
+      };
+    });
+  }, [activeCustomers, allAccounts, todayCollections]);
+
+  // Calculate filters based on current data
+  const filters = useMemo(() => {
+    const dueToday = customers.filter(c => c.status === 'pending').length;
+    const collected = customers.filter(c => c.status === 'collected').length;
+
+    return {
+      dueToday,
+      collected,
+    };
+  }, [customers]);
 
   const filteredCustomers = customers.filter((customer) => {
-    const matchesSearch =
-      customer.customerName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      customer.customerId.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      customer.accountNumber.toLowerCase().includes(searchQuery.toLowerCase());
-
     const matchesFilter = activeFilter === 'all' || customer.status === activeFilter;
-
-    return matchesSearch && matchesFilter;
+    return matchesFilter;
   });
 
   const styles = StyleSheet.create({
@@ -91,67 +148,12 @@ export default function RouteDetails() {
       flex: 1,
       backgroundColor: theme.colors.background.app,
     },
-    header: {
-      backgroundColor: theme.colors.background.cardElevated,
-      paddingHorizontal: spacing(theme, 'screenPadding'),
-      paddingTop: spacing(theme, 'md'),
-      paddingBottom: spacing(theme, 'md'),
-      borderBottomWidth: 1,
-      borderBottomColor: theme.colors.background.divider,
-    },
-    headerTop: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      marginBottom: spacing(theme, 'xs'),
-    },
-    headerLeft: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: spacing(theme, 'md'),
-      flex: 1,
-    },
-    backButton: {
-      width: 40,
-      height: 40,
-      justifyContent: 'center',
-      alignItems: 'center',
-    },
-    backIcon: {
-      fontSize: 24,
-      color: theme.colors.text.primary,
-    },
-    headerTitleSection: {
-      flex: 1,
-    },
-    routeName: {
-      ...typography(theme, 'pageTitle'),
-      fontSize: 20,
-      color: theme.colors.text.primary,
-      fontWeight: '700',
-    },
-    routeInfo: {
-      ...typography(theme, 'caption'),
-      color: theme.colors.text.muted,
-      fontWeight: '600',
-      letterSpacing: 0.5,
-      textTransform: 'uppercase',
-      marginTop: spacing(theme, 'xxs'),
-    },
-    syncButton: {
-      width: 40,
-      height: 40,
-      borderRadius: 20,
-      backgroundColor: theme.colors.surfaceTint.successSoft,
-      justifyContent: 'center',
-      alignItems: 'center',
-    },
-    syncIcon: {
-      fontSize: 20,
+    scrollContent: {
+      paddingVertical: spacing(theme, 'xl'),
     },
     searchContainer: {
       paddingHorizontal: spacing(theme, 'screenPadding'),
-      paddingVertical: spacing(theme, 'md'),
+      paddingBottom: spacing(theme, 'md'),
     },
     searchInputWrapper: {
       flexDirection: 'row',
@@ -189,9 +191,6 @@ export default function RouteDetails() {
       flexDirection: 'row',
       gap: spacing(theme, 'sm'),
     },
-    scrollContent: {
-      paddingBottom: spacing(theme, 'xxl'),
-    },
     customersList: {
       paddingHorizontal: spacing(theme, 'screenPadding'),
       gap: spacing(theme, 'md'),
@@ -212,13 +211,9 @@ export default function RouteDetails() {
     },
   });
 
-  const handleBack = () => {
-    router.back();
-  };
-
   const handleCollect = (customerId: string) => {
-    console.log('Collect pressed for customer:', customerId);
-    // TODO: Navigate to collection screen
+    setSelectedCustomerId(customerId);
+    setIsBottomSheetOpen(true);
   };
 
   const handleCollectAll = (customerId: string) => {
@@ -228,7 +223,29 @@ export default function RouteDetails() {
 
   const handleReceipt = (customerId: string) => {
     console.log('Receipt pressed for customer:', customerId);
-    // TODO: Show receipt modal/screen
+
+    // Find the collection for this customer today
+    const customer = activeCustomers.find(c => c.id === customerId);
+    if (!customer) return;
+
+    const customerAccounts = allAccounts.filter(
+      a => a.customerId === customerId && a.status === 'ACTIVE'
+    );
+    const firstAccount = customerAccounts[0];
+
+    if (firstAccount) {
+      const collection = todayCollections.find(
+        c =>
+          c.customerId === customerId &&
+          c.accountId === firstAccount.id &&
+          c.status !== 'REVERSED'
+      );
+
+      if (collection) {
+        setSelectedCollectionId(collection.id);
+        setIsReceiptOpen(true);
+      }
+    }
   };
 
   const handleVoiceSearch = () => {
@@ -236,46 +253,41 @@ export default function RouteDetails() {
     // TODO: Implement voice search
   };
 
+  const handleSync = () => {
+    console.log('Sync pressed');
+    // TODO: Implement sync functionality
+  };
+
+  const handleCloseBottomSheet = () => {
+    setIsBottomSheetOpen(false);
+    setSelectedCustomerId(null);
+  };
+
+  const handleAddCustomer = () => {
+    router.push('/(app)/(route)/add-customer');
+  };
+
+  const handleEdit = (customerId: string) => {
+    console.log('Edit customer:', customerId);
+    // TODO: Navigate to edit customer screen
+    router.push(`/(app)/(route)/edit-customer/${customerId}`);
+  };
+
+  const handleDelete = (customerId: string) => {
+    console.log('Delete customer:', customerId);
+    // TODO: Show confirmation and delete customer
+  };
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      <View style={styles.header}>
-        <View style={styles.headerTop}>
-          <View style={styles.headerLeft}>
-            <Pressable onPress={handleBack} style={styles.backButton}>
-              <Text style={styles.backIcon}>←</Text>
-            </Pressable>
-
-            <View style={styles.headerTitleSection}>
-              <Text style={styles.routeName}>{headerData.routeName}</Text>
-              <Text style={styles.routeInfo}>
-                ROUTE #{headerData.routeNumber} • {headerData.totalStops} STOPS
-              </Text>
-            </View>
-          </View>
-
-          <Pressable style={styles.syncButton}>
-            <Text style={styles.syncIcon}>☁️</Text>
-          </Pressable>
-        </View>
-      </View>
+      <RouteDetailsHeader
+        routeName={headerData.routeName}
+        routeNumber={headerData.routeNumber}
+        totalStops={headerData.totalStops}
+        onSyncPress={handleSync}
+      />
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-        <View style={styles.searchContainer}>
-          <View style={styles.searchInputWrapper}>
-            <Text style={styles.searchIcon}>🔍</Text>
-            <TextInput
-              style={styles.searchInput}
-              placeholder="Search name, ID or phone..."
-              placeholderTextColor={theme.colors.text.muted}
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-            />
-            <Pressable onPress={handleVoiceSearch} style={styles.voiceButton}>
-              <Text style={styles.voiceIcon}>🎤</Text>
-            </Pressable>
-          </View>
-        </View>
-
         <View style={styles.filtersContainer}>
           <ScrollView horizontal showsHorizontalScrollIndicator={false}>
             <View style={styles.filtersScroll}>
@@ -286,15 +298,6 @@ export default function RouteDetails() {
                 isActive={activeFilter === 'pending'}
                 onPress={() =>
                   setActiveFilter(activeFilter === 'pending' ? 'all' : 'pending')
-                }
-              />
-              <FilterChip
-                label="Overdue"
-                count={filters.overdue}
-                variant="overdue"
-                isActive={activeFilter === 'overdue'}
-                onPress={() =>
-                  setActiveFilter(activeFilter === 'overdue' ? 'all' : 'overdue')
                 }
               />
               <FilterChip
@@ -319,6 +322,8 @@ export default function RouteDetails() {
                 onCollect={handleCollect}
                 onCollectAll={handleCollectAll}
                 onReceipt={handleReceipt}
+                onEdit={handleEdit}
+                onDelete={handleDelete}
               />
             ))
           ) : (
@@ -331,6 +336,45 @@ export default function RouteDetails() {
           )}
         </View>
       </ScrollView>
+
+      <BottomSheet isOpen={isBottomSheetOpen} onClose={handleCloseBottomSheet}>
+        {selectedCustomerId && (() => {
+          const customer = activeCustomers.find(c => c.id === selectedCustomerId);
+          const customerAccounts = allAccounts.filter(
+            a => a.customerId === selectedCustomerId && a.status === 'ACTIVE'
+          );
+          const account = customerAccounts[0];
+
+          // Find delegation if this is a delegated customer
+          const delegation = myDelegations.find(d => d.customerId === selectedCustomerId);
+
+          return customer && account ? (
+            <CollectDeposit
+              onClose={handleCloseBottomSheet}
+              customer={customer}
+              account={account}
+              delegationId={delegation?.id}
+            />
+          ) : (
+            <View style={{ padding: 20 }}>
+              <Text style={{ color: theme.colors.text.primary }}>
+                Customer or account data not found
+              </Text>
+            </View>
+          );
+        })()}
+      </BottomSheet>
+
+      <BottomSheet isOpen={isReceiptOpen} onClose={() => setIsReceiptOpen(false)}>
+        {selectedCollectionId && (
+          <Receipt
+            collectionId={selectedCollectionId}
+            onClose={() => setIsReceiptOpen(false)}
+          />
+        )}
+      </BottomSheet>
+
+      <FloatingActionButton onPress={handleAddCustomer} />
     </SafeAreaView>
   );
 }

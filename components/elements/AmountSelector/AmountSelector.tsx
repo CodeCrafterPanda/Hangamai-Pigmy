@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, Pressable } from 'react-native';
+import { View, Text, StyleSheet, Pressable, FlatList } from 'react-native';
 import { useTheme, typography, spacing, radius } from '@/theme';
 
 interface AmountSelectorProps {
@@ -12,13 +12,13 @@ export default function AmountSelector({
   amount,
   onAmountChange,
   fullDueAmount,
-  quickAmounts = [100, 200, 500],
+  quickAmounts = [100, 200, 300, 400, 500, 1000, 2000, 5000, 10000],
 }: AmountSelectorProps) {
   const { theme } = useTheme();
 
   const styles = StyleSheet.create({
     container: {
-      gap: spacing(theme, 'lg'),
+      paddingHorizontal: spacing(theme, 'screenPadding'),
     },
     label: {
       ...typography(theme, 'caption'),
@@ -27,12 +27,14 @@ export default function AmountSelector({
       textTransform: 'uppercase',
       letterSpacing: 1.5,
       textAlign: 'center',
+      marginBottom: spacing(theme, 'md'),
     },
     amountDisplay: {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
       gap: spacing(theme, 'sm'),
+      marginBottom: spacing(theme, 'lg'),
     },
     currencySymbol: {
       ...typography(theme, 'displayXL'),
@@ -42,26 +44,28 @@ export default function AmountSelector({
     },
     amountValue: {
       ...typography(theme, 'displayXL'),
-      fontSize: 72,
+      fontSize: 48,
       color: theme.colors.text.primary,
       fontWeight: '700',
-      lineHeight: 80,
+      lineHeight: 60,
     },
-    quickButtons: {
-      flexDirection: 'row',
-      justifyContent: 'center',
-      gap: spacing(theme, 'sm'),
-      flexWrap: 'wrap',
+    quickButtonsContainer: {
+      gap: spacing(theme, 'md'),
+    },
+    flatListContainer: {
+      paddingLeft: spacing(theme, 'xs'),
+      paddingRight: 80, // Extra padding to show more buttons exist
     },
     quickButton: {
       paddingHorizontal: spacing(theme, 'lg'),
       paddingVertical: spacing(theme, 'sm'),
       backgroundColor: theme.colors.background.cardElevated,
-      borderRadius: radius(theme, 'button') + 8,
+      borderRadius: radius(theme, 'button'),
       borderWidth: 1,
       borderColor: theme.colors.background.divider,
       minWidth: 100,
       alignItems: 'center',
+      marginRight: spacing(theme, 'sm'),
     },
     quickButtonText: {
       ...typography(theme, 'body'),
@@ -69,19 +73,19 @@ export default function AmountSelector({
       fontWeight: '700',
       fontSize: 16,
     },
-    fullDueButton: {
-      paddingHorizontal: spacing(theme, 'xl'),
-      paddingVertical: spacing(theme, 'sm') + 2,
-      backgroundColor: theme.colors.background.cardElevated,
-      borderRadius: radius(theme, 'button') + 8,
-      borderWidth: 1,
-      borderColor: theme.colors.brand.primary,
-      minWidth: 140,
+    clearButtonContainer: {
+      paddingHorizontal: spacing(theme, 'screenPadding'),
+    },
+    clearButton: {
+      width: '100%',
+      paddingVertical: spacing(theme, 'md'),
+      backgroundColor: theme.colors.status.error,
+      borderRadius: radius(theme, 'button'),
       alignItems: 'center',
     },
-    fullDueButtonText: {
+    clearButtonText: {
       ...typography(theme, 'sectionTitle'),
-      color: theme.colors.brand.primary,
+      color: '#FFFFFF',
       fontWeight: '700',
     },
   });
@@ -90,8 +94,8 @@ export default function AmountSelector({
     onAmountChange(amount + quickAmount);
   };
 
-  const handleFullDue = () => {
-    onAmountChange(fullDueAmount);
+  const handleClear = () => {
+    onAmountChange(0);
   };
 
   return (
@@ -103,23 +107,31 @@ export default function AmountSelector({
         <Text style={styles.amountValue}>{amount}</Text>
       </View>
 
-      <View style={styles.quickButtons}>
-        {quickAmounts.map((quickAmount) => (
-          <Pressable
-            key={quickAmount}
-            onPress={() => handleQuickAmount(quickAmount)}
-            style={({ pressed }) => [styles.quickButton, { opacity: pressed ? 0.7 : 1 }]}
-          >
-            <Text style={styles.quickButtonText}>+ ₹{quickAmount}</Text>
-          </Pressable>
-        ))}
+      <View style={styles.quickButtonsContainer}>
+        <FlatList
+          data={quickAmounts}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          keyExtractor={(item) => item.toString()}
+          contentContainerStyle={styles.flatListContainer}
+          renderItem={({ item: quickAmount }) => (
+            <Pressable
+              onPress={() => handleQuickAmount(quickAmount)}
+              style={({ pressed }) => [styles.quickButton, { opacity: pressed ? 0.7 : 1 }]}
+            >
+              <Text style={styles.quickButtonText}>+ ₹{quickAmount}</Text>
+            </Pressable>
+          )}
+        />
 
-        <Pressable
-          onPress={handleFullDue}
-          style={({ pressed }) => [styles.fullDueButton, { opacity: pressed ? 0.7 : 1 }]}
-        >
-          <Text style={styles.fullDueButtonText}>Full Due</Text>
-        </Pressable>
+        <View style={styles.clearButtonContainer}>
+          <Pressable
+            onPress={handleClear}
+            style={({ pressed }) => [styles.clearButton, { opacity: pressed ? 0.8 : 1 }]}
+          >
+            <Text style={styles.clearButtonText}>Clear</Text>
+          </Pressable>
+        </View>
       </View>
     </View>
   );

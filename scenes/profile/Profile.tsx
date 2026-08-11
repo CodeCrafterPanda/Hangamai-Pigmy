@@ -1,12 +1,20 @@
-import { View, Text, StyleSheet, ScrollView, Pressable, Image, Alert } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { View, Text, StyleSheet, ScrollView, Pressable, Image } from 'react-native';
+import { useState } from 'react';
 import { useRouter } from 'expo-router';
 import { useTheme, typography, spacing, radius } from '@/theme';
+import { useSettingsSlice } from '@/slices';
+import { useDispatch } from 'react-redux';
+import { setLoggedIn } from '@/slices/app.slice';
+import type { Dispatch } from '@/utils/store';
 import type { AgentProfile } from '@/types/ProfileData';
+import AlertBottomSheet from '@/components/elements/AlertBottomSheet';
 
 export default function Profile() {
   const router = useRouter();
+  const dispatch = useDispatch<Dispatch>();
   const { theme } = useTheme();
+  const { clearSession, persistSettings } = useSettingsSlice();
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
   // Mock data - replace with actual data from Redux/API
   const agentProfile: AgentProfile = {
@@ -27,34 +35,6 @@ export default function Profile() {
     container: {
       flex: 1,
       backgroundColor: theme.colors.background.app,
-    },
-    header: {
-      backgroundColor: theme.colors.background.cardElevated,
-      paddingHorizontal: spacing(theme, 'screenPadding'),
-      paddingTop: spacing(theme, 'md'),
-      paddingBottom: spacing(theme, 'md'),
-      borderBottomWidth: 1,
-      borderBottomColor: theme.colors.background.divider,
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: spacing(theme, 'md'),
-    },
-    backButton: {
-      width: 40,
-      height: 40,
-      justifyContent: 'center',
-      alignItems: 'center',
-    },
-    backIcon: {
-      fontSize: 24,
-      color: theme.colors.text.primary,
-    },
-    title: {
-      ...typography(theme, 'pageTitle'),
-      fontSize: 20,
-      color: theme.colors.text.primary,
-      fontWeight: '700',
-      flex: 1,
     },
     scrollContent: {
       paddingTop: spacing(theme, 'md'),
@@ -253,25 +233,21 @@ export default function Profile() {
   };
 
   const handleLogout = () => {
-    Alert.alert(
-      'Log Out',
-      'Are you sure you want to log out?',
-      [
-        {
-          text: 'Cancel',
-          style: 'cancel',
-        },
-        {
-          text: 'Log Out',
-          style: 'destructive',
-          onPress: () => {
-            console.log('User logged out');
-            // TODO: Clear auth and navigate to login
-          },
-        },
-      ],
-      { cancelable: true }
-    );
+    setShowLogoutConfirm(true);
+  };
+
+  const confirmLogout = async () => {
+    console.log('[Profile] User logging out');
+
+    // Clear session (but keep MPIN for next login)
+    clearSession();
+    await persistSettings();
+
+    // Set logged out state
+    dispatch(setLoggedIn(false));
+
+    // Navigate to MPIN screen (not login, since MPIN is already set)
+    router.replace('/(auth)/mpin');
   };
 
   // Get initials from name
@@ -284,14 +260,7 @@ export default function Profile() {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      <View style={styles.header}>
-        <Pressable onPress={handleBack} style={styles.backButton}>
-          <Text style={styles.backIcon}>←</Text>
-        </Pressable>
-        <Text style={styles.title}>Profile</Text>
-      </View>
-
+    <View style={styles.container}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         <View style={styles.profileCard}>
           <View style={styles.avatarContainer}>
@@ -391,6 +360,17 @@ export default function Profile() {
           <Text style={styles.logoutText}>Log Out</Text>
         </Pressable>
       </ScrollView>
-    </SafeAreaView>
+
+      <AlertBottomSheet
+        isOpen={showLogoutConfirm}
+        onClose={() => setShowLogoutConfirm(false)}
+        title="Log Out"
+        message="Are you sure you want to log out? You can log back in using your MPIN."
+        buttons={[
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Log Out', style: 'destructive', onPress: confirmLogout },
+        ]}
+      />
+    </View>
   );
 }

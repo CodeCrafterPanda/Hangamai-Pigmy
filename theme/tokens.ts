@@ -56,8 +56,8 @@ export const darkTheme = {
 
   typography: {
     fontFamily: {
-      primary: 'Inter',
-      fallback: ['System UI', 'SF Pro', 'Roboto'],
+      primary: 'Roboto',
+      fallback: ['System UI', 'SF Pro', 'Inter'],
     },
 
     scale: {
@@ -109,8 +109,8 @@ export const darkTheme = {
     xl: 24,
     xxl: 32,
 
-    screenPadding: 16,
-    cardPadding: 16,
+    screenPadding: 12,
+    cardPadding: 12,
     listGap: 12,
   },
 
@@ -119,6 +119,7 @@ export const darkTheme = {
     card: 14,
     chip: 12,
     input: 10,
+    action: 8,
   },
 
   components: {
@@ -256,8 +257,8 @@ export const lightTheme = {
 
   typography: {
     fontFamily: {
-      primary: 'Inter',
-      fallback: ['System UI', 'SF Pro', 'Roboto'],
+      primary: 'Roboto',
+      fallback: ['System UI', 'SF Pro', 'Inter'],
     },
 
     scale: {
@@ -309,8 +310,8 @@ export const lightTheme = {
     xl: 24,
     xxl: 32,
 
-    screenPadding: 16,
-    cardPadding: 16,
+    screenPadding: 12,
+    cardPadding: 12,
     listGap: 12,
   },
 
@@ -319,6 +320,7 @@ export const lightTheme = {
     card: 14,
     chip: 12,
     input: 10,
+    action: 8,
   },
 
   components: {

@@ -1,59 +1,165 @@
 import { View, Text, StyleSheet, ScrollView, Pressable } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useState, useMemo } from 'react';
 import { useRouter } from 'expo-router';
-import { useTheme, typography, spacing } from '@/theme';
-import ProfileHeader from '@/components/elements/ProfileHeader';
+import { useSelector } from 'react-redux';
+import type { State } from '@/utils/store';
+import { useTheme, typography, spacing, radius } from '@/theme';
 import CollectedTodayCard from '@/components/elements/CollectedTodayCard';
 import StatCard from '@/components/elements/StatCard';
 import AttentionBanner from '@/components/elements/AttentionBanner';
-import CustomerCard from '@/components/elements/CustomerCard';
-import type { UserProfile, DailyStats, AttentionAlert, Customer } from '@/types/HomeData';
+import CustomerCollectionCard from '@/components/elements/CustomerCollectionCard';
+import BottomSheet from '@/components/elements/BottomSheet';
+import CollectDeposit from '@/scenes/collect-deposit';
+import Receipt from '@/scenes/receipt';
+import {
+  selectTotalCollectedToday,
+  selectTodayCollectionsByAgent,
+  selectCollectionsNeedingSync,
+} from '@/slices/collections.slice';
+import { selectCustomersByAgent, selectAllCustomers } from '@/slices/customers.slice';
+import { selectDelegationsBySecondaryAgent } from '@/slices/delegations.slice';
+import { selectAllAccounts } from '@/slices/accounts.slice';
+import { selectSession } from '@/slices/settings.slice';
+import type { DailyStats, AttentionAlert } from '@/types/HomeData';
+import type { CustomerCollection } from '@/types/CollectionData';
 
 export default function Home() {
   const router = useRouter();
   const { theme } = useTheme();
+  const [isBottomSheetOpen, setIsBottomSheetOpen] = useState(false);
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<'primary' | 'delegated'>('primary');
+  const [isReceiptOpen, setIsReceiptOpen] = useState(false);
+  const [selectedCollectionId, setSelectedCollectionId] = useState<string | null>(null);
 
-  // Mock data - replace with actual data from Redux/API
-  const userProfile: UserProfile = {
-    name: 'Rahul K.',
-    branch: 'Shivaji Nagar Branch',
-    isOnline: true,
-  };
+  // Get session and settings
+  const session = useSelector(selectSession);
+  const timezone = useSelector((state: State) => state.settings.branchSettings.timezone);
+  const agentId = session.agentId || 'demo-agent';
 
-  const dailyStats: DailyStats = {
-    collectedToday: 12500,
-    pendingCount: 14,
-    inHandAmount: 45000,
-  };
+  // Get customers
+  const primaryCustomers = useSelector((state: State) => selectCustomersByAgent(state, agentId));
 
+  // Get delegations where logged-in agent is the secondary agent
+  const myDelegations = useSelector((state: State) =>
+    selectDelegationsBySecondaryAgent(state, agentId)
+  );
+
+  // Get delegated customers
+  const allCustomersData = useSelector(selectAllCustomers);
+  const delegatedCustomers = useMemo(() => {
+    const delegatedCustomerIds = myDelegations.map(d => d.customerId);
+    return allCustomersData.filter(c => delegatedCustomerIds.includes(c.id));
+  }, [myDelegations, allCustomersData]);
+
+  // Get all accounts
+  const allAccounts = useSelector(selectAllAccounts);
+
+  // Get today's collections
+  const collectedToday = useSelector((state: State) =>
+    selectTotalCollectedToday(state, agentId, timezone)
+  );
+
+  const todayCollections = useSelector((state: State) =>
+    selectTodayCollectionsByAgent(state, agentId, timezone)
+  );
+
+  const needsSyncCollections = useSelector(selectCollectionsNeedingSync);
+
+  // Filter data based on active tab
+  const activeCustomers = activeTab === 'primary' ? primaryCustomers : delegatedCustomers;
+
+  // Convert to CustomerCollection format with account data
+  const upNextCustomers: CustomerCollection[] = useMemo(() => {
+    return activeCustomers.slice(0, 5).map(customer => {
+      // Find customer's active accounts
+      const customerAccounts = allAccounts.filter(
+        a => a.customerId === customer.id && a.status === 'ACTIVE'
+      );
+      const firstAccount = customerAccounts[0];
+
+      // Check if customer was collected today
+      const todayCollection = firstAccount
+        ? todayCollections.find(
+          c =>
+            c.customerId === customer.id &&
+            c.accountId === firstAccount.id &&
+            c.status !== 'REVERSED'
+        )
+        : null;
+
+      const getInitials = (name: string) => {
+        const parts = name.split(' ');
+        if (parts.length >= 2) {
+          return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
+        }
+        return name.substring(0, 2).toUpperCase();
+      };
+
+      return {
+        id: customer.id,
+        customerId: customer.customerCode,
+        customerName: customer.fullName,
+        accountType: 'Pigmy',
+        accountNumber: firstAccount?.accountNumber || 'N/A',
+        status: todayCollection ? 'collected' : 'pending',
+        dailyDueAmount: firstAccount?.installmentAmount || 0,
+        collectedAmount: todayCollection ? todayCollection.amount : undefined,
+        initials: getInitials(customer.fullName),
+      };
+    });
+  }, [activeCustomers, allAccounts, todayCollections]);
+
+  // Calculate tab-specific stats from real data
+  const dailyStats: DailyStats = useMemo(() => {
+    // Get customer IDs for active tab
+    const activeCustomerIds = activeCustomers.map(c => c.id);
+
+    // Filter today's collections for active tab customers
+    const tabCollections = todayCollections.filter(c =>
+      activeCustomerIds.includes(c.customerId)
+    );
+
+    // Calculate collected amount for this tab (all collections)
+    const tabCollectedAmount = tabCollections
+      .filter(c => c.status !== 'REVERSED')
+      .reduce((sum, c) => sum + c.amount + c.penaltyAmount, 0);
+
+    // Calculate in-hand amount (only CASH collections, not yet settled)
+    const cashCollections = tabCollections.filter(c => c.status !== 'REVERSED' && c.mode === 'CASH');
+    const inHandAmount = cashCollections.reduce((sum, c) => sum + c.amount + c.penaltyAmount, 0);
+
+    console.log('[Home Stats]', {
+      tab: activeTab,
+      totalCollections: tabCollections.length,
+      cashCollections: cashCollections.length,
+      collectedToday: tabCollectedAmount,
+      inHandAmount,
+      collections: tabCollections.map(c => ({ mode: c.mode, amount: c.amount, status: c.status })),
+    });
+
+    // Get customer IDs that were collected today
+    const collectedCustomerIds = new Set(
+      tabCollections.map(c => c.customerId)
+    );
+
+    // Calculate pending (customers not yet collected)
+    const pendingCount = activeCustomers.filter(
+      c => !collectedCustomerIds.has(c.id)
+    ).length;
+
+    return {
+      collectedToday: tabCollectedAmount,
+      pendingCount: pendingCount,
+      inHandAmount: inHandAmount,
+    };
+  }, [activeCustomers, todayCollections]);
+
+  // Calculate attention alerts from real data
   const attentionAlert: AttentionAlert = {
-    overdueCustomers: 3,
-    pendingSync: 2,
+    overdueCustomers: 0, // TODO: Calculate from accounts slice
+    pendingSync: needsSyncCollections.length,
   };
-
-  const upNextCustomers: Customer[] = [
-    {
-      id: '1',
-      name: 'Suresh Patil',
-      accountNumber: '...8892',
-      location: 'Shop #4',
-      initials: 'SP',
-    },
-    {
-      id: '2',
-      name: 'Anita Desai',
-      accountNumber: '...4102',
-      location: 'Market Ln',
-      initials: 'AD',
-    },
-    {
-      id: '3',
-      name: 'Rajesh Kumar',
-      accountNumber: '...9921',
-      location: 'Home',
-      initials: 'RK',
-    },
-  ];
 
   const styles = StyleSheet.create({
     container: {
@@ -61,7 +167,7 @@ export default function Home() {
       backgroundColor: theme.colors.background.app,
     },
     scrollContent: {
-      paddingBottom: spacing(theme, 'xxl'),
+      paddingVertical: spacing(theme, 'xl'),
     },
     statsRow: {
       flexDirection: 'row',
@@ -110,6 +216,36 @@ export default function Home() {
     buttonIcon: {
       fontSize: 18,
     },
+    tabsContainer: {
+      flexDirection: 'row',
+      gap: spacing(theme, 'xs'),
+      paddingHorizontal: spacing(theme, 'screenPadding'),
+      marginBottom: spacing(theme, 'md'),
+    },
+    tab: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: spacing(theme, 'sm'),
+      borderRadius: radius(theme, 'button'),
+      borderWidth: 1,
+      borderColor: theme.colors.background.divider,
+      backgroundColor: theme.colors.background.cardElevated,
+    },
+    tabActive: {
+      backgroundColor: theme.colors.brand.primary,
+      borderColor: theme.colors.brand.primary,
+    },
+    tabText: {
+      ...typography(theme, 'body'),
+      color: theme.colors.text.secondary,
+      fontWeight: '600',
+      fontSize: 14,
+    },
+    tabTextActive: {
+      color: '#FFFFFF',
+    },
     attentionSection: {
       marginBottom: spacing(theme, 'md'),
     },
@@ -149,7 +285,46 @@ export default function Home() {
 
   const handleCollect = (customerId: string) => {
     console.log('Collect pressed for customer:', customerId);
-    // TODO: Navigate to collection screen
+    setSelectedCustomerId(customerId);
+    setIsBottomSheetOpen(true);
+  };
+
+  const handleCloseBottomSheet = () => {
+    setIsBottomSheetOpen(false);
+    setSelectedCustomerId(null);
+  };
+
+  const handleCollectAll = (customerId: string) => {
+    console.log('Collect All pressed for customer:', customerId);
+    setSelectedCustomerId(customerId);
+    setIsBottomSheetOpen(true);
+  };
+
+  const handleReceipt = (customerId: string) => {
+    console.log('Receipt pressed for customer:', customerId);
+
+    // Find the collection for this customer today
+    const customer = activeCustomers.find(c => c.id === customerId);
+    if (!customer) return;
+
+    const customerAccounts = allAccounts.filter(
+      a => a.customerId === customerId && a.status === 'ACTIVE'
+    );
+    const firstAccount = customerAccounts[0];
+
+    if (firstAccount) {
+      const collection = todayCollections.find(
+        c =>
+          c.customerId === customerId &&
+          c.accountId === firstAccount.id &&
+          c.status !== 'REVERSED'
+      );
+
+      if (collection) {
+        setSelectedCollectionId(collection.id);
+        setIsReceiptOpen(true);
+      }
+    }
   };
 
   const handleViewAll = () => {
@@ -163,10 +338,8 @@ export default function Home() {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <View style={styles.container}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-        <ProfileHeader profile={userProfile} />
-
         <CollectedTodayCard amount={dailyStats.collectedToday} />
 
         <View style={styles.statsRow}>
@@ -174,24 +347,31 @@ export default function Home() {
           <StatCard type="inHand" value={dailyStats.inHandAmount} />
         </View>
 
-        <View style={styles.actionButtons}>
+        <View style={styles.tabsContainer}>
           <Pressable
-            onPress={handleStartRoute}
+            onPress={() => setActiveTab('primary')}
             style={({ pressed }) => [
-              styles.startRouteButton,
+              styles.tab,
+              activeTab === 'primary' && styles.tabActive,
               { opacity: pressed ? 0.8 : 1 },
             ]}
           >
-            <Text style={styles.buttonIcon}>▶</Text>
-            <Text style={styles.buttonText}>Start Route</Text>
+            <Text style={[styles.tabText, activeTab === 'primary' && styles.tabTextActive]}>
+              Primary ({primaryCustomers.length})
+            </Text>
           </Pressable>
 
           <Pressable
-            onPress={handleSearch}
-            style={({ pressed }) => [styles.searchButton, { opacity: pressed ? 0.8 : 1 }]}
+            onPress={() => setActiveTab('delegated')}
+            style={({ pressed }) => [
+              styles.tab,
+              activeTab === 'delegated' && styles.tabActive,
+              { opacity: pressed ? 0.8 : 1 },
+            ]}
           >
-            <Text style={styles.buttonIcon}>🔍</Text>
-            <Text style={styles.searchButtonText}>Search</Text>
+            <Text style={[styles.tabText, activeTab === 'delegated' && styles.tabTextActive]}>
+              Delegated ({delegatedCustomers.length})
+            </Text>
           </Pressable>
         </View>
 
@@ -209,11 +389,62 @@ export default function Home() {
 
           <View style={styles.customerList}>
             {upNextCustomers.map((customer) => (
-              <CustomerCard key={customer.id} customer={customer} onCollect={handleCollect} />
+              <CustomerCollectionCard
+                key={customer.id}
+                customer={customer}
+                onCollect={handleCollect}
+                onCollectAll={handleCollectAll}
+                onReceipt={handleReceipt}
+              />
             ))}
           </View>
         </View>
       </ScrollView>
-    </SafeAreaView>
+
+      <BottomSheet isOpen={isBottomSheetOpen} onClose={handleCloseBottomSheet}>
+        {selectedCustomerId && (() => {
+          const customer = activeCustomers.find(c => c.id === selectedCustomerId);
+          const customerAccounts = allAccounts.filter(
+            a => a.customerId === selectedCustomerId && a.status === 'ACTIVE'
+          );
+          const account = customerAccounts[0];
+
+          // Find delegation if this is a delegated customer
+          const delegation = myDelegations.find(d => d.customerId === selectedCustomerId);
+
+          console.log('[Home] Rendering CollectDeposit for:', {
+            customerId: selectedCustomerId,
+            customerFound: !!customer,
+            accountFound: !!account,
+            customerName: customer?.fullName,
+            accountNumber: account?.accountNumber,
+          });
+
+          return customer && account ? (
+            <CollectDeposit
+              onClose={handleCloseBottomSheet}
+              customer={customer}
+              account={account}
+              delegationId={delegation?.id}
+            />
+          ) : (
+            <View style={{ padding: 20 }}>
+              <Text style={{ color: theme.colors.text.primary }}>
+                Customer or account data not found
+              </Text>
+            </View>
+          );
+        })()}
+      </BottomSheet>
+
+      <BottomSheet isOpen={isReceiptOpen} onClose={() => setIsReceiptOpen(false)}>
+        {selectedCollectionId && (
+          <Receipt
+            collectionId={selectedCollectionId}
+            onClose={() => setIsReceiptOpen(false)}
+          />
+        )}
+      </BottomSheet>
+    </View>
   );
 }
