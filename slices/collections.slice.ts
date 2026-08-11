@@ -6,11 +6,13 @@
 import { createSlice, createAsyncThunk, PayloadAction, createSelector } from '@reduxjs/toolkit';
 import { useDispatch, useSelector } from 'react-redux';
 import type { State, Dispatch } from '@/utils/store';
-import type { Collection, CollectionMode, CollectionStatus } from '@/types';
+import type { Collection, CollectionMode } from '@/types';
+import { CollectionStatus } from '@/types/entities';
 import {
   STORAGE_KEYS,
   getItemSafe,
   setItemSafe,
+  setMultipleItemsSafe,
   createEmptyStore,
   addEntityToStore,
   updateEntityInStore,
@@ -21,8 +23,12 @@ import {
   generateReceiptNumber,
   getBusinessDate,
   generateIdempotencyKey,
+  createLedgerEntriesForCollection,
+  calculateAccountBalance,
 } from '@/utils/businessLogic';
 import { generateUUID } from '@/utils/uuid';
+import { addLedgerEntries, selectLedgerEntriesByAccount } from '@/slices/ledger.slice';
+import { updateAccountBalance } from '@/slices/accounts.slice';
 
 // ===========================
 // STATE INTERFACE
@@ -432,6 +438,103 @@ export const selectDelegationCollectionAmountForDate = createSelector(
       )
       .reduce((sum, c) => sum + c.amount + c.penaltyAmount, 0)
 );
+
+// ===========================
+// COMMIT THUNK
+// ===========================
+
+export interface CommitCollectionResult {
+  collection: Collection;
+  /** True when the idempotency key resolved to a collection that was already committed */
+  alreadyExists: boolean;
+}
+
+/**
+ * Commit a collection as one unit: the collection record, its ledger entries and the
+ * account balance cache, persisted through a single batched write.
+ *
+ * The duplicate check and the three dispatches run in one synchronous block. Nothing
+ * awaits between them, so a concurrent caller (double tap) either sees no collection at
+ * all and creates it, or sees the finished one and resolves to it - never a half state.
+ *
+ * `payload.collectedAt` must be frozen per collection attempt by the caller, since it is
+ * the only varying input of the idempotency key.
+ */
+export const commitCollection = createAsyncThunk<
+  CommitCollectionResult,
+  CreateCollectionPayload,
+  { state: State; rejectValue: string }
+>('collections/commit', async (payload, { getState, dispatch, rejectWithValue }) => {
+  const idempotencyKey = generateIdempotencyKey(
+    payload.deviceFingerprint,
+    payload.accountId,
+    payload.collectedAt,
+  );
+
+  const existing = selectCollectionByIdempotencyKey(getState(), idempotencyKey);
+
+  // Already committed: resolve to the existing record instead of writing a second one.
+  // A record left FAILED by an earlier persist failure is the one case that still has
+  // work to do - its in-memory state is complete, only the write needs retrying.
+  if (existing && existing.status !== CollectionStatus.FAILED) {
+    return { collection: existing, alreadyExists: true };
+  }
+
+  if (existing) {
+    dispatch(updateCollectionStatus({ id: existing.id, status: CollectionStatus.CREATED }));
+  } else {
+    dispatch(createCollection(payload));
+
+    const created = selectCollectionByIdempotencyKey(getState(), idempotencyKey);
+    if (!created) {
+      return rejectWithValue('Collection record could not be created');
+    }
+
+    dispatch(
+      addLedgerEntries(
+        createLedgerEntriesForCollection(
+          payload.accountId,
+          created.id,
+          payload.amount,
+          payload.penaltyAmount,
+          payload.collectedAt,
+        ),
+      ),
+    );
+
+    dispatch(
+      updateAccountBalance({
+        id: payload.accountId,
+        balance: calculateAccountBalance(
+          selectLedgerEntriesByAccount(getState(), payload.accountId),
+        ),
+      }),
+    );
+  }
+
+  const state = getState();
+  const collection = selectCollectionByIdempotencyKey(state, idempotencyKey);
+  if (!collection) {
+    return rejectWithValue('Collection record could not be created');
+  }
+
+  const persisted = await setMultipleItemsSafe([
+    [STORAGE_KEYS.COLLECTIONS, state.collections.collections],
+    [STORAGE_KEYS.RECEIPT_SERIES, state.collections.receiptSeries],
+    [STORAGE_KEYS.LEDGER_ENTRIES, state.ledger.ledgerEntries],
+    [STORAGE_KEYS.ACCOUNTS, state.accounts.accounts],
+    [STORAGE_KEYS.SCHEMES, state.accounts.schemes],
+  ]);
+
+  if (!persisted) {
+    // Nothing reached storage, so the in-memory records stay as they are for a retry.
+    // They are tagged FAILED so no caller can mistake them for a completed collection.
+    dispatch(updateCollectionStatus({ id: collection.id, status: CollectionStatus.FAILED }));
+    return rejectWithValue('Collection could not be saved to device storage');
+  }
+
+  return { collection, alreadyExists: existing !== undefined };
+});
 
 // ===========================
 // CUSTOM HOOK

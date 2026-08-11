@@ -1,6 +1,6 @@
 import { View, Text, StyleSheet, Pressable, Image, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useRouter } from 'expo-router';
 import { useDispatch, useSelector } from 'react-redux';
 import type { State, Dispatch } from '@/utils/store';
@@ -8,8 +8,7 @@ import { useTheme, typography, spacing, radius } from '@/theme';
 import InfoCard from '@/components/elements/InfoCard';
 import AmountSelector from '@/components/elements/AmountSelector';
 import PaymentModeSelector from '@/components/elements/PaymentModeSelector';
-import { createCollection } from '@/slices/collections.slice';
-import { persistCollections } from '@/slices/collections.slice';
+import { commitCollection } from '@/slices/collections.slice';
 import { selectSession } from '@/slices/settings.slice';
 import type { CollectDepositData, PaymentMode } from '@/types/CollectDepositData';
 import type { Customer, Account } from '@/types';
@@ -27,6 +26,16 @@ export default function CollectDeposit({ onClose, customer, account, delegationI
   const { theme } = useTheme();
   const [amount, setAmount] = useState(0);
   const [paymentMode, setPaymentMode] = useState<PaymentMode>('cash');
+
+  /**
+   * Frozen for the lifetime of this sheet, because it is the only varying input of the
+   * collection's idempotency key. Recomputing it per tap would give every tap its own
+   * key and defeat the duplicate check in commitCollection.
+   */
+  const [collectedAt] = useState(() => new Date().toISOString());
+
+  // Guards the commit against a second tap landing while the first is still in flight
+  const isSubmittingRef = useRef(false);
 
   // Get session data
   const session = useSelector(selectSession);
@@ -188,20 +197,25 @@ export default function CollectDeposit({ onClose, customer, account, delegationI
   };
 
   const handleCollect = async () => {
-    if (amount <= 0) {
-      Alert.alert('Invalid Amount', 'Please enter an amount greater than 0');
+    if (isSubmittingRef.current) {
       return;
     }
-
-    if (!customer || !account) {
-      Alert.alert('Error', 'Customer or account data missing');
-      return;
-    }
+    isSubmittingRef.current = true;
 
     try {
-      // Create collection record
-      dispatch(
-        createCollection({
+      if (amount <= 0) {
+        Alert.alert('Invalid Amount', 'Please enter an amount greater than 0');
+        return;
+      }
+
+      if (!customer || !account) {
+        Alert.alert('Error', 'Customer or account data missing');
+        return;
+      }
+
+      // Collection, ledger entries and balance cache are committed as one unit
+      const result = await dispatch(
+        commitCollection({
           branchId: session.branchId || 'demo-branch',
           customerId: customer.id,
           accountId: account.id,
@@ -211,14 +225,16 @@ export default function CollectDeposit({ onClose, customer, account, delegationI
           amount: amount,
           penaltyAmount: depositData.depositInfo.penaltyAmount,
           mode: paymentMode === 'cash' ? 'CASH' : 'UPI',
-          collectedAt: new Date().toISOString(),
+          collectedAt: collectedAt,
           timezone: timezone,
           deviceFingerprint: session.deviceFingerprint || 'demo-device',
-        })
+        }),
       );
 
-      // Persist to storage
-      await dispatch(persistCollections());
+      if (commitCollection.rejected.match(result)) {
+        Alert.alert('Error', 'Collection could not be saved. Please try again.');
+        return;
+      }
 
       Alert.alert('Success', `₹${amount} collected successfully!`, [
         {
@@ -236,6 +252,8 @@ export default function CollectDeposit({ onClose, customer, account, delegationI
     } catch (error) {
       console.error('Collection error:', error);
       Alert.alert('Error', 'Failed to process collection');
+    } finally {
+      isSubmittingRef.current = false;
     }
   };
 
