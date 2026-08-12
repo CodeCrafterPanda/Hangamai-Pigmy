@@ -1,93 +1,108 @@
-import { View, Text, StyleSheet, ScrollView, Pressable, TextInput } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Pressable, TextInput, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useRouter } from 'expo-router';
+import { useDispatch, useSelector, useStore } from 'react-redux';
+import type { State, Dispatch } from '@/utils/store';
 import { useTheme, typography, spacing, radius } from '@/theme';
-import type { SettlementData, DailySummary } from '@/types/SettlementData';
+import { selectSession, selectBranchTimezone } from '@/slices/settings.slice';
+import {
+  createSettlement,
+  submitSettlement,
+  revertSettlementSubmission,
+  updateSettlement,
+  persistSettlements,
+  selectSettlementByAgentAndDate,
+  selectScopedDayCollections,
+  selectCashInHand,
+} from '@/slices/settlements.slice';
+import { calculateSettlementSummary, calculateVariance, getCurrentBusinessDate } from '@/utils/businessLogic';
+import { SettlementScope } from '@/types';
+import NestedScreenHeader from '@/components/elements/NestedScreenHeader';
 
-export default function Settlement() {
+interface SettlementProps {
+  scope?: SettlementScope;
+}
+
+export default function Settlement({ scope = SettlementScope.PRIMARY }: SettlementProps) {
   const router = useRouter();
+  const dispatch = useDispatch<Dispatch>();
+  const store = useStore<State>();
   const { theme } = useTheme();
-  const [actualCash, setActualCash] = useState('12500');
-  const [notes, setNotes] = useState('');
+  const [actualCash, setActualCash] = useState('');
+  const [reason, setReason] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
 
-  // Mock data - replace with actual data from Redux/API
-  const settlementData: SettlementData = {
-    businessDate: 'Friday, Oct 24, 2023',
-    dailySummary: {
-      totalCash: 12500.0,
-      upiDigital: 4200.0,
-      totalCollection: 16700.0,
-    },
-    isOffline: true,
-  };
+  // Guards the day closure against a second tap landing while the first is still in flight
+  const isSubmittingRef = useRef(false);
 
-  const expectedCash = settlementData.dailySummary.totalCash;
-  const actualCashAmount = parseFloat(actualCash) || 0;
-  const variance = actualCashAmount - expectedCash;
+  const session = useSelector(selectSession);
+  const timezone = useSelector(selectBranchTimezone);
+  const agentId = session.agentId || 'demo-agent';
+  const branchId = session.branchId || 'demo-branch';
+
+  // Settlement is whole-business-day closure keyed by agentId + businessDate, always
+  // resolved from the branch timezone rather than device-local "today".
+  const businessDate = getCurrentBusinessDate(timezone);
+
+  // Only this scope's collections are closed by this settlement; PRIMARY and DELEGATED
+  // books are never merged into one closure.
+  const dayCollections = useSelector((state: State) =>
+    selectScopedDayCollections(state, agentId, businessDate, scope)
+  );
+
+  const existingSettlement = useSelector((state: State) =>
+    selectSettlementByAgentAndDate(state, agentId, businessDate, scope)
+  );
+
+  const unsettledCashInHand = useSelector((state: State) =>
+    selectCashInHand(state, agentId, businessDate, scope)
+  );
+
+  const summary = useMemo(() => calculateSettlementSummary(dayCollections), [dayCollections]);
+
+  const isClosed = !!existingSettlement && existingSettlement.status !== 'DRAFT';
+
+  // Declared physical cash count — Settlement.cashInHand, not the dashboard cash-in-hand
+  const actualCashAmount = isClosed
+    ? existingSettlement!.cashInHand
+    : parseFloat(actualCash) || 0;
+  // Variance is a physical-cash figure only: declared cash vs system-expected CASH.
+  // UPI never becomes physical cash and must never enter this calculation.
+  const variance = isClosed
+    ? existingSettlement!.variance
+    : calculateVariance(actualCashAmount, summary.cashTotal);
   const isPerfectMatch = variance === 0;
+  const requiresReason = variance !== 0 && !reason.trim();
+
+  // System-generated informational prefix, held separately from the agent's own reason so
+  // re-renders and repeated submits can never duplicate it inside the text the agent edits.
+  const upiNotePrefix =
+    summary.upiTotal > 0
+      ? `UPI transaction of ₹${summary.upiTotal.toLocaleString('en-IN')}.`
+      : '';
+
+  const composeNotes = () => [upiNotePrefix, reason.trim()].filter(Boolean).join(' ');
+
+  const scopeLabel = scope === SettlementScope.DELEGATED ? 'Delegated' : 'Primary';
+
+  const formattedBusinessDate = useMemo(() => {
+    const parsed = new Date(`${businessDate}T00:00:00`);
+    return parsed.toLocaleDateString('en-IN', {
+      weekday: 'long',
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    });
+  }, [businessDate]);
 
   const styles = StyleSheet.create({
     container: {
       flex: 1,
       backgroundColor: theme.colors.background.app,
     },
-    header: {
-      backgroundColor: theme.colors.background.cardElevated,
-      paddingHorizontal: spacing(theme, 'screenPadding'),
-      paddingTop: spacing(theme, 'md'),
-      paddingBottom: spacing(theme, 'md'),
-      borderBottomWidth: 1,
-      borderBottomColor: theme.colors.background.divider,
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-    },
-    headerLeft: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: spacing(theme, 'md'),
-    },
-    backButton: {
-      width: 40,
-      height: 40,
-      justifyContent: 'center',
-      alignItems: 'center',
-    },
-    backIcon: {
-      fontSize: 24,
-      color: theme.colors.text.primary,
-    },
-    title: {
-      ...typography(theme, 'pageTitle'),
-      fontSize: 20,
-      color: theme.colors.text.primary,
-      fontWeight: '700',
-    },
-    offlineBadge: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: spacing(theme, 'xxs'),
-      paddingHorizontal: spacing(theme, 'sm'),
-      paddingVertical: spacing(theme, 'xxs'),
-      backgroundColor: 'rgba(255, 77, 79, 0.15)',
-      borderRadius: radius(theme, 'chip') + 8,
-      borderWidth: 1,
-      borderColor: 'rgba(255, 77, 79, 0.3)',
-    },
-    offlineIcon: {
-      fontSize: 14,
-      color: theme.colors.status.error,
-    },
-    offlineText: {
-      ...typography(theme, 'caption'),
-      color: theme.colors.status.error,
-      fontWeight: '700',
-      textTransform: 'uppercase',
-      letterSpacing: 0.5,
-    },
     scrollContent: {
-      paddingTop: spacing(theme, 'lg'),
+      paddingTop: spacing(theme, 'md'),
       paddingBottom: spacing(theme, 'xxl') + 80,
     },
     dateSection: {
@@ -107,6 +122,27 @@ export default function Settlement() {
       fontSize: 28,
       color: theme.colors.text.primary,
       fontWeight: '700',
+    },
+    closedBanner: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing(theme, 'xs'),
+      marginHorizontal: spacing(theme, 'screenPadding'),
+      marginBottom: spacing(theme, 'lg'),
+      padding: spacing(theme, 'md'),
+      borderRadius: radius(theme, 'input'),
+      backgroundColor: 'rgba(56, 211, 159, 0.15)',
+      borderWidth: 1,
+      borderColor: 'rgba(56, 211, 159, 0.3)',
+    },
+    closedBannerText: {
+      ...typography(theme, 'caption'),
+      color: theme.colors.status.success,
+      fontWeight: '600',
+      flex: 1,
+    },
+    offlineIcon: {
+      fontSize: 14,
     },
     summaryCard: {
       backgroundColor: theme.colors.background.card,
@@ -175,6 +211,10 @@ export default function Settlement() {
       fontSize: 24,
       color: theme.colors.brand.primary,
       fontWeight: '700',
+    },
+    metaText: {
+      ...typography(theme, 'caption'),
+      color: theme.colors.text.muted,
     },
     reconciliationSection: {
       paddingHorizontal: spacing(theme, 'screenPadding'),
@@ -293,6 +333,19 @@ export default function Settlement() {
       color: theme.colors.text.muted,
       fontStyle: 'italic',
     },
+    notesRequired: {
+      ...typography(theme, 'caption'),
+      color: theme.colors.status.error,
+      fontWeight: '700',
+    },
+    notesPrefix: {
+      ...typography(theme, 'caption'),
+      color: theme.colors.text.secondary,
+      backgroundColor: theme.colors.background.cardElevated,
+      borderRadius: radius(theme, 'input'),
+      paddingHorizontal: spacing(theme, 'sm'),
+      paddingVertical: spacing(theme, 'xs'),
+    },
     notesInput: {
       backgroundColor: theme.colors.background.app,
       borderRadius: radius(theme, 'input'),
@@ -301,6 +354,10 @@ export default function Settlement() {
       color: theme.colors.text.primary,
       minHeight: 100,
       textAlignVertical: 'top',
+    },
+    notesValue: {
+      ...typography(theme, 'body'),
+      color: theme.colors.text.primary,
     },
     submitSection: {
       position: 'absolute',
@@ -322,6 +379,9 @@ export default function Settlement() {
       justifyContent: 'center',
       gap: spacing(theme, 'xs'),
     },
+    submitButtonDisabled: {
+      opacity: 0.5,
+    },
     submitButtonIcon: {
       fontSize: 20,
       color: '#FFFFFF',
@@ -340,42 +400,158 @@ export default function Settlement() {
     },
   });
 
-  const handleBack = () => {
-    router.back();
-  };
+  const handleSubmit = async () => {
+    if (isSubmittingRef.current) {
+      return;
+    }
+    isSubmittingRef.current = true;
+    setIsSaving(true);
 
-  const handleSubmit = () => {
-    console.log('Submit day close', {
-      actualCash: actualCashAmount,
-      variance,
-      notes,
-    });
-    // TODO: Submit settlement
+    try {
+      if (!actualCash.trim()) {
+        Alert.alert('Cash in Hand Required', 'Enter the actual cash amount you are carrying.');
+        return;
+      }
+
+      // submitSettlement rejects a non-zero variance without notes; validate first so a
+      // failed submit never leaves an orphan DRAFT behind.
+      if (variance !== 0 && !reason.trim()) {
+        Alert.alert(
+          'Reason Required',
+          'Add a reason explaining the cash variance before closing the day.'
+        );
+        return;
+      }
+
+      const notes = composeNotes();
+
+      // Duplicate guard runs synchronously with the write - no await between the check and
+      // the dispatch, mirroring commitCollection's discipline for collections. Keyed by
+      // agentId + businessDate + scope, so a PRIMARY attempt never blocks or touches
+      // DELEGATED for the same date, and vice versa.
+      const existing = selectSettlementByAgentAndDate(
+        store.getState(),
+        agentId,
+        businessDate,
+        scope
+      );
+
+      if (existing && existing.status !== 'DRAFT') {
+        Alert.alert(
+          'Already Settled',
+          `The ${scope.toLowerCase()} day closure for ${businessDate} has already been submitted.`
+        );
+        return;
+      }
+
+      let settlementId: string;
+
+      if (existing) {
+        // A DRAFT left by an earlier refused submit or rolled-back failed write is the one
+        // case still to finish - refresh its figures instead of writing a second
+        // settlement for the same day.
+        dispatch(
+          updateSettlement({
+            id: existing.id,
+            updates: {
+              cashTotal: summary.cashTotal,
+              upiTotal: summary.upiTotal,
+              totalCollection: summary.totalCollection,
+              cashInHand: actualCashAmount,
+              notes: notes || undefined,
+            },
+          })
+        );
+        settlementId = existing.id;
+      } else {
+        dispatch(
+          createSettlement({
+            agentId,
+            branchId,
+            businessDate,
+            scope,
+            cashTotal: summary.cashTotal,
+            upiTotal: summary.upiTotal,
+            totalCollection: summary.totalCollection,
+            cashInHand: actualCashAmount,
+            notes: notes || undefined,
+          })
+        );
+
+        const created = selectSettlementByAgentAndDate(
+          store.getState(),
+          agentId,
+          businessDate,
+          scope
+        );
+        if (!created) {
+          Alert.alert('Error', 'Settlement could not be created. Please try again.');
+          return;
+        }
+        settlementId = created.id;
+      }
+
+      dispatch(submitSettlement(settlementId));
+
+      const settlementsState = store.getState().settlements;
+      const submitted = settlementsState.settlements.byId[settlementId];
+
+      // Still DRAFT means the reducer refused the submit. It stays DRAFT, so cash in hand
+      // is untouched and the agent can correct the input and retry.
+      if (!submitted || submitted.status === 'DRAFT') {
+        Alert.alert(
+          'Cannot Close Day',
+          settlementsState.error || 'Settlement could not be submitted.'
+        );
+        return;
+      }
+
+      const persistResult = await dispatch(persistSettlements());
+      if (persistSettlements.rejected.match(persistResult)) {
+        // Nothing reached storage, so the submission is rolled back to DRAFT. An unsaved
+        // day closure must not reduce cash in hand, and the record is kept so this same
+        // settlement can be retried instead of a second one being written for the day.
+        dispatch(revertSettlementSubmission(settlementId));
+        Alert.alert(
+          'Not Saved',
+          'The day closure could not be written to this device, so it was not applied. Cash in hand is unchanged — please try again.'
+        );
+        return;
+      }
+
+      Alert.alert(
+        'Day Closed',
+        `${scopeLabel} settlement for ${businessDate} submitted. Cash handed over: ₹${summary.cashTotal.toLocaleString('en-IN')}.`,
+        [{ text: 'OK', onPress: () => router.back() }]
+      );
+    } catch (error) {
+      console.error('[Settlement] Day close failed:', error);
+      Alert.alert('Error', 'Failed to submit settlement');
+    } finally {
+      isSubmittingRef.current = false;
+      setIsSaving(false);
+    }
   };
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      <View style={styles.header}>
-        <View style={styles.headerLeft}>
-          <Pressable onPress={handleBack} style={styles.backButton}>
-            <Text style={styles.backIcon}>←</Text>
-          </Pressable>
-          <Text style={styles.title}>Settlement</Text>
-        </View>
-
-        {settlementData.isOffline && (
-          <View style={styles.offlineBadge}>
-            <Text style={styles.offlineIcon}>📴</Text>
-            <Text style={styles.offlineText}>OFFLINE</Text>
-          </View>
-        )}
-      </View>
+      <NestedScreenHeader title="Settlement" subtitle={scopeLabel} />
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         <View style={styles.dateSection}>
           <Text style={styles.dateLabel}>BUSINESS DATE</Text>
-          <Text style={styles.dateValue}>{settlementData.businessDate}</Text>
+          <Text style={styles.dateValue}>{formattedBusinessDate}</Text>
         </View>
+
+        {isClosed && (
+          <View style={styles.closedBanner}>
+            <Text style={styles.offlineIcon}>🔒</Text>
+            <Text style={styles.closedBannerText}>
+              {scopeLabel} book already closed ({existingSettlement!.status.toLowerCase()}).
+              Collections stay in history; only new collections add to cash in hand.
+            </Text>
+          </View>
+        )}
 
         <View style={styles.summaryCard}>
           <View style={styles.summaryHeader}>
@@ -386,52 +562,82 @@ export default function Settlement() {
           <View style={styles.summaryRow}>
             <View style={styles.summaryLabelRow}>
               <Text style={styles.summaryRowIcon}>💵</Text>
-              <Text style={styles.summaryLabel}>Total Cash</Text>
+              <Text style={styles.summaryLabel}>Cash Collected</Text>
             </View>
             <Text style={styles.summaryAmount}>
-              ₹ {settlementData.dailySummary.totalCash.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+              ₹ {summary.cashTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
             </Text>
           </View>
 
           <View style={styles.summaryRow}>
             <View style={styles.summaryLabelRow}>
               <Text style={styles.summaryRowIcon}>📱</Text>
-              <Text style={styles.summaryLabel}>UPI / Digital</Text>
+              <Text style={styles.summaryLabel}>UPI Collected</Text>
             </View>
             <Text style={styles.summaryAmount}>
-              ₹ {settlementData.dailySummary.upiDigital.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+              ₹ {summary.upiTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+            </Text>
+          </View>
+
+          <View style={styles.summaryRow}>
+            <View style={styles.summaryLabelRow}>
+              <Text style={styles.summaryRowIcon}>🧾</Text>
+              <Text style={styles.summaryLabel}>Unsettled Cash in Hand</Text>
+            </View>
+            <Text style={styles.summaryAmount}>
+              ₹ {unsettledCashInHand.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
             </Text>
           </View>
 
           <View style={styles.totalRow}>
             <Text style={styles.totalLabel}>Total Collection</Text>
             <Text style={styles.totalAmount}>
-              ₹ {settlementData.dailySummary.totalCollection.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+              ₹ {summary.totalCollection.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
             </Text>
           </View>
+
+          <Text style={styles.metaText}>
+            {summary.collectionCount} {scopeLabel.toLowerCase()} collection
+            {summary.collectionCount === 1 ? '' : 's'} on this business date
+          </Text>
         </View>
 
         <View style={styles.reconciliationSection}>
           <Text style={styles.sectionTitle}>Reconciliation</Text>
 
           <View style={styles.reconciliationCard}>
+            <View style={styles.summaryRow}>
+              <Text style={styles.summaryLabel}>Expected Cash (system)</Text>
+              <Text style={styles.summaryAmount}>
+                ₹ {summary.cashTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+              </Text>
+            </View>
+
             <View style={styles.inputSection}>
               <View style={styles.inputHeader}>
-                <Text style={styles.inputLabel}>Cash in Hand</Text>
-                <Text style={styles.inputHint}>Enter actual amount</Text>
+                <Text style={styles.inputLabel}>Declared Physical Cash</Text>
+                <Text style={styles.inputHint}>
+                  {isClosed ? 'Declared at closure' : 'Enter actual amount'}
+                </Text>
               </View>
 
               <View style={styles.inputContainer}>
                 <Text style={styles.currencySymbol}>₹</Text>
-                <TextInput
-                  style={styles.input}
-                  value={actualCash}
-                  onChangeText={setActualCash}
-                  keyboardType="numeric"
-                  placeholder="0"
-                  placeholderTextColor={theme.colors.text.muted}
-                />
-                {actualCash && <Text style={styles.checkIcon}>✓</Text>}
+                {isClosed ? (
+                  <Text style={styles.input}>
+                    {existingSettlement!.cashInHand.toLocaleString('en-IN')}
+                  </Text>
+                ) : (
+                  <TextInput
+                    style={styles.input}
+                    value={actualCash}
+                    onChangeText={setActualCash}
+                    keyboardType="numeric"
+                    placeholder="0"
+                    placeholderTextColor={theme.colors.text.muted}
+                  />
+                )}
+                {!!actualCash && !isClosed && <Text style={styles.checkIcon}>✓</Text>}
               </View>
             </View>
 
@@ -459,19 +665,32 @@ export default function Settlement() {
 
             <View style={styles.notesSection}>
               <View style={styles.notesHeader}>
-                <Text style={styles.notesLabel}>Notes</Text>
-                <Text style={styles.notesOptional}>Optional</Text>
+                <Text style={styles.notesLabel}>Reason</Text>
+                {isClosed ? null : requiresReason ? (
+                  <Text style={styles.notesRequired}>Required for variance</Text>
+                ) : (
+                  <Text style={styles.notesOptional}>Optional</Text>
+                )}
               </View>
 
-              <TextInput
-                style={styles.notesInput}
-                value={notes}
-                onChangeText={setNotes}
-                placeholder="Add remarks for any discrepancies..."
-                placeholderTextColor={theme.colors.text.muted}
-                multiline
-                numberOfLines={4}
-              />
+              {isClosed ? (
+                <Text style={styles.notesValue}>{existingSettlement!.notes || '—'}</Text>
+              ) : (
+                <>
+                  {!!upiNotePrefix && (
+                    <Text style={styles.notesPrefix}>{upiNotePrefix}</Text>
+                  )}
+                  <TextInput
+                    style={styles.notesInput}
+                    value={reason}
+                    onChangeText={setReason}
+                    placeholder="Add remarks for any discrepancies..."
+                    placeholderTextColor={theme.colors.text.muted}
+                    multiline
+                    numberOfLines={4}
+                  />
+                </>
+              )}
             </View>
           </View>
         </View>
@@ -480,17 +699,25 @@ export default function Settlement() {
       <View style={styles.submitSection}>
         <Pressable
           onPress={handleSubmit}
-          style={({ pressed }) => [styles.submitButton, { opacity: pressed ? 0.8 : 1 }]}
+          disabled={isClosed || isSaving}
+          style={({ pressed }) => [
+            styles.submitButton,
+            (isClosed || isSaving) && styles.submitButtonDisabled,
+            { opacity: pressed && !isClosed && !isSaving ? 0.8 : 1 },
+          ]}
         >
           <Text style={styles.submitButtonIcon}>🔒</Text>
-          <Text style={styles.submitButtonText}>Submit Day Close</Text>
+          <Text style={styles.submitButtonText}>
+            {isClosed ? 'Day Closed' : isSaving ? 'Closing...' : 'Submit Day Close'}
+          </Text>
         </Pressable>
 
         <Text style={styles.warningText}>
-          Verify all amounts before submitting. This action cannot be undone.
+          {isClosed
+            ? `${scopeLabel} collections for this business date have already been settled.`
+            : 'Verify all amounts before submitting. This action cannot be undone.'}
         </Text>
       </View>
     </SafeAreaView>
   );
 }
-

@@ -36,6 +36,8 @@ export default function Receipt({ collectionId, onClose }: ReceiptProps) {
     return name.substring(0, 2).toUpperCase();
   };
 
+  const isUpiPayment = collection?.mode === 'UPI';
+
   // Use real data if collection is provided, otherwise mock data
   const receiptData: ReceiptData = collection && customer && account ? {
     receiptNumber: collection.receiptNo,
@@ -362,7 +364,7 @@ export default function Receipt({ collectionId, onClose }: ReceiptProps) {
               <View style={styles.detailItem}>
                 <Text style={styles.detailLabel}>PAYMENT MODE</Text>
                 <View style={styles.detailValueWithIcon}>
-                  <Text style={styles.paymentIcon}>💵</Text>
+                  <Text style={styles.paymentIcon}>{isUpiPayment ? '📱' : '💵'}</Text>
                   <Text style={styles.detailValue}>{receiptData.paymentMode}</Text>
                 </View>
               </View>

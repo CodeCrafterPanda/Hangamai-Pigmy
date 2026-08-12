@@ -1,5 +1,6 @@
 import { Stack } from 'expo-router';
 import { useTheme } from '@/theme';
+import SyncHeader from '@/components/elements/SyncHeader';
 
 export default function ProfileStack() {
   const { theme } = useTheme();
@@ -21,8 +22,8 @@ export default function ProfileStack() {
       <Stack.Screen
         name="index"
         options={{
-          title: 'Sync Status',
           headerShown: true,
+          headerTitle: () => <SyncHeader />,
         }}
       />
       <Stack.Screen

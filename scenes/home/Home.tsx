@@ -20,6 +20,10 @@ import { selectCustomersByAgent, selectAllCustomers } from '@/slices/customers.s
 import { selectDelegationsBySecondaryAgent } from '@/slices/delegations.slice';
 import { selectAllAccounts } from '@/slices/accounts.slice';
 import { selectSession, selectBranchTimezone } from '@/slices/settings.slice';
+import { selectCashInHand, getCollectionSettlementScope } from '@/slices/settlements.slice';
+import { getCurrentBusinessDate } from '@/utils/businessLogic';
+import { navigateToSettlement } from '@/utils/navigation';
+import { SettlementScope } from '@/types';
 import type { DailyStats, AttentionAlert } from '@/types/HomeData';
 import type { CustomerCollection } from '@/types/CollectionData';
 
@@ -66,6 +70,18 @@ export default function Home() {
 
   const needsSyncCollections = useSelector(selectCollectionsNeedingSync);
 
+  // The active tab is the authoritative collection context. Every money figure below is
+  // scoped to it, and so is the settlement it can launch.
+  const activeScope =
+    activeTab === 'primary' ? SettlementScope.PRIMARY : SettlementScope.DELEGATED;
+
+  // Unsettled CASH balance for this agent's business date in the active scope
+  // (collected − settled). PRIMARY and DELEGATED balances are independent.
+  const businessDate = getCurrentBusinessDate(timezone);
+  const cashInHand = useSelector((state: State) =>
+    selectCashInHand(state, agentId, businessDate, activeScope)
+  );
+
   // Filter data based on active tab
   const activeCustomers = activeTab === 'primary' ? primaryCustomers : delegatedCustomers;
 
@@ -110,37 +126,35 @@ export default function Home() {
     });
   }, [activeCustomers, allAccounts, todayCollections]);
 
-  // Tab-specific stats from real persisted todayCollections.
-  // selectDailySummary is agent-wide with no Primary/Delegated dimension — do not use it here
-  // (and do not fork reports.slice); scope with the same active-tab customer filter as pendingCount.
+  // Context-specific stats from real persisted todayCollections.
+  // Money figures are scoped by the collection's own book (Collection.delegationId, via
+  // getCollectionSettlementScope) so they match exactly what a settlement of that scope
+  // closes. selectDailySummary is agent-wide with no Primary/Delegated dimension — do not
+  // use it here, and do not fork reports.slice.
+  // pendingCount stays customer-based: it counts customers still to visit in this tab.
   const dailyStats: DailyStats = useMemo(() => {
-    const activeCustomerIds = activeCustomers.map(c => c.id);
-    const tabCollections = todayCollections.filter(c =>
-      activeCustomerIds.includes(c.customerId),
+    const scopedCollections = todayCollections.filter(
+      c => getCollectionSettlementScope(c) === activeScope,
     );
 
-    const collectedToday = tabCollections
+    const collectedToday = scopedCollections
       .filter(c => c.status !== 'REVERSED')
       .reduce((sum, c) => sum + c.amount + c.penaltyAmount, 0);
 
-    const inHandAmount = tabCollections
-      .filter(c => c.status !== 'REVERSED' && c.mode === 'CASH')
-      .reduce((sum, c) => sum + c.amount + c.penaltyAmount, 0);
-
-    const onlineAmount = tabCollections
+    const onlineAmount = scopedCollections
       .filter(c => c.status !== 'REVERSED' && c.mode === 'UPI')
       .reduce((sum, c) => sum + c.amount + c.penaltyAmount, 0);
 
-    const collectedCustomerIds = new Set(tabCollections.map(c => c.customerId));
+    const collectedCustomerIds = new Set(scopedCollections.map(c => c.customerId));
     const pendingCount = activeCustomers.filter(c => !collectedCustomerIds.has(c.id)).length;
 
     return {
       collectedToday,
       pendingCount,
-      inHandAmount,
+      inHandAmount: cashInHand,
       onlineAmount,
     };
-  }, [activeCustomers, todayCollections]);
+  }, [activeCustomers, todayCollections, activeScope, cashInHand]);
 
   // Calculate attention alerts from real data
   const attentionAlert: AttentionAlert = {
@@ -332,7 +346,11 @@ export default function Home() {
 
         <View style={styles.statsRow}>
           <StatCard type="pending" value={dailyStats.pendingCount} />
-          <StatCard type="inHand" value={dailyStats.inHandAmount} />
+          <StatCard
+            type="inHand"
+            value={dailyStats.inHandAmount}
+            onPress={() => navigateToSettlement(activeScope)}
+          />
           <StatCard type="online" value={dailyStats.onlineAmount} />
         </View>
 

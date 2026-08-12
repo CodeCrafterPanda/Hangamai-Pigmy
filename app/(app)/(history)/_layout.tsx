@@ -53,6 +53,20 @@ export default function HistoryStack() {
           headerShown: true,
         }}
       />
+      <Stack.Screen
+        name="settlement"
+        options={{
+          title: 'Settlement',
+          headerShown: false,
+        }}
+      />
+      <Stack.Screen
+        name="settlement-detail/[id]"
+        options={{
+          title: 'Settlement Details',
+          headerShown: false,
+        }}
+      />
     </Stack>
   );
 }

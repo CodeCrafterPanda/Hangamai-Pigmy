@@ -82,6 +82,16 @@ export enum SettlementStatus {
   REJECTED = 'REJECTED',
 }
 
+/**
+ * Which collection book a settlement closes. Derived per collection from
+ * Collection.delegationId: absent = the agent's own customers (PRIMARY),
+ * present = collected under a delegation (DELEGATED).
+ */
+export enum SettlementScope {
+  PRIMARY = 'PRIMARY',
+  DELEGATED = 'DELEGATED',
+}
+
 export enum KYCType {
   AADHAR = 'AADHAR',
   PAN = 'PAN',
@@ -316,6 +326,7 @@ export interface Settlement {
   agentId: string;
   branchId: string;
   businessDate: string; // YYYY-MM-DD
+  scope: SettlementScope; // unique per agentId + businessDate + scope
   cashTotal: number;
   upiTotal: number;
   totalCollection: number;

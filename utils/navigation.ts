@@ -4,6 +4,7 @@
  */
 
 import { router } from 'expo-router';
+import { SettlementScope } from '@/types';
 
 // ===========================
 // ROUTE PARAMETER TYPES
@@ -69,13 +70,28 @@ export function openReceiptModal(collectionId: string) {
 }
 
 /**
- * Open settlement modal for day closure
+ * Navigate to the settlement (day closure) screen for one collection scope.
+ * Lives in the (history) stack next to settlement-history; there is no (modals) group.
+ */
+export function navigateToSettlement(scope: SettlementScope, businessDate?: string) {
+  router.push({
+    pathname: '/(app)/(history)/settlement',
+    params: businessDate ? { scope, businessDate } : { scope },
+  });
+}
+
+/**
+ * @deprecated Kept for call-site compatibility — delegates to navigateToSettlement.
  */
 export function openSettlementModal(businessDate?: string) {
-  router.push({
-    pathname: '/(modals)/settlement',
-    params: businessDate ? { businessDate } : {},
-  });
+  navigateToSettlement(SettlementScope.PRIMARY, businessDate);
+}
+
+/**
+ * Navigate to a read-only settlement detail screen
+ */
+export function navigateToSettlementDetail(settlementId: string) {
+  router.push(`/(app)/(history)/settlement-detail/${settlementId}`);
 }
 
 /**
@@ -131,10 +147,11 @@ export function navigateToRouteCustomers(routeId: string) {
 }
 
 /**
- * Navigate to receipt detail
+ * Navigate to receipt detail.
+ * Takes the Collection id — Receipt resolves the receipt from the collection record.
  */
-export function navigateToReceiptDetail(receiptId: string) {
-  router.push(`/(app)/(history)/receipt-detail/${receiptId}`);
+export function navigateToReceiptDetail(collectionId: string) {
+  router.push(`/(app)/(history)/receipt-detail/${collectionId}`);
 }
 
 /**
@@ -209,6 +226,7 @@ export default {
   navigateToCustomerDetail,
   navigateToCollectDeposit,
   openReceiptModal,
+  navigateToSettlement,
   openSettlementModal,
   openSearchCustomer,
   openOfflineQueueModal,
@@ -219,6 +237,7 @@ export default {
   navigateToRouteCustomers,
   navigateToReceiptDetail,
   navigateToSettlementHistory,
+  navigateToSettlementDetail,
   switchToTab,
   goBack,
   replaceRoute,

@@ -3,27 +3,32 @@ import { useState, useMemo } from 'react';
 import { useRouter } from 'expo-router';
 import { useSelector } from 'react-redux';
 import { useTheme, typography, spacing, radius } from '@/theme';
+import BottomSheet from '@/components/elements/BottomSheet';
+import Receipt from '@/scenes/receipt';
 import { selectAllCollections } from '@/slices/collections.slice';
 import { selectAllCustomers } from '@/slices/customers.slice';
 import { selectSession, selectBranchTimezone } from '@/slices/settings.slice';
 import { getBusinessDate } from '@/utils/businessLogic';
 
+/**
+ * History root — today's summary and navigation into Monthly Collections.
+ * Month browsing and Collections/Settlements mode live on Monthly Collections.
+ */
 export default function CollectionsHistory() {
   const router = useRouter();
   const { theme } = useTheme();
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [activeFilter, setActiveFilter] = useState<'all' | 'synced' | 'pending'>('all');
+  const [isReceiptOpen, setIsReceiptOpen] = useState(false);
+  const [selectedCollectionId, setSelectedCollectionId] = useState<string | null>(null);
 
-  // Get session
   const session = useSelector(selectSession);
   const timezone = useSelector(selectBranchTimezone);
   const agentId = session.agentId || 'demo-agent';
 
-  // Get collections
   const allCollections = useSelector(selectAllCollections);
   const allCustomers = useSelector(selectAllCustomers);
 
-  // Get only customers where logged-in agent is PRIMARY agent
   const myPrimaryCustomers = useMemo(() => {
     return allCustomers.filter(c => c.primaryAgentId === agentId);
   }, [allCustomers, agentId]);
@@ -32,39 +37,43 @@ export default function CollectionsHistory() {
     return new Set(myPrimaryCustomers.map(c => c.id));
   }, [myPrimaryCustomers]);
 
-  // Filter collections for current month and agent
-  const currentMonth = selectedDate.getMonth();
-  const currentYear = selectedDate.getFullYear();
+  // Root stays on the current calendar month — month switching belongs on Monthly Collections.
+  const now = new Date();
+  const currentMonth = now.getMonth();
+  const currentYear = now.getFullYear();
   const monthPrefix = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}`;
 
   const monthCollections = useMemo(() => {
     return allCollections.filter(c => {
       return (
         c.collectedByAgentId === agentId &&
-        myPrimaryCustomerIds.has(c.customerId) && // Only primary customers
+        myPrimaryCustomerIds.has(c.customerId) &&
         c.businessDate.startsWith(monthPrefix) &&
         c.status !== 'REVERSED'
       );
     });
   }, [allCollections, agentId, monthPrefix, myPrimaryCustomerIds]);
 
-  // Calculate today's and month's stats
   const today = getBusinessDate(new Date().toISOString(), timezone);
   const todayCollections = monthCollections.filter(c => c.businessDate === today);
   const todayAmount = todayCollections.reduce((sum, c) => sum + c.amount + c.penaltyAmount, 0);
   const monthAmount = monthCollections.reduce((sum, c) => sum + c.amount + c.penaltyAmount, 0);
   const monthProgress = monthAmount > 0 ? Math.round((todayAmount / monthAmount) * 100) : 0;
 
-  // Get days in current month
   const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
   const monthDays = Array.from({ length: daysInMonth }, (_, i) => i + 1);
 
-  // Get selected day's collections
-  const selectedDay = selectedDate.getDate();
-  const selectedBusinessDate = getBusinessDate(selectedDate.toISOString(), timezone);
+  // Day strip only moves within the current month
+  const selectedDay =
+    selectedDate.getMonth() === currentMonth && selectedDate.getFullYear() === currentYear
+      ? selectedDate.getDate()
+      : now.getDate();
+  const selectedBusinessDate = getBusinessDate(
+    new Date(currentYear, currentMonth, selectedDay).toISOString(),
+    timezone
+  );
   const dayCollections = monthCollections.filter(c => c.businessDate === selectedBusinessDate);
 
-  // Filter collections based on active filter
   const filteredCollections = dayCollections.filter(c => {
     if (activeFilter === 'synced') return c.status === 'SYNCED';
     if (activeFilter === 'pending') return c.status === 'CREATED' || c.status === 'FAILED';
@@ -147,20 +156,6 @@ export default function CollectionsHistory() {
       ...typography(theme, 'sectionTitle'),
       color: theme.colors.text.primary,
       fontWeight: '700',
-    },
-    navButtons: {
-      flexDirection: 'row',
-      gap: spacing(theme, 'xs'),
-    },
-    navButton: {
-      width: 32,
-      height: 32,
-      justifyContent: 'center',
-      alignItems: 'center',
-    },
-    navIcon: {
-      fontSize: 18,
-      color: theme.colors.text.primary,
     },
     calendarScroll: {
       paddingHorizontal: spacing(theme, 'screenPadding'),
@@ -265,20 +260,6 @@ export default function CollectionsHistory() {
       borderWidth: 1,
       borderColor: theme.colors.background.divider,
     },
-    avatar: {
-      width: 40,
-      height: 40,
-      borderRadius: 20,
-      backgroundColor: theme.colors.background.cardElevated,
-      justifyContent: 'center',
-      alignItems: 'center',
-    },
-    avatarText: {
-      ...typography(theme, 'body'),
-      color: theme.colors.text.primary,
-      fontWeight: '700',
-      fontSize: 14,
-    },
     transactionInfo: {
       flex: 1,
       gap: 2,
@@ -297,6 +278,20 @@ export default function CollectionsHistory() {
       alignItems: 'flex-end',
       gap: 2,
     },
+    modeBadge: {
+      alignSelf: 'flex-start',
+      paddingHorizontal: spacing(theme, 'xs'),
+      paddingVertical: 1,
+      borderRadius: radius(theme, 'chip'),
+      borderWidth: 1,
+      marginTop: 2,
+    },
+    modeText: {
+      ...typography(theme, 'caption'),
+      fontSize: 9,
+      fontWeight: '700',
+      letterSpacing: 0.5,
+    },
     amount: {
       ...typography(theme, 'body'),
       color: theme.colors.text.primary,
@@ -305,7 +300,7 @@ export default function CollectionsHistory() {
     statusBadge: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 2,
+      gap: 4,
     },
     statusDot: {
       width: 6,
@@ -338,22 +333,6 @@ export default function CollectionsHistory() {
     return date.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase().substring(0, 3);
   };
 
-  const getInitials = (name: string) => {
-    const parts = name.split(' ');
-    if (parts.length >= 2) {
-      return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
-    }
-    return name.substring(0, 2).toUpperCase();
-  };
-
-  const handlePrevMonth = () => {
-    setSelectedDate(new Date(currentYear, currentMonth - 1, 1));
-  };
-
-  const handleNextMonth = () => {
-    setSelectedDate(new Date(currentYear, currentMonth + 1, 1));
-  };
-
   const formatAmount = (amount: number) => {
     if (amount >= 100000) {
       return `₹${(amount / 100000).toFixed(1)}L`;
@@ -364,15 +343,26 @@ export default function CollectionsHistory() {
     return `₹${amount}`;
   };
 
+  const handleReceiptPress = (collectionId: string) => {
+    setSelectedCollectionId(collectionId);
+    setIsReceiptOpen(true);
+  };
+
+  const handleCloseReceipt = () => {
+    setIsReceiptOpen(false);
+    setSelectedCollectionId(null);
+  };
+
   const handleMonthCardPress = () => {
-    const month = selectedDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+    const month = now.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
     router.push(`/(app)/(history)/monthly-collections?month=${encodeURIComponent(month)}`);
   };
+
+  const currentMonthLabel = now.toLocaleDateString('en-US', { month: 'long' });
 
   return (
     <View style={styles.container}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-        {/* Stats Cards */}
         <View style={styles.cardsRow}>
           <View style={[styles.card, styles.todayCard]}>
             <Text style={[styles.cardIcon]}>📅</Text>
@@ -380,7 +370,9 @@ export default function CollectionsHistory() {
             <Text style={[styles.cardAmount, styles.todayCardAmount]}>
               {formatAmount(todayAmount)}
             </Text>
-            <Text style={[styles.cardPercentage, styles.todayCardPercentage]}>{monthProgress}%</Text>
+            <Text style={[styles.cardPercentage, styles.todayCardPercentage]}>
+              {monthProgress}%
+            </Text>
           </View>
 
           <Pressable
@@ -388,27 +380,18 @@ export default function CollectionsHistory() {
             style={({ pressed }) => [styles.card, { opacity: pressed ? 0.7 : 1 }]}
           >
             <Text style={[styles.cardIcon]}>📊</Text>
-            <Text style={[styles.cardLabel, styles.regularCardLabel]}>This Month</Text>
+            <Text style={[styles.cardLabel, styles.regularCardLabel]}>{currentMonthLabel}</Text>
             <Text style={[styles.cardAmount, styles.regularCardAmount]}>
               {formatAmount(monthAmount)}
             </Text>
           </Pressable>
         </View>
 
-        {/* Calendar */}
         <View style={styles.calendarSection}>
           <View style={styles.calendarHeader}>
             <Text style={styles.monthText}>
-              {selectedDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+              {now.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
             </Text>
-            <View style={styles.navButtons}>
-              <Pressable onPress={handlePrevMonth} style={styles.navButton}>
-                <Text style={styles.navIcon}>‹</Text>
-              </Pressable>
-              <Pressable onPress={handleNextMonth} style={styles.navButton}>
-                <Text style={styles.navIcon}>›</Text>
-              </Pressable>
-            </View>
           </View>
 
           <ScrollView
@@ -429,10 +412,20 @@ export default function CollectionsHistory() {
                       { opacity: pressed ? 0.7 : 1 },
                     ]}
                   >
-                    <Text style={[styles.dayName, isSelected ? styles.dayNameActive : styles.dayNameInactive]}>
+                    <Text
+                      style={[
+                        styles.dayName,
+                        isSelected ? styles.dayNameActive : styles.dayNameInactive,
+                      ]}
+                    >
                       {getDayName(day)}
                     </Text>
-                    <Text style={[styles.dayNumber, isSelected ? styles.dayNumberActive : styles.dayNumberInactive]}>
+                    <Text
+                      style={[
+                        styles.dayNumber,
+                        isSelected ? styles.dayNumberActive : styles.dayNumberInactive,
+                      ]}
+                    >
                       {day}
                     </Text>
                   </Pressable>
@@ -442,13 +435,17 @@ export default function CollectionsHistory() {
           </ScrollView>
         </View>
 
-        {/* Transactions */}
         <View style={styles.transactionsSection}>
           <View style={styles.transactionsHeader}>
             <View>
               <Text style={styles.transactionsTitle}>Transactions</Text>
               <Text style={styles.transactionsCount}>
-                ({filteredCollections.length} {selectedDate.toLocaleDateString('en-US', { month: 'short' })})
+                ({filteredCollections.length}{' '}
+                {new Date(currentYear, currentMonth, selectedDay).toLocaleDateString('en-US', {
+                  month: 'short',
+                  day: 'numeric',
+                })}
+                )
               </Text>
             </View>
           </View>
@@ -456,10 +453,7 @@ export default function CollectionsHistory() {
           <View style={styles.filtersContainer}>
             <Pressable
               onPress={() => setActiveFilter('all')}
-              style={[
-                styles.filterButton,
-                activeFilter === 'all' && styles.filterButtonActive,
-              ]}
+              style={[styles.filterButton, activeFilter === 'all' && styles.filterButtonActive]}
             >
               <Text
                 style={[
@@ -473,10 +467,7 @@ export default function CollectionsHistory() {
 
             <Pressable
               onPress={() => setActiveFilter('synced')}
-              style={[
-                styles.filterButton,
-                activeFilter === 'synced' && styles.filterButtonActive,
-              ]}
+              style={[styles.filterButton, activeFilter === 'synced' && styles.filterButtonActive]}
             >
               <Text
                 style={[
@@ -490,10 +481,7 @@ export default function CollectionsHistory() {
 
             <Pressable
               onPress={() => setActiveFilter('pending')}
-              style={[
-                styles.filterButton,
-                activeFilter === 'pending' && styles.filterButtonActive,
-              ]}
+              style={[styles.filterButton, activeFilter === 'pending' && styles.filterButtonActive]}
             >
               <Text
                 style={[
@@ -510,19 +498,34 @@ export default function CollectionsHistory() {
             {filteredCollections.length > 0 ? (
               filteredCollections.map(collection => {
                 const customer = allCustomers.find(c => c.id === collection.customerId);
-                const collectionTime = new Date(collection.collectedAt).toLocaleTimeString('en-US', {
-                  hour: '2-digit',
-                  minute: '2-digit',
-                  hour12: true,
-                });
+                const collectionTime = new Date(collection.collectedAt).toLocaleTimeString(
+                  'en-US',
+                  {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    hour12: true,
+                  }
+                );
 
                 const statusConfig =
                   collection.status === 'SYNCED'
                     ? { color: theme.colors.status.success, label: 'Success' }
                     : { color: theme.colors.status.warning, label: 'Syncing' };
 
+                const isCash = collection.mode === 'CASH';
+                const modeColor = isCash
+                  ? theme.colors.status.success
+                  : theme.colors.brand.primary;
+
                 return (
-                  <View key={collection.id} style={styles.transactionItem}>
+                  <Pressable
+                    key={collection.id}
+                    onPress={() => handleReceiptPress(collection.id)}
+                    style={({ pressed }) => [
+                      styles.transactionItem,
+                      { opacity: pressed ? 0.7 : 1 },
+                    ]}
+                  >
                     <View style={styles.transactionInfo}>
                       <Text style={styles.customerName}>
                         {customer?.fullName || 'Unknown Customer'}
@@ -530,6 +533,11 @@ export default function CollectionsHistory() {
                       <Text style={styles.transactionMeta}>
                         Ac: {collection.accountId.slice(-4)} • {collectionTime}
                       </Text>
+                      <View style={[styles.modeBadge, { borderColor: modeColor }]}>
+                        <Text style={[styles.modeText, { color: modeColor }]}>
+                          {isCash ? 'CASH' : 'UPI'}
+                        </Text>
+                      </View>
                     </View>
 
                     <View style={styles.transactionRight}>
@@ -540,8 +548,11 @@ export default function CollectionsHistory() {
                           {statusConfig.label}
                         </Text>
                       </View>
+                      <Text style={[styles.statusText, { color: theme.colors.brand.primary }]}>
+                        RECEIPT ›
+                      </Text>
                     </View>
-                  </View>
+                  </Pressable>
                 );
               })
             ) : (
@@ -553,7 +564,12 @@ export default function CollectionsHistory() {
           </View>
         </View>
       </ScrollView>
+
+      <BottomSheet isOpen={isReceiptOpen} onClose={handleCloseReceipt}>
+        {selectedCollectionId && (
+          <Receipt collectionId={selectedCollectionId} onClose={handleCloseReceipt} />
+        )}
+      </BottomSheet>
     </View>
   );
 }
-

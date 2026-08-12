@@ -1,19 +1,15 @@
 import { View, Text, StyleSheet, ScrollView, Pressable } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { useMemo } from 'react';
-import { useRouter } from 'expo-router';
 import { useSelector } from 'react-redux';
-import type { State } from '@/utils/store';
 import { useTheme, typography, spacing } from '@/theme';
 import SyncStatusCard from '@/components/elements/SyncStatusCard';
 import OfflineTransactionCard from '@/components/elements/OfflineTransactionCard';
-import { selectCollectionsNeedingSync, selectAllCollections } from '@/slices/collections.slice';
+import { selectCollectionsNeedingSync } from '@/slices/collections.slice';
 import { selectAllCustomers } from '@/slices/customers.slice';
 import { selectSession } from '@/slices/settings.slice';
 import type { OfflineTransaction, SyncStatus } from '@/types/OfflineQueueData';
 
 export default function OfflineQueue() {
-  const router = useRouter();
   const { theme } = useTheme();
 
   // Get session
@@ -73,44 +69,8 @@ export default function OfflineQueue() {
       flex: 1,
       backgroundColor: theme.colors.background.app,
     },
-    header: {
-      backgroundColor: theme.colors.background.cardElevated,
-      paddingHorizontal: spacing(theme, 'screenPadding'),
-      paddingTop: spacing(theme, 'md'),
-      paddingBottom: spacing(theme, 'md'),
-      borderBottomWidth: 1,
-      borderBottomColor: theme.colors.background.divider,
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-    },
-    headerLeft: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: spacing(theme, 'md'),
-      flex: 1,
-    },
-    backButton: {
-      width: 40,
-      height: 40,
-      justifyContent: 'center',
-      alignItems: 'center',
-    },
-    backIcon: {
-      fontSize: 24,
-      color: theme.colors.text.primary,
-    },
-    title: {
-      ...typography(theme, 'pageTitle'),
-      fontSize: 20,
-      color: theme.colors.text.primary,
-      fontWeight: '700',
-    },
-    offlineIcon: {
-      fontSize: 24,
-    },
     scrollContent: {
-      paddingTop: spacing(theme, 'md'),
+      paddingVertical: spacing(theme, 'md'),
       paddingBottom: spacing(theme, 'xxl') + 80,
     },
     transactionsSection: {
@@ -188,10 +148,6 @@ export default function OfflineQueue() {
     },
   });
 
-  const handleBack = () => {
-    router.back();
-  };
-
   const handleRetryTransaction = (transactionId: string) => {
     console.log('Retry transaction:', transactionId);
     // TODO: Retry failed transaction
@@ -210,17 +166,7 @@ export default function OfflineQueue() {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      <View style={styles.header}>
-        <View style={styles.headerLeft}>
-          <Pressable onPress={handleBack} style={styles.backButton}>
-            <Text style={styles.backIcon}>←</Text>
-          </Pressable>
-          <Text style={styles.title}>Offline Queue</Text>
-        </View>
-        <Text style={styles.offlineIcon}>📴</Text>
-      </View>
-
+    <View style={styles.container}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         <SyncStatusCard
           pendingCount={syncStatus.pendingCount}
@@ -268,7 +214,7 @@ export default function OfflineQueue() {
           <Text style={styles.syncButtonText}>Sync Now</Text>
         </Pressable>
       </View>
-    </SafeAreaView>
+    </View>
   );
 }
 

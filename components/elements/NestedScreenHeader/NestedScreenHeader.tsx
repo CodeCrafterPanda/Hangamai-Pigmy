@@ -2,12 +2,19 @@ import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { useTheme, typography, spacing } from '@/theme';
 import { useRouter } from 'expo-router';
 
-interface MonthlyCollectionsHeaderProps {
-  month: string;
-  branchName: string;
+interface NestedScreenHeaderProps {
+  title: string;
+  /** Context line under the title (branch, settlement scope, etc.) */
+  subtitle?: string;
 }
 
-export default function MonthlyCollectionsHeader({ month, branchName }: MonthlyCollectionsHeaderProps) {
+/**
+ * Shared header for nested screens, matching RouteDetailsHeader / Customer Details:
+ * ←  Title
+ *    Subtitle
+ * Routes rendering this must keep the Stack header hidden so only one header is visible.
+ */
+export default function NestedScreenHeader({ title, subtitle }: NestedScreenHeaderProps) {
   const { theme } = useTheme();
   const router = useRouter();
 
@@ -38,7 +45,6 @@ export default function MonthlyCollectionsHeader({ month, branchName }: MonthlyC
     },
     titleSection: {
       flex: 1,
-      gap: 2,
     },
     title: {
       ...typography(theme, 'sectionTitle'),
@@ -48,6 +54,9 @@ export default function MonthlyCollectionsHeader({ month, branchName }: MonthlyC
     subtitle: {
       ...typography(theme, 'caption'),
       color: theme.colors.text.secondary,
+      fontWeight: '600',
+      letterSpacing: 0.3,
+      marginTop: 2,
     },
   });
 
@@ -58,16 +67,21 @@ export default function MonthlyCollectionsHeader({ month, branchName }: MonthlyC
   return (
     <View style={styles.container}>
       <View style={styles.leftSection}>
-        <Pressable onPress={handleBack} style={styles.backButton}>
+        <Pressable onPress={handleBack} style={styles.backButton} hitSlop={8}>
           <Text style={styles.backIcon}>←</Text>
         </Pressable>
 
         <View style={styles.titleSection}>
-          <Text style={styles.title}>{month}</Text>
-          <Text style={styles.subtitle}>{branchName}</Text>
+          <Text style={styles.title} numberOfLines={1}>
+            {title}
+          </Text>
+          {!!subtitle && (
+            <Text style={styles.subtitle} numberOfLines={1}>
+              {subtitle}
+            </Text>
+          )}
         </View>
       </View>
     </View>
   );
 }
-
