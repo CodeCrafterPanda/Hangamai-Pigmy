@@ -1,4 +1,14 @@
-import { View, Text, StyleSheet, ScrollView, Pressable, type NativeSyntheticEvent, type NativeScrollEvent } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  Pressable,
+  Share,
+  Alert,
+  type NativeSyntheticEvent,
+  type NativeScrollEvent,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useState, useMemo, useRef } from 'react';
 import { useLocalSearchParams } from 'expo-router';
@@ -7,14 +17,20 @@ import type { State } from '@/utils/store';
 import { useTheme, typography, spacing, radius } from '@/theme';
 import NestedScreenHeader from '@/components/elements/NestedScreenHeader';
 import BottomSheet from '@/components/elements/BottomSheet';
-import { selectAllCollections } from '@/slices/collections.slice';
 import { selectCustomersByAgent } from '@/slices/customers.slice';
-import { selectSession, selectBranchTimezone } from '@/slices/settings.slice';
+import {
+  selectAllRoutes,
+  selectBranchTimezone,
+  selectCurrentAgent,
+  selectCurrentBranch,
+  selectSession,
+} from '@/slices/settings.slice';
 import { selectSettlementsByAgentAndMonth } from '@/slices/settlements.slice';
-import { getBusinessDate } from '@/utils/businessLogic';
+import { selectMonthlyCollectionReport } from '@/slices/reports.slice';
+import { getCurrentBusinessDate } from '@/utils/businessLogic';
+import { buildMonthlyReportCsv, buildMonthlyReportFileName } from '@/utils/reportExport';
 import { navigateToSettlementDetail } from '@/utils/navigation';
 import { SettlementScope } from '@/types';
-import type { MonthlyCollectionsData, FilterOption } from '@/types/MonthlyCollectionsData';
 
 /** Shared geometry so frozen + scrollable halves paint as one table */
 const TABLE_HEADER_HEIGHT = 64;
@@ -23,159 +39,90 @@ const TABLE_TOTAL_ROW_HEIGHT = 60;
 const CUSTOMER_COLUMN_WIDTH = 150;
 const DAY_COLUMN_WIDTH = 80;
 const TOTAL_COLUMN_WIDTH = 100;
+const METRIC_COLUMN_WIDTH = 90;
+
+/** Keeps the reconciliation banner from crowding out the table when many issues exist */
+const MAX_VISIBLE_AUDIT_ERRORS = 3;
+
+/** Display only: a zero in this table means "nothing happened", which reads better as a dash */
+const EMPTY_CELL = '—';
+
+function formatCellValue(value: number): string {
+  return value === 0 ? EMPTY_CELL : value.toLocaleString('en-IN');
+}
+
+/** Parses the "Month Year" route param (e.g. "December 2025") into that month's first day */
+function parseMonthParam(value?: string): Date | null {
+  if (!value) return null;
+
+  const parts = value.split(' ');
+  if (parts.length !== 2) return null;
+
+  const year = parseInt(parts[1], 10);
+  const probe = new Date(`${parts[0]} 1, ${year}`);
+  if (Number.isNaN(probe.getTime())) return null;
+
+  return new Date(year, probe.getMonth(), 1);
+}
 
 export default function MonthlyCollections() {
   const { theme } = useTheme();
   const { month } = useLocalSearchParams<{ month?: string }>();
-  const [isMonthPickerOpen, setIsMonthPickerOpen] = useState(false);
+  const [activePicker, setActivePicker] = useState<'month' | 'route' | null>(null);
   const [selectedMonth, setSelectedMonth] = useState<Date | null>(null);
+  const [routeFilter, setRouteFilter] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'collections' | 'settlements'>('collections');
 
   // Get session
   const session = useSelector(selectSession);
   const timezone = useSelector(selectBranchTimezone);
+  const agent = useSelector(selectCurrentAgent);
+  const branch = useSelector(selectCurrentBranch);
   const agentId = session.agentId || 'demo-agent';
 
-  // Get data from Redux - only PRIMARY customers (not delegated)
-  const allCollections = useSelector(selectAllCollections);
-  const myPrimaryCustomers = useSelector((state: State) =>
-    selectCustomersByAgent(state, agentId)
+  // "Now" is the branch business date, never the device calendar
+  const currentBusinessDate = getCurrentBusinessDate(timezone);
+  const [businessYear, businessMonthIndex] = useMemo(() => {
+    const [year, monthNumber] = currentBusinessDate.split('-').map(Number);
+    return [year, monthNumber - 1];
+  }, [currentBusinessDate]);
+
+  // Selected month, or the month from the route param, or the current business month
+  const paramMonth = useMemo(() => parseMonthParam(month), [month]);
+  const activeMonth = selectedMonth ?? paramMonth ?? new Date(businessYear, businessMonthIndex, 1);
+  const currentYear = activeMonth.getFullYear();
+  const currentMonthIndex = activeMonth.getMonth();
+
+  // This screen reports the agent's own book. PRIMARY and DELEGATED cash never merge.
+  const report = useSelector((state: State) =>
+    selectMonthlyCollectionReport(
+      state,
+      currentYear,
+      // The selector takes month 1-12; Date.getMonth() is 0-11
+      currentMonthIndex + 1,
+      currentBusinessDate,
+      agentId,
+      SettlementScope.PRIMARY,
+      routeFilter ?? undefined,
+    ),
   );
-  const myPrimaryCustomerIds = useMemo(() => {
-    return new Set(myPrimaryCustomers.map(c => c.id));
-  }, [myPrimaryCustomers]);
-
-  // Use selected month, or parse from URL, or use current
-  const now = new Date();
-  let currentDate = selectedMonth || now;
-
-  if (!selectedMonth && month) {
-    // Parse "Month Year" format (e.g., "December 2025" or "October 2023")
-    const parts = month.split(' ');
-    if (parts.length === 2) {
-      const monthName = parts[0];
-      const year = parseInt(parts[1], 10);
-      // Try to parse the month
-      const testDate = new Date(`${monthName} 1, ${year}`);
-      if (!isNaN(testDate.getTime())) {
-        const monthIndex = testDate.getMonth();
-        currentDate = new Date(year, monthIndex, 1);
-      }
-    }
-  }
-
-  // Validate currentDate and fall back to now if invalid
-  if (isNaN(currentDate.getTime())) {
-    currentDate = now;
-  }
-
-  const currentMonth = currentDate.getMonth();
-  const currentYear = currentDate.getFullYear();
-  const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
-
-  console.log('[MonthlyCollections] Date info:', {
-    monthParam: month,
-    currentMonth: currentMonth + 1,
-    currentYear,
-    daysInMonth,
-    agentId,
-    dateIsValid: !isNaN(currentDate.getTime()),
-  });
-
-  // Get collections for this month via businessDate yyyy-MM (branch-local), not device calendar
-  const monthPrefix = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}`;
-  const monthCollections = useMemo(() => {
-    return allCollections.filter(c => {
-      return (
-        c.collectedByAgentId === agentId &&
-        myPrimaryCustomerIds.has(c.customerId) && // Only primary customers
-        c.businessDate.startsWith(monthPrefix) &&
-        c.status !== 'REVERSED'
-      );
-    });
-  }, [allCollections, agentId, myPrimaryCustomerIds, monthPrefix]);
 
   // Same selected month drives Settlements mode — no separate month state
   const monthSettlements = useSelector((state: State) =>
-    selectSettlementsByAgentAndMonth(state, agentId, monthPrefix)
+    selectSettlementsByAgentAndMonth(state, agentId, report.monthPrefix),
   );
 
-  // Build customer data with daily collections
-  const customers = useMemo(() => {
-    console.log('[MonthlyCollections] Building customer data:', {
-      customersCount: myPrimaryCustomers.length,
-      collectionsCount: monthCollections.length,
-    });
+  // Route options come from the agent's own customers, not a report-only ownership map
+  const myPrimaryCustomers = useSelector((state: State) => selectCustomersByAgent(state, agentId));
+  const allRoutes = useSelector(selectAllRoutes);
+  const routeOptions = useMemo(() => {
+    const myRouteIds = new Set(myPrimaryCustomers.map(customer => customer.routeId));
+    return allRoutes.filter(route => myRouteIds.has(route.id));
+  }, [myPrimaryCustomers, allRoutes]);
 
-    return myPrimaryCustomers.map(customer => {
-      const dailyCollections: Record<string, number | null> = {};
-      let monthlyTotal = 0;
-
-      // Check each day of the month
-      for (let day = 1; day <= daysInMonth; day++) {
-        const dayDate = new Date(currentYear, currentMonth, day);
-        const businessDate = getBusinessDate(dayDate.toISOString(), timezone);
-
-        const dayCollection = monthCollections.find(
-          c => c.customerId === customer.id && c.businessDate === businessDate
-        );
-
-        if (dayCollection) {
-          const amount = dayCollection.amount + dayCollection.penaltyAmount;
-          dailyCollections[day.toString()] = amount;
-          monthlyTotal += amount;
-        } else {
-          dailyCollections[day.toString()] = null;
-        }
-      }
-
-      console.log(`[MonthlyCollections] Customer ${customer.fullName}:`, {
-        monthlyTotal,
-        hasCollections: Object.values(dailyCollections).some(v => v !== null),
-      });
-
-      return {
-        accountNumber: customer.customerCode,
-        name: customer.fullName,
-        dailyCollections,
-        monthlyTotal,
-      };
-    });
-  }, [myPrimaryCustomers, monthCollections, daysInMonth, currentYear, currentMonth, timezone]);
-
-  // Calculate daily totals
-  const dailyTotals: Record<string, number> = {};
-  let grandTotal = 0;
-
-  for (let day = 1; day <= daysInMonth; day++) {
-    let dayTotal = 0;
-    customers.forEach(c => {
-      const amount = c.dailyCollections[day.toString()];
-      if (amount) dayTotal += amount;
-    });
-    dailyTotals[day.toString()] = dayTotal;
-    grandTotal += dayTotal;
-  }
-
-  const monthlyData: MonthlyCollectionsData = {
-    month: currentDate.toLocaleDateString('en-US', { month: 'short' }),
-    year: currentYear,
-    branch: 'Hangamai Main Branch',
-    selectedRoute: '',
-    selectedAgent: 'Self',
-    status: 'Active',
-    daysInMonth: daysInMonth, // Actual days in the month
-    customers: customers, // Show all customers
-    dailyTotals,
-    grandTotal,
-    isAuditSuccessful: true,
-  };
-
-  const [filters, setFilters] = useState<FilterOption>({
-    agent: 'All',
-    route: '',
-    status: 'Active',
-  });
+  const selectedRouteName = routeFilter
+    ? (allRoutes.find(route => route.id === routeFilter)?.name ?? 'Unknown')
+    : 'All';
 
   const styles = StyleSheet.create({
     container: {
@@ -264,7 +211,9 @@ export default function MonthlyCollections() {
       fontWeight: '600',
     },
     filterChipTextActive: {
+      ...typography(theme, 'caption'),
       color: '#FFFFFF',
+      fontWeight: '600',
     },
     filterChipIcon: {
       fontSize: 12,
@@ -440,6 +389,50 @@ export default function MonthlyCollections() {
       justifyContent: 'center',
       paddingHorizontal: spacing(theme, 'sm'),
     },
+    // The missed column leads the scrollable side, so it centres like the day columns
+    // it sits next to rather than right-aligning like the trailing money columns.
+    missedHeaderCell: {
+      width: METRIC_COLUMN_WIDTH,
+      height: TABLE_HEADER_HEIGHT,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingHorizontal: spacing(theme, 'xxs'),
+    },
+    missedBodyCell: {
+      width: METRIC_COLUMN_WIDTH,
+      height: TABLE_ROW_HEIGHT,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingHorizontal: spacing(theme, 'xxs'),
+    },
+    missedFooterCell: {
+      width: METRIC_COLUMN_WIDTH,
+      height: TABLE_TOTAL_ROW_HEIGHT,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingHorizontal: spacing(theme, 'xxs'),
+    },
+    metricHeaderCell: {
+      width: METRIC_COLUMN_WIDTH,
+      height: TABLE_HEADER_HEIGHT,
+      alignItems: 'flex-end',
+      justifyContent: 'center',
+      paddingHorizontal: spacing(theme, 'sm'),
+    },
+    metricBodyCell: {
+      width: METRIC_COLUMN_WIDTH,
+      height: TABLE_ROW_HEIGHT,
+      alignItems: 'flex-end',
+      justifyContent: 'center',
+      paddingHorizontal: spacing(theme, 'sm'),
+    },
+    metricFooterCell: {
+      width: METRIC_COLUMN_WIDTH,
+      height: TABLE_TOTAL_ROW_HEIGHT,
+      alignItems: 'flex-end',
+      justifyContent: 'center',
+      paddingHorizontal: spacing(theme, 'sm'),
+    },
     settlementsSection: {
       flex: 1,
       paddingHorizontal: spacing(theme, 'screenPadding'),
@@ -456,6 +449,14 @@ export default function MonthlyCollections() {
       borderColor: theme.colors.background.divider,
       padding: spacing(theme, 'md'),
       gap: spacing(theme, 'xs'),
+    },
+    settlementSummaryTitle: {
+      ...typography(theme, 'caption'),
+      color: theme.colors.text.muted,
+      fontWeight: '700',
+      textTransform: 'uppercase',
+      fontSize: 10,
+      letterSpacing: 0.5,
     },
     settlementTopRow: {
       flexDirection: 'row',
@@ -494,6 +495,12 @@ export default function MonthlyCollections() {
       ...typography(theme, 'caption'),
       color: theme.colors.text.primary,
       fontWeight: '600',
+      fontSize: 12,
+    },
+    settlementAmountValueStrong: {
+      ...typography(theme, 'caption'),
+      color: theme.colors.brand.primary,
+      fontWeight: '700',
       fontSize: 12,
     },
     emptyState: {
@@ -567,6 +574,19 @@ export default function MonthlyCollections() {
       textAlign: 'right',
       fontSize: 13,
     },
+    cellTextMetric: {
+      ...typography(theme, 'body'),
+      color: theme.colors.text.secondary,
+      textAlign: 'right',
+      fontSize: 13,
+    },
+    cellTextMissed: {
+      ...typography(theme, 'body'),
+      color: theme.colors.status.warning,
+      fontWeight: '600',
+      textAlign: 'right',
+      fontSize: 13,
+    },
     totalLabel: {
       ...typography(theme, 'body'),
       color: theme.colors.text.primary,
@@ -589,12 +609,13 @@ export default function MonthlyCollections() {
       fontSize: 13,
     },
     auditBanner: {
-      margin: spacing(theme, 'screenPadding'),
+      marginHorizontal: spacing(theme, 'screenPadding'),
+      marginBottom: spacing(theme, 'sm'),
       padding: spacing(theme, 'md'),
-      backgroundColor: 'rgba(46, 212, 122, 0.1)',
+      backgroundColor: 'rgba(255, 92, 92, 0.1)',
       borderRadius: radius(theme, 'card'),
       borderWidth: 1,
-      borderColor: theme.colors.status.success,
+      borderColor: theme.colors.status.error,
       flexDirection: 'row',
       gap: spacing(theme, 'sm'),
     },
@@ -602,7 +623,7 @@ export default function MonthlyCollections() {
       width: 40,
       height: 40,
       borderRadius: 20,
-      backgroundColor: theme.colors.status.success,
+      backgroundColor: theme.colors.status.error,
       justifyContent: 'center',
       alignItems: 'center',
     },
@@ -616,30 +637,44 @@ export default function MonthlyCollections() {
     },
     auditTitle: {
       ...typography(theme, 'body'),
-      color: theme.colors.status.success,
+      color: theme.colors.status.error,
       fontWeight: '700',
       textTransform: 'uppercase',
     },
     auditMessage: {
-      ...typography(theme, 'body'),
+      ...typography(theme, 'caption'),
       color: theme.colors.text.primary,
+      fontSize: 12,
     },
-    monthPickerContent: {
+    auditOkRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing(theme, 'xs'),
+      paddingHorizontal: spacing(theme, 'screenPadding'),
+      marginBottom: spacing(theme, 'xs'),
+    },
+    auditOkText: {
+      ...typography(theme, 'caption'),
+      color: theme.colors.status.success,
+      fontSize: 11,
+      fontWeight: '600',
+    },
+    pickerContent: {
       paddingHorizontal: spacing(theme, 'screenPadding'),
       paddingTop: spacing(theme, 'md'),
       paddingBottom: spacing(theme, 'xl'),
     },
-    monthPickerTitle: {
+    pickerTitle: {
       ...typography(theme, 'pageTitle'),
       color: theme.colors.text.primary,
       fontWeight: '700',
       marginBottom: spacing(theme, 'lg'),
       textAlign: 'center',
     },
-    monthOptionsList: {
+    pickerOptionsList: {
       gap: spacing(theme, 'xs'),
     },
-    monthOption: {
+    pickerOption: {
       backgroundColor: theme.colors.background.cardElevated,
       borderRadius: radius(theme, 'input'),
       borderWidth: 1,
@@ -647,50 +682,58 @@ export default function MonthlyCollections() {
       paddingHorizontal: spacing(theme, 'md'),
       paddingVertical: spacing(theme, 'md'),
     },
-    monthOptionSelected: {
+    pickerOptionSelected: {
       backgroundColor: theme.colors.surfaceTint.primarySoft,
       borderColor: theme.colors.brand.primary,
     },
-    monthOptionText: {
+    pickerOptionText: {
       ...typography(theme, 'body'),
       color: theme.colors.text.primary,
       fontWeight: '500',
     },
-    monthOptionTextSelected: {
+    pickerOptionTextSelected: {
       color: theme.colors.brand.primary,
       fontWeight: '700',
     },
   });
 
-  const handleRemoveRouteFilter = () => {
-    setFilters({ ...filters, route: null });
-  };
-
   const handleMonthChange = (newMonth: Date) => {
     setSelectedMonth(newMonth);
-    setIsMonthPickerOpen(false);
+    setActivePicker(null);
   };
 
-  // Generate month options: last 6 months + current + next 6 months
+  const handleRouteChange = (newRouteId: string | null) => {
+    setRouteFilter(newRouteId);
+    setActivePicker(null);
+  };
+
+  /**
+   * Exports the report model that is on screen — the CSV recalculates nothing, so its
+   * totals cannot drift from the displayed ones. Works entirely from local state.
+   */
+  const handleExport = async () => {
+    try {
+      await Share.share({
+        title: buildMonthlyReportFileName(report),
+        message: buildMonthlyReportCsv(report),
+      });
+    } catch {
+      Alert.alert('Export Failed', 'The report could not be shared from this device.');
+    }
+  };
+
+  // Month options are anchored to the business month, not the device calendar
   const monthOptions = useMemo(() => {
-    const options = [];
-    const today = new Date();
-    // Start from 6 months ago
-    for (let i = 9; i >= -3; i--) {
-      const date = new Date(today.getFullYear(), today.getMonth() - i, 1);
-      options.push(date);
+    const options: Date[] = [];
+    for (let offset = 9; offset >= -3; offset--) {
+      options.push(new Date(businessYear, businessMonthIndex - offset, 1));
     }
     return options;
-  }, []);
+  }, [businessYear, businessMonthIndex]);
 
   const getDayOfWeek = (day: number) => {
-    const date = new Date(monthlyData.year, getMonthIndex(monthlyData.month), day);
+    const date = new Date(report.year, report.month - 1, day);
     return date.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase();
-  };
-
-  const getMonthIndex = (month: string) => {
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    return months.indexOf(month);
   };
 
   // User-driven vertical scroll only: the other half mirrors and must not sync back.
@@ -734,23 +777,32 @@ export default function MonthlyCollections() {
     });
   };
 
-  const hasMonthCollections = monthCollections.length > 0;
-  const dayNumbers = Array.from({ length: daysInMonth }, (_, i) => i + 1);
+  const hasMonthCollections = report.collectionCount > 0;
+  const dayNumbers = Array.from({ length: report.daysInMonth }, (_, i) => i + 1);
+  const monthLabel = `${activeMonth.toLocaleDateString('en-US', { month: 'short' })} ${currentYear}`;
+  const headerSubtitle = `${branch?.name ?? 'Branch'} · Primary book`;
+  const visibleAuditErrors = report.auditErrors.slice(0, MAX_VISIBLE_AUDIT_ERRORS);
+  const hiddenAuditErrorCount = report.auditErrors.length - visibleAuditErrors.length;
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      <NestedScreenHeader title="Monthly Collections" subtitle={monthlyData.branch} />
+      <NestedScreenHeader title="Monthly Collections" subtitle={headerSubtitle} />
 
       <View style={styles.controlsContainer}>
         <View style={styles.controlsRow}>
-          <Pressable onPress={() => setIsMonthPickerOpen(true)} style={styles.dateButton}>
-            <Text style={styles.dateText}>{`${monthlyData.month} ${monthlyData.year}`}</Text>
+          <Pressable onPress={() => setActivePicker('month')} style={styles.dateButton}>
+            <Text style={styles.dateText}>{monthLabel}</Text>
             <Text style={styles.dateIcon}>📅</Text>
           </Pressable>
 
           <View style={styles.actionButtons}>
-
-            <Pressable style={[styles.iconButton, styles.iconButtonPrimary]}>
+            <Pressable
+              onPress={handleExport}
+              style={({ pressed }) => [
+                styles.iconButton,
+                styles.iconButtonPrimary,
+                { opacity: pressed ? 0.8 : 1 },
+              ]}>
               <Text style={[styles.iconButtonIcon, styles.iconButtonIconPrimary]}>📤</Text>
             </Pressable>
           </View>
@@ -765,14 +817,9 @@ export default function MonthlyCollections() {
             styles.modeTab,
             viewMode === 'collections' && styles.modeTabActive,
             { opacity: pressed ? 0.8 : 1 },
-          ]}
-        >
+          ]}>
           <Text
-            style={[
-              styles.modeTabText,
-              viewMode === 'collections' && styles.modeTabTextActive,
-            ]}
-          >
+            style={[styles.modeTabText, viewMode === 'collections' && styles.modeTabTextActive]}>
             Collections
           </Text>
         </Pressable>
@@ -783,14 +830,9 @@ export default function MonthlyCollections() {
             styles.modeTab,
             viewMode === 'settlements' && styles.modeTabActive,
             { opacity: pressed ? 0.8 : 1 },
-          ]}
-        >
+          ]}>
           <Text
-            style={[
-              styles.modeTabText,
-              viewMode === 'settlements' && styles.modeTabTextActive,
-            ]}
-          >
+            style={[styles.modeTabText, viewMode === 'settlements' && styles.modeTabTextActive]}>
             Settlements
           </Text>
         </Pressable>
@@ -799,26 +841,55 @@ export default function MonthlyCollections() {
       {viewMode === 'collections' && (
         <>
           <View style={styles.filtersRow}>
-            <Pressable style={styles.filterChip}>
-              <Text style={styles.filterChipText}>Agent: {filters.agent}</Text>
-              <Text style={styles.filterDropdownIcon}>▼</Text>
+            <View style={styles.filterChip}>
+              <Text style={styles.filterChipText}>Agent: {agent?.name ?? agentId}</Text>
+            </View>
+
+            <Pressable
+              onPress={() => setActivePicker('route')}
+              style={[styles.filterChip, !!routeFilter && styles.filterChipActive]}>
+              <Text style={routeFilter ? styles.filterChipTextActive : styles.filterChipText}>
+                Route: {selectedRouteName}
+              </Text>
+              <Text style={routeFilter ? styles.filterChipIcon : styles.filterDropdownIcon}>▼</Text>
             </Pressable>
 
-            {filters.route && (
-              <Pressable
-                style={[styles.filterChip, styles.filterChipActive]}
-                onPress={handleRemoveRouteFilter}
-              >
-                <Text style={styles.filterChipTextActive}>Route: {filters.route}</Text>
-                <Text style={styles.filterChipIcon}>✕</Text>
-              </Pressable>
-            )}
-
-            <Pressable style={styles.filterChip}>
-              <Text style={styles.filterChipText}>Status: {filters.status}</Text>
-              <Text style={styles.filterDropdownIcon}>▼</Text>
-            </Pressable>
+            <View style={styles.filterChip}>
+              <Text style={styles.filterChipText}>Status: Active</Text>
+            </View>
           </View>
+
+          {/* Real reconciliation outcome — never a fixed success state */}
+          {report.isAuditSuccessful ? (
+            <View style={styles.auditOkRow}>
+              <Text style={styles.auditOkText}>
+                ✓ Reconciled — customer, day, Cash/UPI, ledger and settlement totals agree
+              </Text>
+            </View>
+          ) : (
+            <View style={styles.auditBanner}>
+              <View style={styles.auditIconContainer}>
+                <Text style={styles.auditIcon}>!</Text>
+              </View>
+              <View style={styles.auditContent}>
+                <Text style={styles.auditTitle}>
+                  {report.auditErrors.length} reconciliation issue
+                  {report.auditErrors.length === 1 ? '' : 's'}
+                </Text>
+                {visibleAuditErrors.map((error, index) => (
+                  <Text key={`audit-error-${index}`} style={styles.auditMessage}>
+                    • {error}
+                  </Text>
+                ))}
+                {hiddenAuditErrorCount > 0 && (
+                  <Text style={styles.auditMessage}>
+                    • {hiddenAuditErrorCount} more issue
+                    {hiddenAuditErrorCount === 1 ? '' : 's'} in the exported report
+                  </Text>
+                )}
+              </View>
+            </View>
+          )}
 
           <View style={styles.tableContainer}>
             {!hasMonthCollections ? (
@@ -841,16 +912,17 @@ export default function MonthlyCollections() {
                     onScrollEndDrag={handleScrollEndDrag}
                     onMomentumScrollEnd={clearVerticalDriver}
                     scrollEventThrottle={16}
-                    showsVerticalScrollIndicator={false}
-                  >
-                    {monthlyData.customers.map((customer, index) => (
-                      <View key={`customer-${index}`} style={[styles.dataRow, styles.customerBodyCell]}>
+                    showsVerticalScrollIndicator={false}>
+                    {report.rows.map(row => (
+                      <View
+                        key={`customer-${row.accountId}`}
+                        style={[styles.dataRow, styles.customerBodyCell]}>
                         <View style={styles.customerCellContent}>
                           <Text style={styles.customerName} numberOfLines={1}>
-                            {customer.name}
+                            {row.customerName}
                           </Text>
                           <Text style={styles.customerAcctNo} numberOfLines={1}>
-                            {customer.accountNumber}
+                            {row.accountNumber}
                           </Text>
                         </View>
                       </View>
@@ -868,10 +940,12 @@ export default function MonthlyCollections() {
                 <ScrollView
                   horizontal
                   style={styles.scrollableColumns}
-                  showsHorizontalScrollIndicator={true}
-                >
+                  showsHorizontalScrollIndicator={true}>
                   <View>
                     <View style={styles.headerRowDates}>
+                      <View style={styles.missedHeaderCell}>
+                        <Text style={styles.columnHeaderText}>Missed</Text>
+                      </View>
                       {dayNumbers.map(day => (
                         <View key={day} style={styles.dayHeaderCell}>
                           <Text style={styles.dayHeaderText}>
@@ -880,6 +954,12 @@ export default function MonthlyCollections() {
                           <Text style={styles.daySubText}>{getDayOfWeek(day)}</Text>
                         </View>
                       ))}
+                      <View style={styles.metricHeaderCell}>
+                        <Text style={styles.columnHeaderText}>Cash</Text>
+                      </View>
+                      <View style={styles.metricHeaderCell}>
+                        <Text style={styles.columnHeaderText}>UPI</Text>
+                      </View>
                       <View style={styles.totalHeaderCell}>
                         <Text style={styles.totalHeaderText}>Total</Text>
                       </View>
@@ -892,46 +972,110 @@ export default function MonthlyCollections() {
                       onScrollEndDrag={handleScrollEndDrag}
                       onMomentumScrollEnd={clearVerticalDriver}
                       scrollEventThrottle={16}
-                      showsVerticalScrollIndicator={false}
-                    >
-                      {monthlyData.customers.map((customer, index) => (
-                        <View key={`dates-${index}`} style={styles.dataRowDates}>
+                      showsVerticalScrollIndicator={false}>
+                      {report.rows.map(row => (
+                        <View key={`dates-${row.accountId}`} style={styles.dataRowDates}>
+                          {/* Missed days stay visible even though MVP penalty is ₹0 */}
+                          <View style={styles.missedBodyCell}>
+                            <Text
+                              style={
+                                row.missedDays > 0 ? styles.cellTextMissed : styles.cellTextEmpty
+                              }
+                              numberOfLines={1}>
+                              {row.missedDays > 0 ? row.missedDays : EMPTY_CELL}
+                            </Text>
+                          </View>
                           {dayNumbers.map(day => {
-                            const dayAmount = customer.dailyCollections[day.toString()];
+                            const dayAmount = row.dailyCollections[day];
                             return (
                               <View key={day} style={styles.dayBodyCell}>
                                 <Text
-                                  style={
-                                    dayAmount ? styles.cellTextAmount : styles.cellTextEmpty
-                                  }
-                                  numberOfLines={1}
-                                >
-                                  {dayAmount || '—'}
+                                  style={dayAmount ? styles.cellTextAmount : styles.cellTextEmpty}
+                                  numberOfLines={1}>
+                                  {dayAmount || EMPTY_CELL}
                                 </Text>
                               </View>
                             );
                           })}
+                          <View style={styles.metricBodyCell}>
+                            <Text
+                              style={
+                                row.cashCollected ? styles.cellTextMetric : styles.cellTextEmpty
+                              }
+                              numberOfLines={1}>
+                              {formatCellValue(row.cashCollected)}
+                            </Text>
+                          </View>
+                          <View style={styles.metricBodyCell}>
+                            <Text
+                              style={
+                                row.upiCollected ? styles.cellTextMetric : styles.cellTextEmpty
+                              }
+                              numberOfLines={1}>
+                              {formatCellValue(row.upiCollected)}
+                            </Text>
+                          </View>
                           <View style={styles.totalBodyCell}>
-                            <Text style={styles.cellTextTotal} numberOfLines={1}>
-                              {(customer.monthlyTotal || 0).toLocaleString('en-IN')}
+                            <Text
+                              style={row.monthlyTotal ? styles.cellTextTotal : styles.cellTextEmpty}
+                              numberOfLines={1}>
+                              {formatCellValue(row.monthlyTotal)}
                             </Text>
                           </View>
                         </View>
                       ))}
 
                       <View style={styles.footerRowDates}>
-                        {dayNumbers.map(day => (
-                          <View key={day} style={styles.dayFooterCell}>
-                            <Text style={styles.totalAmount} numberOfLines={1}>
-                              {(monthlyData.dailyTotals[day.toString()] || 0).toLocaleString(
-                                'en-IN'
-                              )}
-                            </Text>
-                          </View>
-                        ))}
+                        <View style={styles.missedFooterCell}>
+                          <Text
+                            style={
+                              report.totalMissedDays ? styles.totalAmount : styles.cellTextEmpty
+                            }
+                            numberOfLines={1}>
+                            {formatCellValue(report.totalMissedDays)}
+                          </Text>
+                        </View>
+                        {dayNumbers.map(day => {
+                          const dayTotal = report.dailyTotals[day] || 0;
+                          return (
+                            <View key={day} style={styles.dayFooterCell}>
+                              <Text
+                                style={dayTotal ? styles.totalAmount : styles.cellTextEmpty}
+                                numberOfLines={1}>
+                                {formatCellValue(dayTotal)}
+                              </Text>
+                            </View>
+                          );
+                        })}
+                        <View style={styles.metricFooterCell}>
+                          <Text
+                            style={
+                              report.totalCashCollected
+                                ? styles.totalAmountGrand
+                                : styles.cellTextEmpty
+                            }
+                            numberOfLines={1}>
+                            {formatCellValue(report.totalCashCollected)}
+                          </Text>
+                        </View>
+                        <View style={styles.metricFooterCell}>
+                          <Text
+                            style={
+                              report.totalUpiCollected
+                                ? styles.totalAmountGrand
+                                : styles.cellTextEmpty
+                            }
+                            numberOfLines={1}>
+                            {formatCellValue(report.totalUpiCollected)}
+                          </Text>
+                        </View>
                         <View style={styles.totalFooterCell}>
-                          <Text style={styles.totalAmountGrand} numberOfLines={1}>
-                            {(monthlyData.grandTotal || 0).toLocaleString('en-IN')}
+                          <Text
+                            style={
+                              report.grandTotal ? styles.totalAmountGrand : styles.cellTextEmpty
+                            }
+                            numberOfLines={1}>
+                            {formatCellValue(report.grandTotal)}
                           </Text>
                         </View>
                       </View>
@@ -948,8 +1092,43 @@ export default function MonthlyCollections() {
         <ScrollView
           style={styles.settlementsSection}
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={styles.settlementsList}
-        >
+          contentContainerStyle={styles.settlementsList}>
+          {/* Cash reconciliation for the agent's own book — settlement never erases
+              collection history, it only moves the unsettled balance. */}
+          <View style={styles.settlementCard}>
+            <Text style={styles.settlementSummaryTitle}>
+              Cash reconciliation · Primary book · all routes
+            </Text>
+
+            <View style={styles.settlementAmountRow}>
+              <Text style={styles.settlementAmountLabel}>Cash collected</Text>
+              <Text style={styles.settlementAmountValue}>
+                ₹{report.settlement.cashCollected.toLocaleString('en-IN')}
+              </Text>
+            </View>
+
+            <View style={styles.settlementAmountRow}>
+              <Text style={styles.settlementAmountLabel}>UPI collected</Text>
+              <Text style={styles.settlementAmountValue}>
+                ₹{report.settlement.upiCollected.toLocaleString('en-IN')}
+              </Text>
+            </View>
+
+            <View style={styles.settlementAmountRow}>
+              <Text style={styles.settlementAmountLabel}>Settled cash</Text>
+              <Text style={styles.settlementAmountValue}>
+                ₹{report.settlement.settledCash.toLocaleString('en-IN')}
+              </Text>
+            </View>
+
+            <View style={styles.settlementAmountRow}>
+              <Text style={styles.settlementAmountLabel}>Unsettled cash in hand</Text>
+              <Text style={styles.settlementAmountValueStrong}>
+                ₹{report.settlement.cashInHand.toLocaleString('en-IN')}
+              </Text>
+            </View>
+          </View>
+
           {monthSettlements.length > 0 ? (
             monthSettlements.map(settlement => {
               const statusColor =
@@ -975,11 +1154,7 @@ export default function MonthlyCollections() {
                 <Pressable
                   key={settlement.id}
                   onPress={() => navigateToSettlementDetail(settlement.id)}
-                  style={({ pressed }) => [
-                    styles.settlementCard,
-                    { opacity: pressed ? 0.7 : 1 },
-                  ]}
-                >
+                  style={({ pressed }) => [styles.settlementCard, { opacity: pressed ? 0.7 : 1 }]}>
                   <View style={styles.settlementTopRow}>
                     <Text style={styles.settlementDate}>{dateLabel}</Text>
                     <Text style={[styles.settlementStatus, { color: statusColor }]}>
@@ -1016,41 +1191,85 @@ export default function MonthlyCollections() {
         </ScrollView>
       )}
 
-      <BottomSheet isOpen={isMonthPickerOpen} onClose={() => setIsMonthPickerOpen(false)}>
-        <View style={styles.monthPickerContent}>
-          <Text style={styles.monthPickerTitle}>Select Month</Text>
-          <View style={styles.monthOptionsList}>
-            {monthOptions.map((date, index) => {
-              const optionMonth = date.getMonth();
-              const optionYear = date.getFullYear();
-              const isSelected = optionMonth === currentMonth && optionYear === currentYear;
-              const label = date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+      <BottomSheet isOpen={activePicker !== null} onClose={() => setActivePicker(null)}>
+        {activePicker === 'route' ? (
+          <View style={styles.pickerContent}>
+            <Text style={styles.pickerTitle}>Select Route</Text>
+            <View style={styles.pickerOptionsList}>
+              <Pressable
+                onPress={() => handleRouteChange(null)}
+                style={({ pressed }) => [
+                  styles.pickerOption,
+                  !routeFilter && styles.pickerOptionSelected,
+                  { opacity: pressed ? 0.7 : 1 },
+                ]}>
+                <Text
+                  style={[
+                    styles.pickerOptionText,
+                    !routeFilter && styles.pickerOptionTextSelected,
+                  ]}>
+                  All routes
+                </Text>
+              </Pressable>
 
-              return (
-                <Pressable
-                  key={index}
-                  onPress={() => handleMonthChange(date)}
-                  style={({ pressed }) => [
-                    styles.monthOption,
-                    isSelected && styles.monthOptionSelected,
-                    { opacity: pressed ? 0.7 : 1 },
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.monthOptionText,
-                      isSelected && styles.monthOptionTextSelected,
-                    ]}
-                  >
-                    {label}
-                  </Text>
-                </Pressable>
-              );
-            })}
+              {routeOptions.map(route => {
+                const isSelected = route.id === routeFilter;
+                return (
+                  <Pressable
+                    key={route.id}
+                    onPress={() => handleRouteChange(route.id)}
+                    style={({ pressed }) => [
+                      styles.pickerOption,
+                      isSelected && styles.pickerOptionSelected,
+                      { opacity: pressed ? 0.7 : 1 },
+                    ]}>
+                    <Text
+                      style={[
+                        styles.pickerOptionText,
+                        isSelected && styles.pickerOptionTextSelected,
+                      ]}>
+                      {route.name}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
           </View>
-        </View>
+        ) : (
+          <View style={styles.pickerContent}>
+            <Text style={styles.pickerTitle}>Select Month</Text>
+            <View style={styles.pickerOptionsList}>
+              {monthOptions.map((date, index) => {
+                const isSelected =
+                  date.getMonth() === currentMonthIndex && date.getFullYear() === currentYear;
+                const label = date.toLocaleDateString('en-US', {
+                  month: 'long',
+                  year: 'numeric',
+                });
+
+                return (
+                  <Pressable
+                    key={index}
+                    onPress={() => handleMonthChange(date)}
+                    style={({ pressed }) => [
+                      styles.pickerOption,
+                      isSelected && styles.pickerOptionSelected,
+                      { opacity: pressed ? 0.7 : 1 },
+                    ]}>
+                    <Text
+                      style={[
+                        styles.pickerOptionText,
+                        isSelected && styles.pickerOptionTextSelected,
+                      ]}>
+                      {label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </View>
+        )}
       </BottomSheet>
     </SafeAreaView>
   );
 }
-

@@ -55,12 +55,12 @@ export function getCurrentBusinessDate(timezone: string): string {
 export function isBackdateAllowed(
   targetDate: string,
   currentDate: string,
-  allowBackdateDays: number
+  allowBackdateDays: number,
 ): boolean {
   const target = parseISO(targetDate);
   const current = parseISO(currentDate);
   const daysDiff = differenceInDays(current, target);
-  
+
   return daysDiff >= 0 && daysDiff <= allowBackdateDays;
 }
 
@@ -70,7 +70,7 @@ export function isBackdateAllowed(
 export function formatTimestampInTimezone(
   timestamp: string,
   timezone: string,
-  formatStr: string = 'PPpp'
+  formatStr: string = 'PPpp',
 ): string {
   try {
     return formatInTimeZone(parseISO(timestamp), timezone, formatStr);
@@ -102,17 +102,14 @@ export function generateReceiptNumber(series: ReceiptSeriesConfig): {
   const nextNumber = series.currentNumber + 1;
   const paddedNumber = String(nextNumber).padStart(4, '0');
   const receiptNo = `${series.prefix}-${series.year}-${paddedNumber}`;
-  
+
   return { receiptNo, nextNumber };
 }
 
 /**
  * Initialize receipt series for a new year
  */
-export function initializeReceiptSeriesForYear(
-  prefix: string,
-  year: number
-): ReceiptSeriesConfig {
+export function initializeReceiptSeriesForYear(prefix: string, year: number): ReceiptSeriesConfig {
   return {
     prefix,
     year,
@@ -157,7 +154,7 @@ export function generateAccountNumber(year: number, lastNumber: number): string 
 export function generateIdempotencyKey(
   deviceFingerprint: string,
   accountId: string,
-  timestamp: string
+  timestamp: string,
 ): string {
   return `${deviceFingerprint}-${accountId}-${timestamp}`;
 }
@@ -190,20 +187,20 @@ export function calculateDueMissedPenalty(
   collections: Collection[],
   currentBusinessDate: string,
   frequency: SchemeFrequency,
-  penaltyPerDay: number
+  penaltyPerDay: number,
 ): DueCalculationResult {
   // Get last collection date
   const lastCollection = collections.find(c => c.status !== 'REVERSED');
   const lastCollectionDate = lastCollection?.businessDate;
-  
+
   // Calculate missed days based on frequency
   let missedDays = 0;
   if (lastCollectionDate) {
     const daysSinceLastCollection = differenceInDays(
       parseISO(currentBusinessDate),
-      parseISO(lastCollectionDate)
+      parseISO(lastCollectionDate),
     );
-    
+
     switch (frequency) {
       case 'DAILY':
         missedDays = Math.max(0, daysSinceLastCollection - 1);
@@ -219,9 +216,9 @@ export function calculateDueMissedPenalty(
     // No collection yet - calculate from account opening
     const daysSinceOpening = differenceInDays(
       parseISO(currentBusinessDate),
-      parseISO(account.openedAt)
+      parseISO(account.openedAt),
     );
-    
+
     switch (frequency) {
       case 'DAILY':
         missedDays = Math.max(0, daysSinceOpening);
@@ -234,15 +231,15 @@ export function calculateDueMissedPenalty(
         break;
     }
   }
-  
+
   // Calculate due amount (installment * missed cycles + today's installment)
   const dueAmount = account.installmentAmount * (missedDays + 1);
-  
+
   // Calculate penalty
   const penaltyAmount = missedDays > 0 ? missedDays * penaltyPerDay : 0;
-  
+
   const totalDue = dueAmount + penaltyAmount;
-  
+
   return {
     dueAmount,
     missedDays,
@@ -343,10 +340,7 @@ export function calculateMissedDaysForMonth(
     }
 
     const satisfied = collections.some(
-      c =>
-        c.accountId === account.id &&
-        c.businessDate === businessDate &&
-        c.status !== 'REVERSED',
+      c => c.accountId === account.id && c.businessDate === businessDate && c.status !== 'REVERSED',
     );
 
     if (!satisfied) {
@@ -415,10 +409,10 @@ export function createLedgerEntriesForCollection(
   collectionId: string,
   amount: number,
   penaltyAmount: number,
-  postedAt: string
+  postedAt: string,
 ): LedgerEntry[] {
   const entries: LedgerEntry[] = [];
-  
+
   // Credit entry for collection amount
   entries.push({
     id: `${collectionId}-CREDIT`,
@@ -430,7 +424,7 @@ export function createLedgerEntriesForCollection(
     postedAt,
     createdAt: new Date().toISOString(),
   });
-  
+
   // Penalty entry if applicable
   if (penaltyAmount > 0) {
     entries.push({
@@ -444,7 +438,7 @@ export function createLedgerEntriesForCollection(
       createdAt: new Date().toISOString(),
     });
   }
-  
+
   return entries;
 }
 
@@ -454,10 +448,10 @@ export function createLedgerEntriesForCollection(
 export function createReversalLedgerEntry(
   originalCollection: Collection,
   reversalId: string,
-  postedAt: string
+  postedAt: string,
 ): LedgerEntry[] {
   const entries: LedgerEntry[] = [];
-  
+
   // Reverse the collection amount
   entries.push({
     id: `${reversalId}-REVERSAL-CREDIT`,
@@ -469,7 +463,7 @@ export function createReversalLedgerEntry(
     postedAt,
     createdAt: new Date().toISOString(),
   });
-  
+
   // Reverse the penalty if applicable
   if (originalCollection.penaltyAmount > 0) {
     entries.push({
@@ -483,7 +477,7 @@ export function createReversalLedgerEntry(
       createdAt: new Date().toISOString(),
     });
   }
-  
+
   return entries;
 }
 
@@ -503,19 +497,17 @@ export interface SettlementSummary {
  * @param collections Collections for the business date
  * @returns Settlement summary
  */
-export function calculateSettlementSummary(
-  collections: Collection[]
-): SettlementSummary {
+export function calculateSettlementSummary(collections: Collection[]): SettlementSummary {
   const validCollections = collections.filter(c => c.status !== 'REVERSED');
-  
+
   const cashTotal = validCollections
     .filter(c => c.mode === 'CASH')
     .reduce((sum, c) => sum + c.amount + c.penaltyAmount, 0);
-  
+
   const upiTotal = validCollections
     .filter(c => c.mode === 'UPI')
     .reduce((sum, c) => sum + c.amount + c.penaltyAmount, 0);
-  
+
   return {
     cashTotal,
     upiTotal,
@@ -551,38 +543,38 @@ export function checkDelegationEligibility(
   delegations: any[], // Active delegations
   currentTimestamp: string,
   todayCollectionCount: number,
-  todayCollectionAmount: number
+  todayCollectionAmount: number,
 ): DelegationEligibility {
   // Find applicable delegation
   const applicableDelegation = delegations.find(d => {
     // Check customer match
     if (d.customerId !== customerId) return false;
-    
+
     // Check account match (null means all accounts)
     if (d.accountId && d.accountId !== accountId) return false;
-    
+
     // Check agent match
     if (d.secondaryAgentId !== agentId) return false;
-    
+
     // Check time window
     const now = new Date(currentTimestamp).getTime();
     const start = new Date(d.startAt).getTime();
     const end = new Date(d.endAt).getTime();
     if (now < start || now > end) return false;
-    
+
     // Check status
     if (d.status !== 'ACTIVE') return false;
-    
+
     return true;
   });
-  
+
   if (!applicableDelegation) {
     return {
       isEligible: false,
       reason: 'No active delegation found',
     };
   }
-  
+
   // Check collection count limit
   if (
     applicableDelegation.maxCollectionsPerDay &&
@@ -594,7 +586,7 @@ export function checkDelegationEligibility(
       delegationId: applicableDelegation.id,
     };
   }
-  
+
   // Check amount limit
   if (
     applicableDelegation.maxAmountPerDay &&
@@ -606,7 +598,7 @@ export function checkDelegationEligibility(
       delegationId: applicableDelegation.id,
     };
   }
-  
+
   return {
     isEligible: true,
     delegationId: applicableDelegation.id,
@@ -626,18 +618,18 @@ export function isDuplicateCollection(
   amount: number,
   collectedByAgentId: string,
   existingCollections: Collection[],
-  timeWindowMinutes: number = 5
+  timeWindowMinutes: number = 5,
 ): boolean {
   const currentTime = new Date().getTime();
   const timeWindow = timeWindowMinutes * 60 * 1000;
-  
+
   return existingCollections.some(c => {
     if (c.status === 'REVERSED') return false;
     if (c.accountId !== accountId) return false;
     if (c.businessDate !== businessDate) return false;
     if (c.amount !== amount) return false;
     if (c.collectedByAgentId !== collectedByAgentId) return false;
-    
+
     // Check time window
     const collectionTime = new Date(c.collectedAt).getTime();
     return currentTime - collectionTime < timeWindow;
@@ -648,31 +640,189 @@ export function isDuplicateCollection(
 // MONTHLY REPORT RECONCILIATION
 // ===========================
 
+/** Allowed rounding difference (1 paisa) for every monetary comparison below */
+const RECONCILIATION_TOLERANCE = 0.01;
+
 /**
- * Verify monthly report totals match
+ * Per-account balance facts gathered by the report projection.
+ * `ledgerBalance` is calculateAccountBalance over the account's ledger entries — the
+ * authoritative figure. `cachedBalance` is the copy held on the Account record.
+ */
+export interface ReportBalanceCheck {
+  accountNumber: string;
+  ledgerBalance: number;
+  cachedBalance: number;
+  /** False when the account has no ledger entries at all */
+  hasLedgerData: boolean;
+  collectedInMonth: number;
+}
+
+/** Per-business-date cash facts, taken from the settlement/cash-in-hand rule. */
+export interface ReportSettlementCheck {
+  businessDate: string;
+  cashCollected: number;
+  settledCash: number;
+  cashInHand: number;
+}
+
+/**
+ * Facts the monthly report projection hands to the reconciliation check so the check
+ * itself stays the only place that decides whether a month reconciles.
+ */
+export interface MonthlyReportCrossChecks {
+  cashTotal: number;
+  upiTotal: number;
+  /** In-scope month collections before account-level filtering — catches rows dropped by account status */
+  inScopeCollectionTotal: number;
+  /** Collections that exist in memory only because their storage write failed */
+  failedCollectionCount: number;
+  /** Receipts whose collection has no CREDIT ledger entry */
+  receiptsWithoutLedgerEntry: string[];
+  /** Receipts whose collection has more than one CREDIT ledger entry */
+  receiptsWithDuplicateLedgerEntry: string[];
+  balanceChecks: ReportBalanceCheck[];
+  settlementChecks: ReportSettlementCheck[];
+}
+
+function formatInr(amount: number): string {
+  return `₹${amount.toLocaleString('en-IN')}`;
+}
+
+/** Keeps a surfaced list readable without hiding that more entries exist. */
+function summarizeList(values: string[], limit: number = 5): string {
+  const shown = values.slice(0, limit).join(', ');
+  const remaining = values.length - limit;
+  return remaining > 0 ? `${shown} and ${remaining} more` : shown;
+}
+
+/**
+ * Financial-consistency checks layered on top of the report's own arithmetic.
+ * Every problem is reported, never corrected — source data wins over the projection.
+ * Account numbers and receipt numbers identify records without copying customer data.
+ */
+function collectCrossCheckErrors(
+  grandTotal: number,
+  crossChecks: MonthlyReportCrossChecks,
+): string[] {
+  const errors: string[] = [];
+  const {
+    cashTotal,
+    upiTotal,
+    inScopeCollectionTotal,
+    failedCollectionCount,
+    receiptsWithoutLedgerEntry,
+    receiptsWithDuplicateLedgerEntry,
+    balanceChecks,
+    settlementChecks,
+  } = crossChecks;
+
+  // Payment-method totals must reconcile with the overall collection total
+  if (Math.abs(cashTotal + upiTotal - grandTotal) > RECONCILIATION_TOLERANCE) {
+    errors.push(
+      `Cash (${formatInr(cashTotal)}) + UPI (${formatInr(upiTotal)}) does not match grand total (${formatInr(grandTotal)})`,
+    );
+  }
+
+  // Collections that exist for the month but are not represented by any report row
+  const unrepresented = inScopeCollectionTotal - grandTotal;
+  if (Math.abs(unrepresented) > RECONCILIATION_TOLERANCE) {
+    errors.push(
+      `${formatInr(unrepresented)} of collections in this month are not represented in the report rows (account closed, blocked or missing)`,
+    );
+  }
+
+  if (failedCollectionCount > 0) {
+    errors.push(
+      `${failedCollectionCount} collection(s) in this month were never written to device storage (status FAILED) and will not survive a restart`,
+    );
+  }
+
+  if (receiptsWithoutLedgerEntry.length > 0) {
+    errors.push(
+      `No ledger entry found for receipt(s): ${summarizeList(receiptsWithoutLedgerEntry)}`,
+    );
+  }
+
+  if (receiptsWithDuplicateLedgerEntry.length > 0) {
+    errors.push(
+      `Duplicate ledger entries found for receipt(s): ${summarizeList(receiptsWithDuplicateLedgerEntry)}`,
+    );
+  }
+
+  // Ledger is the authoritative balance. Where it has nothing to derive from, say so
+  // instead of substituting the cached figure as if it were verified.
+  const accountsWithoutLedgerData = balanceChecks
+    .filter(check => !check.hasLedgerData && check.collectedInMonth > 0)
+    .map(check => check.accountNumber);
+
+  if (accountsWithoutLedgerData.length > 0) {
+    errors.push(
+      `Ledger balance data not available for account(s) with collections this month: ${summarizeList(accountsWithoutLedgerData)}`,
+    );
+  }
+
+  const mismatchedBalances = balanceChecks.filter(
+    check =>
+      check.hasLedgerData &&
+      Math.abs(check.ledgerBalance - check.cachedBalance) > RECONCILIATION_TOLERANCE,
+  );
+
+  mismatchedBalances.slice(0, 5).forEach(check => {
+    errors.push(
+      `Account ${check.accountNumber} balance (${formatInr(check.cachedBalance)}) does not match its ledger balance (${formatInr(check.ledgerBalance)})`,
+    );
+  });
+
+  if (mismatchedBalances.length > 5) {
+    errors.push(`${mismatchedBalances.length - 5} further account balance mismatch(es) not listed`);
+  }
+
+  // A closure can never hand over more cash than was collected in that scope/date
+  settlementChecks
+    .filter(check => check.settledCash - check.cashCollected > RECONCILIATION_TOLERANCE)
+    .forEach(check => {
+      errors.push(
+        `Settled cash (${formatInr(check.settledCash)}) on ${check.businessDate} exceeds cash collected (${formatInr(check.cashCollected)})`,
+      );
+    });
+
+  return errors;
+}
+
+/**
+ * Verify monthly report totals match.
+ *
+ * The single reconciliation entry point for the monthly report: the two internal
+ * arithmetic checks (customer sum and day sum against the grand total) always run, and
+ * `crossChecks` adds the payment-method, ledger/balance and settlement checks when the
+ * projection supplies them.
  */
 export function verifyMonthlyReportReconciliation(
   customerTotals: number[],
   dayTotals: number[],
-  grandTotal: number
+  grandTotal: number,
+  crossChecks?: MonthlyReportCrossChecks,
 ): { isValid: boolean; errors: string[] } {
   const errors: string[] = [];
-  
+
   // Sum of all customer totals should equal grand total
   const customerSum = customerTotals.reduce((sum, total) => sum + total, 0);
-  if (Math.abs(customerSum - grandTotal) > 0.01) {
-    // Allow 1 paisa difference for rounding
+  if (Math.abs(customerSum - grandTotal) > RECONCILIATION_TOLERANCE) {
     errors.push(
-      `Customer totals sum (₹${customerSum}) does not match grand total (₹${grandTotal})`
+      `Customer totals sum (₹${customerSum}) does not match grand total (₹${grandTotal})`,
     );
   }
-  
+
   // Sum of all day totals should equal grand total
   const daySum = dayTotals.reduce((sum, total) => sum + total, 0);
-  if (Math.abs(daySum - grandTotal) > 0.01) {
+  if (Math.abs(daySum - grandTotal) > RECONCILIATION_TOLERANCE) {
     errors.push(`Day totals sum (₹${daySum}) does not match grand total (₹${grandTotal})`);
   }
-  
+
+  if (crossChecks) {
+    errors.push(...collectCrossCheckErrors(grandTotal, crossChecks));
+  }
+
   return {
     isValid: errors.length === 0,
     errors,
@@ -704,10 +854,10 @@ export function normalizePhone(phone: string): string {
  */
 export function maskKYCNumber(kycNumber: string, visibleDigits: number = 4): string {
   if (kycNumber.length <= visibleDigits) return kycNumber;
-  
+
   const masked = 'X'.repeat(kycNumber.length - visibleDigits);
   const visible = kycNumber.slice(-visibleDigits);
-  
+
   return `${masked}${visible}`;
 }
 
@@ -725,7 +875,7 @@ export function maskKYCNumber(kycNumber: string, visibleDigits: number = 4): str
 export function calculateNextRetryTime(
   retryCount: number,
   baseDelayMs: number = 1000,
-  maxDelayMs: number = 3600000
+  maxDelayMs: number = 3600000,
 ): string {
   const delayMs = Math.min(baseDelayMs * Math.pow(2, retryCount), maxDelayMs);
   const nextRetryTime = new Date(Date.now() + delayMs);
@@ -762,4 +912,3 @@ export default {
   maskKYCNumber,
   calculateNextRetryTime,
 };
-

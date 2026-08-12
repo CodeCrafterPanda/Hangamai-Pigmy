@@ -18,7 +18,7 @@ import {
   getEntitiesArray,
   type NormalizedStore,
 } from '@/utils/storage';
-import { calculateVariance } from '@/utils/businessLogic';
+import { calculateSettlementSummary, calculateVariance } from '@/utils/businessLogic';
 import { generateUUID } from '@/utils/uuid';
 
 // ===========================
@@ -62,22 +62,22 @@ export const hydrateSettlements = createAsyncThunk(
     try {
       const stored = await getItemSafe<NormalizedStore<PersistedSettlement>>(
         STORAGE_KEYS.SETTLEMENTS,
-        createEmptyStore<PersistedSettlement>()
+        createEmptyStore<PersistedSettlement>(),
       );
-      
+
       const byId: Record<string, Settlement> = {};
       Object.keys(stored.byId).forEach(id => {
         const record = stored.byId[id];
         byId[id] = { ...record, scope: record.scope ?? SettlementScope.PRIMARY };
       });
-      
+
       const settlements: NormalizedStore<Settlement> = { ...stored, byId };
-      
+
       return { settlements };
     } catch (error: any) {
       return rejectWithValue(error.message || 'Failed to hydrate settlements');
     }
-  }
+  },
 );
 
 /**
@@ -89,19 +89,19 @@ export const persistSettlements = createAsyncThunk(
     try {
       const state = getState() as State;
       const { settlements } = state.settlements;
-      
+
       // setItemSafe swallows the write error and reports false, so the caller can only
       // learn that a day closure never reached storage if we reject here.
       const persisted = await setItemSafe(STORAGE_KEYS.SETTLEMENTS, settlements);
       if (!persisted) {
         return rejectWithValue('Failed to persist settlements to device storage');
       }
-      
+
       return true;
     } catch (error: any) {
       return rejectWithValue(error.message || 'Failed to persist settlements');
     }
-  }
+  },
 );
 
 // ===========================
@@ -130,10 +130,10 @@ const slice = createSlice({
     createSettlement: (state, { payload }: PayloadAction<CreateSettlementPayload>) => {
       const id = generateUUID();
       const now = new Date().toISOString();
-      
+
       // Calculate variance
       const variance = calculateVariance(payload.cashInHand, payload.cashTotal);
-      
+
       const settlement: Settlement = {
         id,
         agentId: payload.agentId,
@@ -150,36 +150,36 @@ const slice = createSlice({
         createdAt: now,
         updatedAt: now,
       };
-      
+
       state.settlements = addEntityToStore(state.settlements, settlement);
       state.error = undefined;
     },
-    
+
     /**
      * Update settlement (only allowed in DRAFT status)
      */
     updateSettlement: (
       state,
-      { payload }: PayloadAction<{ id: string; updates: Partial<CreateSettlementPayload> }>
+      { payload }: PayloadAction<{ id: string; updates: Partial<CreateSettlementPayload> }>,
     ) => {
       const { id, updates } = payload;
       const existing = state.settlements.byId[id];
-      
+
       if (!existing) {
         state.error = 'Settlement not found';
         return;
       }
-      
+
       if (existing.status !== 'DRAFT') {
         state.error = 'Cannot update submitted settlement';
         return;
       }
-      
+
       // Recalculate variance if cash values changed
       const cashInHand = updates.cashInHand ?? existing.cashInHand;
       const cashTotal = updates.cashTotal ?? existing.cashTotal;
       const variance = calculateVariance(cashInHand, cashTotal);
-      
+
       state.settlements = updateEntityInStore(state.settlements, id, {
         ...updates,
         variance,
@@ -187,30 +187,30 @@ const slice = createSlice({
       });
       state.error = undefined;
     },
-    
+
     /**
      * Submit settlement (lock for review)
      */
     submitSettlement: (state, { payload }: PayloadAction<string>) => {
       const now = new Date().toISOString();
       const existing = state.settlements.byId[payload];
-      
+
       if (!existing) {
         state.error = 'Settlement not found';
         return;
       }
-      
+
       if (existing.status !== 'DRAFT') {
         state.error = 'Settlement already submitted';
         return;
       }
-      
+
       // Validate: if variance != 0, notes required
       if (existing.variance !== 0 && !existing.notes) {
         state.error = 'Notes required when variance is not zero';
         return;
       }
-      
+
       state.settlements = updateEntityInStore(state.settlements, payload, {
         status: 'SUBMITTED',
         submittedAt: now,
@@ -218,7 +218,7 @@ const slice = createSlice({
       });
       state.error = undefined;
     },
-    
+
     /**
      * Roll a submission back to DRAFT because its storage write failed.
      *
@@ -230,25 +230,22 @@ const slice = createSlice({
      */
     revertSettlementSubmission: (state, { payload }: PayloadAction<string>) => {
       const existing = state.settlements.byId[payload];
-      
+
       if (!existing || existing.status !== 'SUBMITTED') {
         return;
       }
-      
+
       state.settlements = updateEntityInStore(state.settlements, payload, {
         status: 'DRAFT',
         submittedAt: undefined,
         updatedAt: new Date().toISOString(),
       });
     },
-    
+
     /**
      * Approve settlement (admin action, will be used later)
      */
-    approveSettlement: (
-      state,
-      { payload }: PayloadAction<{ id: string; reviewedBy: string }>
-    ) => {
+    approveSettlement: (state, { payload }: PayloadAction<{ id: string; reviewedBy: string }>) => {
       const now = new Date().toISOString();
       state.settlements = updateEntityInStore(state.settlements, payload.id, {
         status: 'APPROVED',
@@ -258,13 +255,13 @@ const slice = createSlice({
       });
       state.error = undefined;
     },
-    
+
     /**
      * Reject settlement (admin action, will be used later)
      */
     rejectSettlement: (
       state,
-      { payload }: PayloadAction<{ id: string; reviewedBy: string; notes: string }>
+      { payload }: PayloadAction<{ id: string; reviewedBy: string; notes: string }>,
     ) => {
       const now = new Date().toISOString();
       state.settlements = updateEntityInStore(state.settlements, payload.id, {
@@ -276,21 +273,21 @@ const slice = createSlice({
       });
       state.error = undefined;
     },
-    
+
     /**
      * Set error
      */
     setError: (state, { payload }: PayloadAction<string>) => {
       state.error = payload;
     },
-    
+
     /**
      * Clear error
      */
     clearError: state => {
       state.error = undefined;
     },
-    
+
     /**
      * Reset settlements state
      */
@@ -312,7 +309,7 @@ const slice = createSlice({
       state.error = action.payload as string;
       state.hydrated = true;
     });
-    
+
     // Persist
     builder.addCase(persistSettlements.pending, state => {
       state.loading = true;
@@ -343,18 +340,18 @@ const selectSettlementsStore = (state: State) => state.settlements.settlements;
 const selectCollectionsStore = (state: State) => state.collections.collections;
 
 const selectSettlementEntities = createSelector([selectSettlementsStore], store =>
-  getEntitiesArray(store)
+  getEntitiesArray(store),
 );
 
 const selectCollectionEntities = createSelector([selectCollectionsStore], store =>
-  getEntitiesArray(store)
+  getEntitiesArray(store),
 );
 
 /**
  * Get all settlements as array
  */
 export const selectAllSettlements = createSelector([selectSettlementEntities], settlements =>
-  [...settlements].sort((a, b) => b.businessDate.localeCompare(a.businessDate))
+  [...settlements].sort((a, b) => b.businessDate.localeCompare(a.businessDate)),
 );
 
 /**
@@ -372,7 +369,7 @@ export const selectSettlementsByAgent = createSelector(
   (settlements, agentId) =>
     settlements
       .filter(s => s.agentId === agentId)
-      .sort((a, b) => b.businessDate.localeCompare(a.businessDate))
+      .sort((a, b) => b.businessDate.localeCompare(a.businessDate)),
 );
 
 /**
@@ -387,7 +384,7 @@ export const selectSettlementsByAgentAndMonth = createSelector(
   (settlements, agentId, monthPrefix) =>
     settlements
       .filter(s => s.agentId === agentId && s.businessDate.startsWith(monthPrefix))
-      .sort((a, b) => b.businessDate.localeCompare(a.businessDate))
+      .sort((a, b) => b.businessDate.localeCompare(a.businessDate)),
 );
 
 /**
@@ -399,10 +396,10 @@ export const selectSettlementByAgentAndDate = (
   state: State,
   agentId: string,
   businessDate: string,
-  scope: SettlementScope
+  scope: SettlementScope,
 ): Settlement | undefined => {
   return selectSettlementEntities(state).find(
-    s => s.agentId === agentId && s.businessDate === businessDate && s.scope === scope
+    s => s.agentId === agentId && s.businessDate === businessDate && s.scope === scope,
   );
 };
 
@@ -413,7 +410,7 @@ export const selectHasSettlementForDate = (
   state: State,
   agentId: string,
   businessDate: string,
-  scope: SettlementScope
+  scope: SettlementScope,
 ): boolean => {
   return !!selectSettlementByAgentAndDate(state, agentId, businessDate, scope);
 };
@@ -424,7 +421,7 @@ export const selectHasSettlementForDate = (
 export const selectPendingSettlements = createSelector([selectSettlementEntities], settlements =>
   settlements
     .filter(s => s.status === 'DRAFT' || s.status === 'SUBMITTED')
-    .sort((a, b) => b.businessDate.localeCompare(a.businessDate))
+    .sort((a, b) => b.businessDate.localeCompare(a.businessDate)),
 );
 
 /**
@@ -435,7 +432,7 @@ export const selectSettlementsWithVariance = createSelector(
   settlements =>
     settlements
       .filter(s => s.variance !== 0)
-      .sort((a, b) => b.businessDate.localeCompare(a.businessDate))
+      .sort((a, b) => b.businessDate.localeCompare(a.businessDate)),
 );
 
 /**
@@ -446,7 +443,7 @@ export const selectSettlementsByStatus = createSelector(
   (settlements, status) =>
     settlements
       .filter(s => s.status === status)
-      .sort((a, b) => b.businessDate.localeCompare(a.businessDate))
+      .sort((a, b) => b.businessDate.localeCompare(a.businessDate)),
 );
 
 // ===========================
@@ -478,31 +475,25 @@ export const selectScopedDayCollections = createSelector(
       c =>
         c.collectedByAgentId === agentId &&
         c.businessDate === businessDate &&
-        getCollectionSettlementScope(c) === scope
-    )
+        getCollectionSettlementScope(c) === scope,
+    ),
 );
 
 /**
  * Cash the agent physically collected on a business date in one scope, before any closure.
- * Same amount/REVERSED rules as calculateSettlementSummary so the two always agree.
+ * Delegates to calculateSettlementSummary, so which collections count as cash is decided
+ * in exactly one place.
  */
 export const selectEligibleCashCollected = createSelector(
   [selectScopedDayCollections],
-  collections =>
-    collections
-      .filter(c => c.status !== 'REVERSED' && c.mode === 'CASH')
-      .reduce((sum, c) => sum + c.amount + c.penaltyAmount, 0)
+  collections => calculateSettlementSummary(collections).cashTotal,
 );
 
 /**
- * Cash already handed over through a day closure for a business date.
- *
- * Uses Settlement.cashTotal (system-computed collected cash) — NOT Settlement.cashInHand,
- * which is the agent-declared physical count and exists only to produce `variance` for
- * reconciliation. Only settlements at SUBMITTED status or later count; DRAFT is still
- * mutable/discardable and must not reduce the running balance.
+ * The settlement records that close one agent's business date within one scope.
+ * Settlement identity is agentId + businessDate + scope.
  */
-export const selectSettledCashTotal = createSelector(
+export const selectScopedDateSettlements = createSelector(
   [
     selectSettlementEntities,
     (_state: State, agentId: string, _businessDate: string, _scope: SettlementScope) => agentId,
@@ -511,36 +502,55 @@ export const selectSettledCashTotal = createSelector(
     (_state: State, _agentId: string, _businessDate: string, scope: SettlementScope) => scope,
   ],
   (settlements, agentId, businessDate, scope) =>
-    settlements
-      .filter(
-        s =>
-          s.agentId === agentId &&
-          s.businessDate === businessDate &&
-          s.scope === scope &&
-          s.status !== 'DRAFT'
-      )
-      .reduce((sum, s) => sum + s.cashTotal, 0)
+    settlements.filter(
+      s => s.agentId === agentId && s.businessDate === businessDate && s.scope === scope,
+    ),
 );
 
 /**
+ * Cash already handed over through a day closure.
+ *
+ * Uses Settlement.cashTotal (system-computed collected cash) — NOT Settlement.cashInHand,
+ * which is the agent-declared physical count and exists only to produce `variance` for
+ * reconciliation. Only settlements at SUBMITTED status or later count; DRAFT is still
+ * mutable/discardable and must not reduce the running balance.
+ *
+ * Takes an already scope/date-filtered set so reporting can apply the same rule to a
+ * month's worth of closures without restating it.
+ */
+export function sumSettledCash(settlements: Settlement[]): number {
+  return settlements.filter(s => s.status !== 'DRAFT').reduce((sum, s) => sum + s.cashTotal, 0);
+}
+
+export const selectSettledCashTotal = createSelector([selectScopedDateSettlements], sumSettledCash);
+
+/**
+ * The unsettled cash rule itself: eligible collected CASH − cash already handed over.
+ *
+ * Derived on every read rather than stored as a mutable number, so a collection made
+ * after settlement raises it again automatically and a repeated settlement can never
+ * reduce it twice. UPI never contributes. Both arguments must already be narrowed to one
+ * agent + scope (and, for a single day, one business date) by the caller; PRIMARY and
+ * DELEGATED balances are independent and must never be pooled.
+ *
+ * Distinct concept from Settlement.cashInHand — see sumSettledCash.
+ */
+export function calculateCashInHand(collections: Collection[], settlements: Settlement[]): number {
+  return calculateSettlementSummary(collections).cashTotal - sumSettledCash(settlements);
+}
+
+/**
  * Authoritative unsettled cash balance for an agent on a business date, within one scope.
- *
- * Derived live on every read (collected − settled) rather than stored as a mutable
- * number, so a collection made after settlement raises it again automatically and a
- * repeated settlement can never reduce it twice. UPI never contributes. PRIMARY and
- * DELEGATED balances are independent - neither can be reduced by the other's closure.
- *
- * Distinct concept from Settlement.cashInHand — see selectSettledCashTotal.
  */
 export const selectCashInHand = (
   state: State,
   agentId: string,
   businessDate: string,
-  scope: SettlementScope
+  scope: SettlementScope,
 ): number => {
-  return (
-    selectEligibleCashCollected(state, agentId, businessDate, scope) -
-    selectSettledCashTotal(state, agentId, businessDate, scope)
+  return calculateCashInHand(
+    selectScopedDayCollections(state, agentId, businessDate, scope),
+    selectScopedDateSettlements(state, agentId, businessDate, scope),
   );
 };
 
@@ -551,7 +561,7 @@ export const selectCashInHand = (
 export function useSettlementsSlice() {
   const dispatch = useDispatch<Dispatch>();
   const state = useSelector((state: State) => state.settlements);
-  
+
   return {
     dispatch,
     ...state,
@@ -579,4 +589,3 @@ export const {
 } = slice.actions;
 
 export default slice.reducer;
-

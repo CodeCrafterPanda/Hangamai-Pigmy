@@ -11,6 +11,5 @@ export * from './ReceiptData';
 export * from './OfflineQueueData';
 export * from './SettlementData';
 export * from './ProfileData';
-export * from './MonthlyCollectionsData';
 export * from './AddCustomerData';
 export * from './EditCustomerData';
