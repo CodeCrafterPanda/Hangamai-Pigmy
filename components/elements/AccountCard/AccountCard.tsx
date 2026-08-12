@@ -1,5 +1,5 @@
 import { View, Text, StyleSheet, Pressable } from 'react-native';
-import { useTheme, typography, spacing, radius } from '@/theme';
+import { useTheme, typography, spacing, radius, withAlpha } from '@/theme';
 import ProgressBar from '@/components/elements/ProgressBar';
 import type { CustomerAccount, AccountType, AccountStatus } from '@/types/CustomerDetailData';
 
@@ -16,16 +16,16 @@ export default function AccountCard({ account, onPress }: AccountCardProps) {
       case 'pigmy':
         return {
           label: 'PIGMY',
-          backgroundColor: 'rgba(59, 111, 255, 0.15)',
+          backgroundColor: theme.colors.surfaceTint.primarySoft,
           textColor: theme.colors.brand.primary,
-          borderColor: 'rgba(59, 111, 255, 0.3)',
+          borderColor: withAlpha(theme.colors.brand.primary, 0.3),
         };
       case 'loan':
         return {
           label: 'LOAN',
-          backgroundColor: 'rgba(142, 84, 233, 0.15)',
-          textColor: '#8E54E9',
-          borderColor: 'rgba(142, 84, 233, 0.3)',
+          backgroundColor: theme.colors.surfaceTint.infoSoft,
+          textColor: theme.colors.status.info,
+          borderColor: withAlpha(theme.colors.status.info, 0.3),
         };
     }
   };
@@ -36,7 +36,7 @@ export default function AccountCard({ account, onPress }: AccountCardProps) {
         return {
           label: 'Pending',
           icon: '⏱',
-          color: '#D4834D',
+          color: theme.colors.status.warning,
         };
       case 'paid':
         return {

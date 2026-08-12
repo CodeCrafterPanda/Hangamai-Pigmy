@@ -37,9 +37,10 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       [
         'expo-splash-screen',
         {
-          backgroundColor: '#ffffff',
+          // Match emerald theme tokens (light / dark backgrounds)
+          backgroundColor: '#F5FAF7',
           dark: {
-            backgroundColor: '#101212',
+            backgroundColor: '#07120D',
           },
           image: './assets/images/logo-lg.png',
           imageWidth: 200,

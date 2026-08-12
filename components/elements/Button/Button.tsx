@@ -49,7 +49,7 @@ function Button({
 
   const defaultLoaderColor =
     loaderColor ||
-    (variant === 'secondary' && theme.mode === 'light'
+    (variant === 'secondary' && theme.meta.mode === 'light'
       ? theme.colors.brand.primary
       : theme.colors.text.primary);
 

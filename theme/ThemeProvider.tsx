@@ -17,29 +17,28 @@ interface ThemeProviderProps {
 
 export function ThemeProvider({ children, initialMode }: ThemeProviderProps) {
   const systemColorScheme = useRNColorScheme();
-  const [mode, setMode] = useState<ThemeMode>(initialMode || systemColorScheme || 'light');
+  // App is dark-first (emerald dark theme). Prefer explicit initialMode, else dark.
+  const [mode, setMode] = useState<ThemeMode>('dark');
   const [isReady, setIsReady] = useState(false);
 
   // Load persisted theme on mount
   useEffect(() => {
     loadThemeMode().then(savedMode => {
-      if (savedMode) {
+      if (savedMode === 'dark' || savedMode === 'light') {
         setMode(savedMode);
-      } else if (systemColorScheme) {
+      } else if (initialMode) {
+        setMode(initialMode);
+      } else if (systemColorScheme === 'dark' || systemColorScheme === 'light') {
+        // No saved preference — follow system, but only once at boot
         setMode(systemColorScheme);
+      } else {
+        setMode('dark');
       }
       setIsReady(true);
     });
   }, []);
 
-  // Sync with system theme if no preference is saved
-  useEffect(() => {
-    if (isReady && systemColorScheme && !mode) {
-      setMode(systemColorScheme);
-    }
-  }, [systemColorScheme, isReady]);
-
-  const theme: Theme = mode === 'dark' ? darkTheme : lightTheme;
+  const theme = (mode === 'dark' ? darkTheme : lightTheme) as Theme;
   const isDark = mode === 'dark';
 
   const toggleTheme = () => {

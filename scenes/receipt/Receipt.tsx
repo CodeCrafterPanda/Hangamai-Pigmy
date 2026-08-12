@@ -249,13 +249,13 @@ export default function Receipt({ collectionId, onClose }: ReceiptProps) {
       alignItems: 'center',
     },
     whatsappBg: {
-      backgroundColor: 'rgba(37, 211, 102, 0.15)',
+      backgroundColor: theme.colors.surfaceTint.successSoft,
     },
     smsBg: {
-      backgroundColor: 'rgba(59, 111, 255, 0.15)',
+      backgroundColor: theme.colors.surfaceTint.infoSoft,
     },
     pdfBg: {
-      backgroundColor: 'rgba(255, 77, 79, 0.15)',
+      backgroundColor: theme.colors.surfaceTint.errorSoft,
     },
     shareIcon: {
       fontSize: 24,

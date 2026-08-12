@@ -12,7 +12,7 @@ import AlertBottomSheet from '@/components/elements/AlertBottomSheet';
 export default function Profile() {
   const router = useRouter();
   const dispatch = useDispatch<Dispatch>();
-  const { theme } = useTheme();
+  const { theme, isDark, toggleTheme } = useTheme();
   const { clearSession, persistSettings } = useSettingsSlice();
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
@@ -146,7 +146,7 @@ export default function Profile() {
     },
     iconApp: {
       fontSize: 20,
-      color: '#8E54E9',
+      color: theme.colors.brand.primary,
     },
     infoContent: {
       flex: 1,
@@ -180,6 +180,37 @@ export default function Profile() {
     checkIcon: {
       fontSize: 14,
       color: '#FFFFFF',
+    },
+    themeButton: {
+      backgroundColor: theme.colors.background.card,
+      borderRadius: radius(theme, 'button'),
+      borderWidth: 1,
+      borderColor: theme.colors.background.divider,
+      marginHorizontal: spacing(theme, 'screenPadding'),
+      marginBottom: spacing(theme, 'md'),
+      paddingVertical: spacing(theme, 'md'),
+      paddingHorizontal: spacing(theme, 'md'),
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+    },
+    themeButtonLeft: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing(theme, 'xs'),
+    },
+    themeIcon: {
+      fontSize: 24,
+    },
+    themeText: {
+      ...typography(theme, 'sectionTitle'),
+      color: theme.colors.text.primary,
+      fontWeight: '600',
+    },
+    themeModeLabel: {
+      ...typography(theme, 'caption'),
+      color: theme.colors.brand.primary,
+      fontWeight: '700',
     },
     helpButton: {
       backgroundColor: theme.colors.background.card,
@@ -343,6 +374,17 @@ export default function Profile() {
             </View>
           </View>
         </View>
+
+        <Pressable
+          onPress={toggleTheme}
+          style={({ pressed }) => [styles.themeButton, { opacity: pressed ? 0.7 : 1 }]}
+        >
+          <View style={styles.themeButtonLeft}>
+            <Text style={styles.themeIcon}>{isDark ? '🌙' : '☀️'}</Text>
+            <Text style={styles.themeText}>Appearance</Text>
+          </View>
+          <Text style={styles.themeModeLabel}>{isDark ? 'Dark' : 'Light'}</Text>
+        </Pressable>
 
         <Pressable
           onPress={handleHelpSupport}

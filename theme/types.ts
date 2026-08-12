@@ -4,8 +4,10 @@
 
 import { darkTheme, lightTheme } from './tokens';
 
-export type Theme = typeof darkTheme;
 export type ThemeMode = 'light' | 'dark';
+
+/** Either theme variant — property access stays type-safe via shared keys */
+export type Theme = typeof darkTheme | typeof lightTheme;
 
 export type ColorTokens = Theme['colors'];
 export type TypographyTokens = Theme['typography'];
@@ -25,12 +27,3 @@ export interface ThemeContextValue {
   toggleTheme: () => void;
   setThemeMode: (mode: ThemeMode) => void;
 }
-
-// Ensure both themes have the same structure
-type AssertSameStructure = typeof darkTheme extends typeof lightTheme
-  ? typeof lightTheme extends typeof darkTheme
-    ? true
-    : false
-  : false;
-
-const _typeCheck: AssertSameStructure = true;

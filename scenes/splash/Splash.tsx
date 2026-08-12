@@ -3,7 +3,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'expo-router';
-import { useTheme, typography, spacing, radius } from '@/theme';
+import { useTheme, typography, spacing, radius, screenGradient, withAlpha } from '@/theme';
 import ProgressBar from '@/components/elements/ProgressBar';
 
 export default function Splash() {
@@ -15,7 +15,7 @@ export default function Splash() {
   useEffect(() => {
     // Simulate loading progress
     const interval = setInterval(() => {
-      setProgress((prev) => {
+      setProgress(prev => {
         if (prev >= 100) {
           clearInterval(interval);
           // Navigate directly to home (auth temporarily disabled)
@@ -46,6 +46,7 @@ export default function Splash() {
   const styles = StyleSheet.create({
     container: {
       flex: 1,
+      backgroundColor: theme.colors.background.app,
     },
     gradient: {
       flex: 1,
@@ -59,20 +60,20 @@ export default function Splash() {
       paddingHorizontal: spacing(theme, 'screenPadding'),
     },
     logoCard: {
-      backgroundColor: 'rgba(18, 26, 43, 0.6)',
+      backgroundColor: withAlpha(theme.colors.background.card, 0.85),
       borderRadius: radius(theme, 'card') + 8,
       padding: spacing(theme, 'xl'),
       alignItems: 'center',
       gap: spacing(theme, 'lg'),
       minWidth: 280,
       borderWidth: 1,
-      borderColor: 'rgba(59, 111, 255, 0.2)',
+      borderColor: withAlpha(theme.colors.brand.primary, 0.25),
     },
     iconContainer: {
       width: 80,
       height: 80,
       borderRadius: 16,
-      backgroundColor: 'rgba(11, 18, 32, 0.8)',
+      backgroundColor: theme.colors.surfaceTint.primarySoft,
       justifyContent: 'center',
       alignItems: 'center',
       marginBottom: spacing(theme, 'sm'),
@@ -123,10 +124,10 @@ export default function Splash() {
       gap: spacing(theme, 'xs'),
       paddingHorizontal: spacing(theme, 'md'),
       paddingVertical: spacing(theme, 'xs'),
-      backgroundColor: 'rgba(59, 111, 255, 0.15)',
+      backgroundColor: theme.colors.surfaceTint.primarySoft,
       borderRadius: radius(theme, 'chip') + 8,
       borderWidth: 1,
-      borderColor: 'rgba(59, 111, 255, 0.3)',
+      borderColor: withAlpha(theme.colors.brand.primary, 0.3),
     },
     securityIcon: {
       fontSize: 12,
@@ -150,7 +151,7 @@ export default function Splash() {
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <LinearGradient
-        colors={['#0B1220', '#1A2440', '#0B1220']}
+        colors={screenGradient(theme)}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={styles.gradient}
@@ -185,4 +186,3 @@ export default function Splash() {
     </SafeAreaView>
   );
 }
-

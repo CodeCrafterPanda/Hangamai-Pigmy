@@ -3,7 +3,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useState } from 'react';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { useTheme, typography, spacing, radius } from '@/theme';
+import { useTheme, typography, spacing, radius, screenGradient, withAlpha } from '@/theme';
 import { useSettingsSlice } from '@/slices';
 import { useDispatch } from 'react-redux';
 import { setLoggedIn } from '@/slices/app.slice';
@@ -197,6 +197,7 @@ export default function MPINEntry() {
   const styles = StyleSheet.create({
     container: {
       flex: 1,
+      backgroundColor: theme.colors.background.app,
     },
     gradient: {
       flex: 1,
@@ -211,7 +212,7 @@ export default function MPINEntry() {
       width: 80,
       height: 80,
       borderRadius: 16,
-      backgroundColor: 'rgba(11, 18, 32, 0.8)',
+      backgroundColor: theme.colors.surfaceTint.primarySoft,
       justifyContent: 'center',
       alignItems: 'center',
       alignSelf: 'center',
@@ -272,7 +273,7 @@ export default function MPINEntry() {
       fontSize: 11,
     },
     numpadContainer: {
-      backgroundColor: 'rgba(18, 26, 43, 0.4)',
+      backgroundColor: withAlpha(theme.colors.background.card, 0.55),
       borderRadius: radius(theme, 'card') + 8,
       padding: spacing(theme, 'lg'),
       marginHorizontal: spacing(theme, 'md'),
@@ -286,11 +287,11 @@ export default function MPINEntry() {
       width: 70,
       height: 70,
       borderRadius: 35,
-      backgroundColor: 'rgba(31, 42, 68, 0.8)',
+      backgroundColor: withAlpha(theme.colors.background.cardElevated, 0.9),
       justifyContent: 'center',
       alignItems: 'center',
       borderWidth: 1,
-      borderColor: 'rgba(59, 111, 255, 0.1)',
+      borderColor: withAlpha(theme.colors.brand.primary, 0.15),
     },
     numButtonText: {
       ...typography(theme, 'displayXL'),
@@ -302,11 +303,11 @@ export default function MPINEntry() {
       width: 70,
       height: 70,
       borderRadius: 35,
-      backgroundColor: 'rgba(31, 42, 68, 0.8)',
+      backgroundColor: withAlpha(theme.colors.background.cardElevated, 0.9),
       justifyContent: 'center',
       alignItems: 'center',
       borderWidth: 1,
-      borderColor: 'rgba(59, 111, 255, 0.1)',
+      borderColor: withAlpha(theme.colors.brand.primary, 0.15),
     },
     iconButtonIcon: {
       fontSize: 24,
@@ -331,7 +332,7 @@ export default function MPINEntry() {
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <LinearGradient
-        colors={['#0B1220', '#1A2440', '#0B1220']}
+        colors={screenGradient(theme)}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={styles.gradient}

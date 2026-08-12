@@ -1,102 +1,111 @@
 /**
  * Theme Tokens - Dark and Light Mode
- * Source: THEME.md
+ *
+ * Source:
+ * - Reference React Native dashboard theme
+ * - Dark mode follows the reference UI directly
+ * - Light mode is a derived companion theme
  */
 
 export const darkTheme = {
   meta: {
-    name: 'Pigmy Agent Dark Theme',
+    name: 'Pigmy Agent Emerald Dark Theme',
     mode: 'dark' as const,
-    description: 'Field-agent fintech UI optimized for offline usage and high contrast',
+    description:
+      'Deep emerald fintech theme based on the reference dashboard UI, optimized for field-agent usage and high contrast',
   },
 
   colors: {
     brand: {
-      primary: '#3B6FFF',
-      primaryDark: '#2F5AE8',
-      primaryGradient: ['#3B6FFF', '#5A8CFF'] as [string, string],
+      primary: '#34D399',
+      primaryDark: '#10B981',
+      primaryGradient: ['#34D399', '#10B981'] as [string, string],
     },
 
     background: {
-      app: '#0B1220',
-      card: '#121A2B',
-      cardElevated: '#151F33',
-      divider: '#1F2A44',
+      app: '#07120D',
+      card: '#0C1C16',
+      cardElevated: '#10241C',
+      divider: '#173328',
     },
 
     text: {
       primary: '#FFFFFF',
-      secondary: '#B6C0D6',
-      muted: '#7C89A8',
-      disabled: '#5A657F',
+      secondary: '#E6F2EC',
+      muted: '#6FAF95',
+      disabled: '#466B5A',
     },
 
     status: {
-      success: '#2ED47A',
-      warning: '#F4C430',
-      error: '#FF4D4F',
-      info: '#4DA3FF',
-      offline: '#FFC107',
+      success: '#34D399',
+      warning: '#FBBF24',
+      error: '#F87171',
+      info: '#60A5FA',
+      offline: '#FBBF24',
     },
 
     financial: {
-      cash: '#38D39F',
-      penalty: '#FF6B6B',
+      cash: '#34D399',
+      penalty: '#F87171',
     },
 
-    // Add soft tints for dark mode (derived for consistency)
     surfaceTint: {
-      primarySoft: '#1A2B4D',
-      successSoft: '#1A2F25',
-      warningSoft: '#332A14',
-      errorSoft: '#331A1A',
-      infoSoft: '#1A2B4D',
+      primarySoft: '#123326',
+      successSoft: '#123326',
+      warningSoft: '#332B12',
+      errorSoft: '#351A1A',
+      infoSoft: '#13283A',
     },
   },
 
   typography: {
     fontFamily: {
-      primary: 'Roboto',
-      fallback: ['System UI', 'SF Pro', 'Inter'],
+      primary: 'System',
+      fallback: ['Roboto', 'SF Pro', 'Inter'],
     },
 
     scale: {
       displayXL: {
-        fontSize: 32,
-        lineHeight: 40,
-        fontWeight: '600' as const,
+        fontSize: 30,
+        lineHeight: 38,
+        fontWeight: '800' as const,
       },
+
       pageTitle: {
-        fontSize: 20,
-        lineHeight: 28,
-        fontWeight: '600' as const,
+        fontSize: 24,
+        lineHeight: 32,
+        fontWeight: '800' as const,
       },
+
       sectionTitle: {
+        fontSize: 18,
+        lineHeight: 26,
+        fontWeight: '700' as const,
+      },
+
+      body: {
         fontSize: 16,
         lineHeight: 24,
-        fontWeight: '500' as const,
+        fontWeight: '600' as const,
       },
-      body: {
-        fontSize: 14,
-        lineHeight: 20,
-        fontWeight: '400' as const,
-      },
+
       caption: {
+        fontSize: 13,
+        lineHeight: 18,
+        fontWeight: '600' as const,
+      },
+
+      micro: {
         fontSize: 12,
         lineHeight: 16,
-        fontWeight: '400' as const,
-      },
-      micro: {
-        fontSize: 10,
-        lineHeight: 14,
-        fontWeight: '500' as const,
+        fontWeight: '700' as const,
       },
     },
 
     numeric: {
-      amountWeight: '600' as const,
+      amountWeight: '800' as const,
       currencyScale: 0.9,
-      negativeColor: '#FF6B6B',
+      negativeColor: '#F87171',
     },
   },
 
@@ -105,88 +114,94 @@ export const darkTheme = {
     xs: 8,
     sm: 12,
     md: 16,
-    lg: 20,
+    lg: 22,
     xl: 24,
     xxl: 32,
 
-    screenPadding: 12,
-    cardPadding: 12,
-    listGap: 12,
+    screenPadding: 22,
+    cardPadding: 16,
+    listGap: 10,
   },
 
   radius: {
-    button: 12,
-    card: 14,
+    button: 14,
+    card: 16,
     chip: 12,
-    input: 10,
-    action: 8,
+    input: 14,
+    action: 12,
   },
 
   components: {
     button: {
       height: 48,
+
       primary: {
-        background: '#3B6FFF',
-        textColor: '#FFFFFF',
+        background: '#34D399',
+        textColor: '#07120D',
       },
+
       secondary: {
-        background: '#1A2440',
-        borderColor: '#2A3A66',
-        textColor: '#FFFFFF',
+        background: '#0C1C16',
+        borderColor: '#214638',
+        textColor: '#E6F2EC',
       },
+
       danger: {
-        background: '#FF4D4F',
-        textColor: '#FFFFFF',
+        background: '#F87171',
+        textColor: '#07120D',
       },
     },
 
     card: {
-      background: '#121A2B',
-      borderColor: '#1F2A44',
-      elevation: 2,
+      background: '#0C1C16',
+      borderColor: '#173328',
+      elevation: 0,
     },
 
     chip: {
-      height: 24,
+      height: 28,
       paddingHorizontal: 12,
-      fontSize: 11,
-      background: '#1A2440',
-      textColor: '#B6C0D6',
+      fontSize: 13,
+      background: '#123326',
+      textColor: '#34D399',
     },
 
     input: {
       height: 48,
-      background: '#121A2B',
-      borderColor: '#2A3A66',
-      placeholderColor: '#7C89A8',
-      textColor: '#FFFFFF',
-      focusBorderColor: '#3B6FFF',
+      background: '#0B1813',
+      borderColor: '#214638',
+      placeholderColor: '#6FAF95',
+      textColor: '#E6F2EC',
+      focusBorderColor: '#34D399',
     },
 
     banner: {
       info: {
-        background: '#1A2B4D',
-        borderColor: '#2A3A66',
-        textColor: '#FFFFFF',
-        iconColor: '#4DA3FF',
+        background: '#13283A',
+        borderColor: '#21445F',
+        textColor: '#E6F2EC',
+        iconColor: '#60A5FA',
       },
+
       warning: {
-        background: '#332A14',
-        borderColor: '#4D4014',
+        background: '#332B12',
+        borderColor: '#5A491A',
         textColor: '#FFFFFF',
-        iconColor: '#F4C430',
+        iconColor: '#FBBF24',
       },
+
       success: {
-        background: '#1A2F25',
-        borderColor: '#2A4A35',
+        background: '#123326',
+        borderColor: '#205B43',
         textColor: '#FFFFFF',
-        iconColor: '#2ED47A',
+        iconColor: '#34D399',
       },
+
       error: {
-        background: '#331A1A',
-        borderColor: '#4D2A2A',
+        background: '#351A1A',
+        borderColor: '#5B2929',
         textColor: '#FFFFFF',
-        iconColor: '#FF4D4F',
+        iconColor: '#F87171',
       },
     },
   },
@@ -195,7 +210,7 @@ export const darkTheme = {
     primarySize: 24,
     secondarySize: 20,
     inlineSize: 16,
-    color: '#B6C0D6',
+    color: '#6FAF95',
   },
 
   ux: {
@@ -205,99 +220,112 @@ export const darkTheme = {
   },
 } as const;
 
+/**
+ * Light companion theme.
+ *
+ * Derived from the emerald dark reference while maintaining
+ * the same brand identity and semantic status colors.
+ */
+
 export const lightTheme = {
   meta: {
-    name: 'Pigmy Agent Light Theme',
+    name: 'Pigmy Agent Emerald Light Theme',
     mode: 'light' as const,
-    description: 'High-contrast light theme designed to pair well with the Pigmy Agent Dark Theme',
+    description:
+      'Clean emerald fintech light theme designed as the companion to the reference-inspired dark theme',
   },
 
   colors: {
     brand: {
-      primary: '#2F5AE8',
-      primaryDark: '#244AD0',
-      primaryGradient: ['#2F5AE8', '#4D7DFF'] as [string, string],
+      primary: '#059669',
+      primaryDark: '#047857',
+      primaryGradient: ['#059669', '#34D399'] as [string, string],
     },
 
     background: {
-      app: '#F6F8FC',
+      app: '#F5FAF7',
       card: '#FFFFFF',
       cardElevated: '#FFFFFF',
-      divider: '#E6ECF5',
+      divider: '#DCEAE3',
     },
 
     text: {
-      primary: '#0B1220',
-      secondary: '#3E4B66',
-      muted: '#6B7A99',
-      disabled: '#A2AEC6',
+      primary: '#07120D',
+      secondary: '#29483A',
+      muted: '#668476',
+      disabled: '#9AAEA4',
     },
 
     status: {
-      success: '#1FAE67',
-      warning: '#C98A00',
-      error: '#D92D20',
+      success: '#059669',
+      warning: '#D97706',
+      error: '#DC2626',
       info: '#2563EB',
-      offline: '#B45309',
+      offline: '#D97706',
     },
 
     financial: {
-      cash: '#148A57',
-      penalty: '#D92D20',
+      cash: '#059669',
+      penalty: '#DC2626',
     },
 
     surfaceTint: {
-      primarySoft: '#EAF0FF',
-      successSoft: '#EAF9F1',
-      warningSoft: '#FFF6E0',
-      errorSoft: '#FFE8E7',
+      primarySoft: '#E5F7EF',
+      successSoft: '#E7F8F0',
+      warningSoft: '#FFF7E0',
+      errorSoft: '#FEECEC',
       infoSoft: '#EAF2FF',
     },
   },
 
   typography: {
     fontFamily: {
-      primary: 'Roboto',
-      fallback: ['System UI', 'SF Pro', 'Inter'],
+      primary: 'System',
+      fallback: ['Roboto', 'SF Pro', 'Inter'],
     },
 
     scale: {
       displayXL: {
-        fontSize: 32,
-        lineHeight: 40,
-        fontWeight: '600' as const,
+        fontSize: 30,
+        lineHeight: 38,
+        fontWeight: '800' as const,
       },
+
       pageTitle: {
-        fontSize: 20,
-        lineHeight: 28,
-        fontWeight: '600' as const,
+        fontSize: 24,
+        lineHeight: 32,
+        fontWeight: '800' as const,
       },
+
       sectionTitle: {
+        fontSize: 18,
+        lineHeight: 26,
+        fontWeight: '700' as const,
+      },
+
+      body: {
         fontSize: 16,
         lineHeight: 24,
-        fontWeight: '500' as const,
+        fontWeight: '600' as const,
       },
-      body: {
-        fontSize: 14,
-        lineHeight: 20,
-        fontWeight: '400' as const,
-      },
+
       caption: {
+        fontSize: 13,
+        lineHeight: 18,
+        fontWeight: '600' as const,
+      },
+
+      micro: {
         fontSize: 12,
         lineHeight: 16,
-        fontWeight: '400' as const,
-      },
-      micro: {
-        fontSize: 10,
-        lineHeight: 14,
-        fontWeight: '500' as const,
+        fontWeight: '700' as const,
       },
     },
 
     numeric: {
-      amountWeight: '600' as const,
+      amountWeight: '800' as const,
       currencyScale: 0.9,
-      negativeColor: '#D92D20',
+      negativeColor: '#DC2626',
     },
   },
 
@@ -306,88 +334,94 @@ export const lightTheme = {
     xs: 8,
     sm: 12,
     md: 16,
-    lg: 20,
+    lg: 22,
     xl: 24,
     xxl: 32,
 
-    screenPadding: 12,
-    cardPadding: 12,
-    listGap: 12,
+    screenPadding: 22,
+    cardPadding: 16,
+    listGap: 10,
   },
 
   radius: {
-    button: 12,
-    card: 14,
+    button: 14,
+    card: 16,
     chip: 12,
-    input: 10,
-    action: 8,
+    input: 14,
+    action: 12,
   },
 
   components: {
     button: {
       height: 48,
+
       primary: {
-        background: '#2F5AE8',
+        background: '#059669',
         textColor: '#FFFFFF',
       },
+
       secondary: {
-        background: '#EEF3FF',
-        borderColor: '#D6E2FF',
-        textColor: '#0B1220',
+        background: '#E5F7EF',
+        borderColor: '#BCE5D2',
+        textColor: '#047857',
       },
+
       danger: {
-        background: '#D92D20',
+        background: '#DC2626',
         textColor: '#FFFFFF',
       },
     },
 
     card: {
       background: '#FFFFFF',
-      borderColor: '#E6ECF5',
+      borderColor: '#DCEAE3',
       elevation: 0,
     },
 
     chip: {
-      height: 24,
+      height: 28,
       paddingHorizontal: 12,
-      fontSize: 11,
-      background: '#EEF3FF',
-      textColor: '#244AD0',
+      fontSize: 13,
+      background: '#E5F7EF',
+      textColor: '#047857',
     },
 
     input: {
       height: 48,
       background: '#FFFFFF',
-      borderColor: '#D6DEEB',
-      placeholderColor: '#6B7A99',
-      textColor: '#0B1220',
-      focusBorderColor: '#2F5AE8',
+      borderColor: '#CFE0D7',
+      placeholderColor: '#668476',
+      textColor: '#07120D',
+      focusBorderColor: '#059669',
     },
 
     banner: {
       info: {
         background: '#EAF2FF',
-        borderColor: '#CFE0FF',
-        textColor: '#0B1220',
+        borderColor: '#C9DCFF',
+        textColor: '#07120D',
         iconColor: '#2563EB',
       },
+
       warning: {
-        background: '#FFF6E0',
-        borderColor: '#FFE2A8',
-        textColor: '#0B1220',
-        iconColor: '#C98A00',
+        background: '#FFF7E0',
+        borderColor: '#F5D992',
+        textColor: '#07120D',
+        iconColor: '#D97706',
       },
+
       success: {
-        background: '#EAF9F1',
-        borderColor: '#BDEFD1',
-        textColor: '#0B1220',
-        iconColor: '#1FAE67',
+        background: '#E7F8F0',
+        borderColor: '#B6E7CF',
+        textColor: '#07120D',
+        iconColor: '#059669',
       },
+
       error: {
-        background: '#FFE8E7',
-        borderColor: '#FFC1BD',
-        textColor: '#0B1220',
-        iconColor: '#D92D20',
+        background: '#FEECEC',
+        borderColor: '#F8C5C5',
+        textColor: '#07120D',
+        iconColor: '#DC2626',
       },
     },
   },
@@ -396,20 +430,12 @@ export const lightTheme = {
     primarySize: 24,
     secondarySize: 20,
     inlineSize: 16,
-    color: '#3E4B66',
+    color: '#668476',
   },
 
   ux: {
     touchTargetMin: 48,
     offlineFirst: true,
     highContrast: true,
-    switchingNotes: {
-      preserveBrandHue: true,
-      keepPrimaryButtonsSolid: true,
-      useSoftTintsForChipsAndBanners: true,
-      keepAmountsHighEmphasis: true,
-    },
   },
 } as const;
-
-export type ThemeMode = 'light' | 'dark';
