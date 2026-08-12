@@ -6,6 +6,7 @@ export * from './RouteData';
 export * from './CollectionData';
 export * from './DelegatedData';
 export * from './CustomerDetailData';
+export * from './CustomerListData';
 export * from './CollectDepositData';
 export * from './ReceiptData';
 export * from './OfflineQueueData';

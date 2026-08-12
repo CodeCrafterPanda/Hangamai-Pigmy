@@ -144,6 +144,19 @@ export function generateAccountNumber(year: number, lastNumber: number): string 
 }
 
 // ===========================
+// ROUTE CODE GENERATION
+// ===========================
+
+/**
+ * Derive a route code from a route name
+ * Uppercased, with any run of whitespace collapsed to a single underscore
+ * Example: "Parner Main" -> "PARNER_MAIN"
+ */
+export function generateRouteCode(name: string): string {
+  return name.trim().toUpperCase().replace(/\s+/g, '_');
+}
+
+// ===========================
 // IDEMPOTENCY KEY GENERATION
 // ===========================
 
@@ -533,6 +546,23 @@ export interface DelegationEligibility {
   delegationId?: string;
 }
 
+/** Delegation duration applied when no date range is captured (matches the seeded window). */
+export const DEFAULT_DELEGATION_DURATION_DAYS = 30;
+
+/**
+ * Default validity window for a delegation created from Add/Edit Customer.
+ * Those screens capture no date range, so the window follows the seeded precedent.
+ */
+export function createDefaultDelegationWindow(from: Date = new Date()): {
+  startAt: string;
+  endAt: string;
+} {
+  const endAt = new Date(from);
+  endAt.setDate(endAt.getDate() + DEFAULT_DELEGATION_DURATION_DAYS);
+
+  return { startAt: from.toISOString(), endAt: endAt.toISOString() };
+}
+
 /**
  * Check if agent can collect for a customer/account via delegation
  */
@@ -895,6 +925,7 @@ export default {
   initializeReceiptSeriesForYear,
   generateCustomerCode,
   generateAccountNumber,
+  generateRouteCode,
   generateIdempotencyKey,
   calculateDueMissedPenalty,
   calculateMissedDaysForMonth,
@@ -904,6 +935,7 @@ export default {
   createReversalLedgerEntry,
   calculateSettlementSummary,
   calculateVariance,
+  createDefaultDelegationWindow,
   checkDelegationEligibility,
   isDuplicateCollection,
   verifyMonthlyReportReconciliation,

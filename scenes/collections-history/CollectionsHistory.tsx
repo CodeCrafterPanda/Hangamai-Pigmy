@@ -306,13 +306,17 @@ export default function CollectionsHistory() {
       padding: spacing(theme, 'sm'),
       borderWidth: 1,
       borderColor: theme.colors.background.divider,
+      borderLeftWidth: 4,
+      overflow: 'hidden',
     },
     transactionInfo: {
       flex: 1,
       gap: 2,
     },
     customerName: {
-      ...typography(theme, 'body'),
+      ...typography(theme, 'sectionTitle'),
+      fontSize: 16,
+      lineHeight: 22,
       color: theme.colors.text.primary,
       fontWeight: '600',
     },
@@ -565,7 +569,9 @@ export default function CollectionsHistory() {
                 const statusConfig =
                   collection.status === 'SYNCED'
                     ? { color: theme.colors.status.success, label: 'Success' }
-                    : { color: theme.colors.status.warning, label: 'Syncing' };
+                    : collection.status === 'FAILED'
+                      ? { color: theme.colors.status.error, label: 'Failed' }
+                      : { color: '#D4834D', label: 'Syncing' };
 
                 const isCash = collection.mode === 'CASH';
                 const modeColor = isCash
@@ -578,7 +584,7 @@ export default function CollectionsHistory() {
                     onPress={() => handleReceiptPress(collection.id)}
                     style={({ pressed }) => [
                       styles.transactionItem,
-                      { opacity: pressed ? 0.7 : 1 },
+                      { borderLeftColor: statusConfig.color, opacity: pressed ? 0.7 : 1 },
                     ]}
                   >
                     <View style={styles.transactionInfo}>

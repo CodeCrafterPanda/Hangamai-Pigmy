@@ -101,7 +101,8 @@ export default function Routes() {
       backgroundColor: theme.colors.background.app,
     },
     scrollContent: {
-      paddingVertical: spacing(theme, 'xl'),
+      paddingTop: spacing(theme, 'sm'),
+      paddingBottom: spacing(theme, 'screenPadding') + 56 + spacing(theme, 'sm'),
     },
     searchContainer: {
       paddingHorizontal: spacing(theme, 'screenPadding'),
@@ -130,7 +131,7 @@ export default function Routes() {
     },
     routesList: {
       paddingHorizontal: spacing(theme, 'screenPadding'),
-      gap: spacing(theme, 'md'),
+      gap: spacing(theme, 'sm'),
     },
     emptyState: {
       padding: spacing(theme, 'xxl'),

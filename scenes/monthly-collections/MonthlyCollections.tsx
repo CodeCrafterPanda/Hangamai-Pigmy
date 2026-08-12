@@ -447,8 +447,11 @@ export default function MonthlyCollections() {
       borderRadius: radius(theme, 'card'),
       borderWidth: 1,
       borderColor: theme.colors.background.divider,
-      padding: spacing(theme, 'md'),
+      borderLeftWidth: 4,
+      borderLeftColor: theme.colors.brand.primary,
+      padding: spacing(theme, 'sm'),
       gap: spacing(theme, 'xs'),
+      overflow: 'hidden',
     },
     settlementSummaryTitle: {
       ...typography(theme, 'caption'),
@@ -1154,7 +1157,10 @@ export default function MonthlyCollections() {
                 <Pressable
                   key={settlement.id}
                   onPress={() => navigateToSettlementDetail(settlement.id)}
-                  style={({ pressed }) => [styles.settlementCard, { opacity: pressed ? 0.7 : 1 }]}>
+                  style={({ pressed }) => [
+                    styles.settlementCard,
+                    { borderLeftColor: statusColor, opacity: pressed ? 0.7 : 1 },
+                  ]}>
                   <View style={styles.settlementTopRow}>
                     <Text style={styles.settlementDate}>{dateLabel}</Text>
                     <Text style={[styles.settlementStatus, { color: statusColor }]}>

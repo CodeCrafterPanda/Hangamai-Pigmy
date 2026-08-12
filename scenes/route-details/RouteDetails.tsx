@@ -196,7 +196,7 @@ export default function RouteDetails({ routeId }: RouteDetailsProps) {
     },
     customersList: {
       paddingHorizontal: spacing(theme, 'screenPadding'),
-      gap: spacing(theme, 'md'),
+      gap: spacing(theme, 'sm'),
     },
     emptyState: {
       padding: spacing(theme, 'xxl'),
@@ -267,6 +267,12 @@ export default function RouteDetails({ routeId }: RouteDetailsProps) {
   };
 
   const handleAddCustomer = () => {
+    if (routeId) {
+      // Carry the route context so the agent does not pick the route they came from again
+      router.push({ pathname: '/(app)/(route)/add-customer', params: { routeId } });
+      return;
+    }
+
     router.push('/(app)/(route)/add-customer');
   };
 

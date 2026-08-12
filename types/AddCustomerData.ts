@@ -19,6 +19,8 @@ export interface Assignment {
   branch: string;
   route: string;
   primaryAgent: string;
+  /** Agent the customer is delegated to when the primary agent is not the logged-in agent */
+  delegatedAgent: string;
 }
 
 export interface KYCDetails {

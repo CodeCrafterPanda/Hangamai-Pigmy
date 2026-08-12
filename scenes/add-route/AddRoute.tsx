@@ -11,10 +11,16 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useState } from 'react';
 import { useRouter } from 'expo-router';
 import { useDispatch, useSelector } from 'react-redux';
-import type { Dispatch } from '@/utils/store';
+import type { Dispatch, State } from '@/utils/store';
 import { useTheme, typography, spacing, radius } from '@/theme';
-import { addRoute, persistSettings, selectSession } from '@/slices/settings.slice';
+import {
+  addRoute,
+  persistSettings,
+  selectSession,
+  selectRoutesByBranch,
+} from '@/slices/settings.slice';
 import type { Route as RouteEntity } from '@/types/entities';
+import { generateRouteCode } from '@/utils/businessLogic';
 import { generateUUID } from '@/utils/uuid';
 
 export default function AddRoute() {
@@ -22,10 +28,14 @@ export default function AddRoute() {
   const dispatch = useDispatch<Dispatch>();
   const { theme } = useTheme();
   const session = useSelector(selectSession);
+  const branchRoutes = useSelector((state: State) =>
+    selectRoutesByBranch(state, session.branchId || ''),
+  );
 
   const [name, setName] = useState('');
-  const [routeCode, setRouteCode] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+
+  const derivedRouteCode = generateRouteCode(name);
 
   const styles = StyleSheet.create({
     container: {
@@ -85,6 +95,26 @@ export default function AddRoute() {
       paddingHorizontal: spacing(theme, 'md'),
       paddingVertical: spacing(theme, 'md'),
     },
+    readOnlyField: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing(theme, 'xs'),
+      backgroundColor: theme.colors.background.cardElevated,
+      borderRadius: radius(theme, 'input'),
+      borderWidth: 1,
+      borderColor: theme.colors.background.divider,
+      paddingHorizontal: spacing(theme, 'md'),
+      height: 48,
+    },
+    readOnlyIcon: {
+      fontSize: 14,
+      color: theme.colors.text.muted,
+    },
+    readOnlyText: {
+      ...typography(theme, 'body'),
+      color: theme.colors.text.muted,
+      flex: 1,
+    },
     actionButtons: {
       paddingHorizontal: spacing(theme, 'screenPadding'),
       flexDirection: 'row',
@@ -122,27 +152,13 @@ export default function AddRoute() {
     },
   });
 
-  const handleSave = async () => {
+  const saveRoute = async (branchId: string) => {
     const trimmedName = name.trim();
-    const trimmedCode = routeCode.trim();
-
-    if (!trimmedName) {
-      Alert.alert('Validation Error', 'Please enter a route name');
-      return;
-    }
-    if (!trimmedCode) {
-      Alert.alert('Validation Error', 'Please enter a route code');
-      return;
-    }
-    if (!session.branchId) {
-      Alert.alert('Validation Error', 'No branch is associated with the current session');
-      return;
-    }
 
     const newRoute: RouteEntity = {
       id: generateUUID(),
-      branchId: session.branchId,
-      routeCode: trimmedCode,
+      branchId,
+      routeCode: generateRouteCode(trimmedName),
       name: trimmedName,
       createdAt: new Date().toISOString(),
     };
@@ -159,6 +175,44 @@ export default function AddRoute() {
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const handleSave = async () => {
+    const trimmedName = name.trim();
+
+    if (!trimmedName) {
+      Alert.alert('Validation Error', 'Please enter a route name');
+      return;
+    }
+    if (!session.branchId) {
+      Alert.alert('Validation Error', 'No branch is associated with the current session');
+      return;
+    }
+
+    const branchId = session.branchId;
+    const routeCode = generateRouteCode(trimmedName);
+    const existingRoute = branchRoutes.find(
+      r => r.routeCode.trim().toUpperCase() === routeCode,
+    );
+
+    if (existingRoute) {
+      Alert.alert(
+        'Duplicate Route Code',
+        `"${existingRoute.name}" already uses the code ${routeCode}.\n\nYou can continue anyway if this is a different route.`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Continue Anyway',
+            onPress: () => {
+              void saveRoute(branchId);
+            },
+          },
+        ],
+      );
+      return;
+    }
+
+    await saveRoute(branchId);
   };
 
   const handleCancel = () => {
@@ -198,18 +252,13 @@ export default function AddRoute() {
           </View>
 
           <View style={styles.field}>
-            <Text style={styles.label}>
-              Route Code <Text style={styles.required}>*</Text>
-            </Text>
-            <TextInput
-              style={styles.input}
-              placeholder="e.g. R-04"
-              placeholderTextColor={theme.colors.text.muted}
-              value={routeCode}
-              onChangeText={setRouteCode}
-              autoCapitalize="characters"
-              editable={!isSaving}
-            />
+            <Text style={styles.label}>Route Code</Text>
+            <View style={styles.readOnlyField}>
+              <Text style={styles.readOnlyIcon}>🔒</Text>
+              <Text style={styles.readOnlyText}>
+                {derivedRouteCode || 'Generated from the route name'}
+              </Text>
+            </View>
           </View>
         </View>
 

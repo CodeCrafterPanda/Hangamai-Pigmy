@@ -78,6 +78,16 @@ export default function AppLayout() {
         }}
       />
       <Tabs.Screen
+        name="(customers)"
+        listeners={resetSectionOnTabPress}
+        options={{
+          title: 'Customers',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="people-outline" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="(history)"
         listeners={resetSectionOnTabPress}
         options={{

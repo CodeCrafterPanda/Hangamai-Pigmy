@@ -33,6 +33,18 @@ export interface AccountsState {
   lastAccountNumber: number;
 }
 
+/**
+ * Account creation payload.
+ * `accountNumber` is optional: when omitted the sequential number is generated, when
+ * supplied the caller's manually entered number is used as-is.
+ */
+export type AddAccountPayload = Omit<
+  Account,
+  'id' | 'accountNumber' | 'currentBalance' | 'openedAt'
+> & {
+  accountNumber?: string;
+};
+
 const initialState: AccountsState = {
   accounts: createEmptyStore<Account>(),
   schemes: createEmptyStore<Scheme>(),
@@ -118,22 +130,26 @@ const slice = createSlice({
     /**
      * Add a new account
      */
-    addAccount: (
-      state,
-      {
-        payload,
-      }: PayloadAction<Omit<Account, 'id' | 'accountNumber' | 'currentBalance' | 'openedAt'>>,
-    ) => {
+    addAccount: (state, { payload }: PayloadAction<AddAccountPayload>) => {
+      const { accountNumber: manualAccountNumber, ...accountData } = payload;
       const id = generateUUID();
       const now = new Date().toISOString();
       const currentYear = new Date().getFullYear();
 
-      // Generate account number
-      state.lastAccountNumber += 1;
-      const accountNumber = generateAccountNumber(currentYear, state.lastAccountNumber);
+      const trimmedManualNumber = manualAccountNumber?.trim();
+      let accountNumber: string;
+
+      if (trimmedManualNumber) {
+        // A manually entered number sits outside the generated series, so the counter is
+        // left alone rather than consuming a sequence number no account will ever use.
+        accountNumber = trimmedManualNumber;
+      } else {
+        state.lastAccountNumber += 1;
+        accountNumber = generateAccountNumber(currentYear, state.lastAccountNumber);
+      }
 
       const account: Account = {
-        ...payload,
+        ...accountData,
         id,
         accountNumber,
         currentBalance: 0, // Will be calculated from ledger
@@ -154,6 +170,28 @@ const slice = createSlice({
           currentBalance: payload.balance,
         } as Partial<Account>);
       }
+    },
+
+    /**
+     * Update an account's number (manual passbook number correction).
+     * The account id and the owning customer are never touched, so ledger, collection and
+     * delegation references stay intact. A blank number is ignored: there is no path back
+     * to the generated series for an existing account.
+     */
+    updateAccountNumber: (
+      state,
+      { payload }: PayloadAction<{ id: string; accountNumber: string }>,
+    ) => {
+      const trimmed = payload.accountNumber.trim();
+      const existing = state.accounts.byId[payload.id];
+      if (!existing || !trimmed) return;
+
+      // A manually entered number sits outside the generated series, so `lastAccountNumber`
+      // is left alone here as well.
+      state.accounts = updateEntityInStore(state.accounts, payload.id, {
+        accountNumber: trimmed,
+      } as Partial<Account>);
+      state.error = undefined;
     },
 
     /**
@@ -325,6 +363,7 @@ export function useAccountsSlice() {
 export const {
   addAccount,
   updateAccountBalance,
+  updateAccountNumber,
   updateAccountStatus,
   addScheme,
   setError,

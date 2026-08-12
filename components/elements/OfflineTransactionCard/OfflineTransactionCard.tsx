@@ -58,47 +58,38 @@ export default function OfflineTransactionCard({
       overflow: 'hidden',
     },
     content: {
-      padding: spacing(theme, 'md'),
-      gap: spacing(theme, 'sm'),
+      padding: spacing(theme, 'sm'),
+      gap: spacing(theme, 'xxs'),
+      minHeight: 64,
+      justifyContent: 'center',
     },
     header: {
       flexDirection: 'row',
       justifyContent: 'space-between',
-      alignItems: 'flex-start',
+      alignItems: 'center',
+      gap: spacing(theme, 'sm'),
     },
     customerName: {
       ...typography(theme, 'sectionTitle'),
-      fontSize: 18,
+      fontSize: 16,
+      lineHeight: 22,
       color: theme.colors.text.primary,
-      fontWeight: '700',
+      fontWeight: '600',
       flex: 1,
     },
-    statusBadge: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: spacing(theme, 'xxs'),
-      paddingHorizontal: spacing(theme, 'sm'),
-      paddingVertical: spacing(theme, 'xxs'),
-      backgroundColor: statusConfig.bgColor,
-      borderRadius: radius(theme, 'chip'),
-      borderWidth: 1,
-      borderColor: statusConfig.borderColor,
-    },
-    statusIcon: {
-      fontSize: 12,
-    },
-    statusText: {
-      ...typography(theme, 'micro'),
-      color: statusConfig.textColor,
-      fontWeight: '700',
-    },
     amount: {
-      ...typography(theme, 'displayXL'),
-      fontSize: 28,
+      ...typography(theme, 'body'),
       color: theme.colors.text.primary,
       fontWeight: '700',
     },
     metaRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: spacing(theme, 'sm'),
+    },
+    metaLeft: {
+      flex: 1,
       flexDirection: 'row',
       alignItems: 'center',
       gap: spacing(theme, 'xs'),
@@ -117,9 +108,27 @@ export default function OfflineTransactionCard({
       ...typography(theme, 'caption'),
       color: theme.colors.text.muted,
     },
+    statusBadge: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing(theme, 'xxs'),
+      paddingHorizontal: spacing(theme, 'xs'),
+      paddingVertical: spacing(theme, 'xxs'),
+      backgroundColor: statusConfig.bgColor,
+      borderRadius: radius(theme, 'chip'),
+      borderWidth: 1,
+      borderColor: statusConfig.borderColor,
+    },
+    statusIcon: {
+      fontSize: 10,
+    },
+    statusText: {
+      ...typography(theme, 'micro'),
+      color: statusConfig.textColor,
+      fontWeight: '600',
+    },
     errorSection: {
-      marginTop: spacing(theme, 'xs'),
-      gap: spacing(theme, 'xs'),
+      gap: spacing(theme, 'xxs'),
     },
     errorMessage: {
       ...typography(theme, 'caption'),
@@ -146,21 +155,26 @@ export default function OfflineTransactionCard({
     <View style={styles.container}>
       <View style={styles.content}>
         <View style={styles.header}>
-          <Text style={styles.customerName}>{transaction.customerName}</Text>
+          <Text style={styles.customerName} numberOfLines={1}>
+            {transaction.customerName}
+          </Text>
+          <Text style={styles.amount}>
+            ₹{transaction.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+          </Text>
+        </View>
+
+        <View style={styles.metaRow}>
+          <View style={styles.metaLeft}>
+            <Text style={styles.receiptNumber}>{transaction.receiptNumber}</Text>
+            <View style={styles.dot} />
+            <Text style={styles.time}>{transaction.time}</Text>
+          </View>
           <View style={styles.statusBadge}>
             <Text style={[styles.statusIcon, { color: statusConfig.textColor }]}>
               {statusConfig.icon}
             </Text>
             <Text style={styles.statusText}>{statusConfig.label}</Text>
           </View>
-        </View>
-
-        <Text style={styles.amount}>₹{transaction.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</Text>
-
-        <View style={styles.metaRow}>
-          <Text style={styles.receiptNumber}>{transaction.receiptNumber}</Text>
-          <View style={styles.dot} />
-          <Text style={styles.time}>{transaction.time}</Text>
         </View>
 
         {transaction.status === 'failed' && transaction.errorMessage && (

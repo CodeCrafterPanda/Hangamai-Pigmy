@@ -20,6 +20,7 @@ export default function RouteCard({ route, onPress }: RouteCardProps) {
           bgColor: 'rgba(244, 196, 48, 0.15)',
           textColor: '#D4834D',
           borderColor: 'rgba(212, 131, 77, 0.3)',
+          leftBorderColor: '#D4834D',
         };
       case 'completed':
         return {
@@ -28,6 +29,7 @@ export default function RouteCard({ route, onPress }: RouteCardProps) {
           bgColor: theme.colors.surfaceTint.successSoft,
           textColor: theme.colors.status.success,
           borderColor: theme.colors.status.success,
+          leftBorderColor: theme.colors.status.success,
         };
       case 'not_started':
         return {
@@ -36,6 +38,7 @@ export default function RouteCard({ route, onPress }: RouteCardProps) {
           bgColor: theme.colors.background.cardElevated,
           textColor: theme.colors.text.muted,
           borderColor: theme.colors.background.divider,
+          leftBorderColor: theme.colors.text.muted,
         };
     }
   };
@@ -46,10 +49,15 @@ export default function RouteCard({ route, onPress }: RouteCardProps) {
     container: {
       backgroundColor: theme.colors.background.card,
       borderRadius: radius(theme, 'card'),
-      padding: spacing(theme, 'md'),
-      gap: spacing(theme, 'md'),
       borderWidth: 1,
       borderColor: theme.colors.background.divider,
+      borderLeftWidth: 4,
+      borderLeftColor: statusConfig.leftBorderColor,
+      overflow: 'hidden',
+    },
+    content: {
+      padding: spacing(theme, 'sm'),
+      gap: spacing(theme, 'xxs'),
     },
     header: {
       flexDirection: 'row',
@@ -59,23 +67,24 @@ export default function RouteCard({ route, onPress }: RouteCardProps) {
     },
     titleSection: {
       flex: 1,
-      gap: spacing(theme, 'xxs'),
+      gap: 2,
     },
     routeName: {
       ...typography(theme, 'sectionTitle'),
       color: theme.colors.text.primary,
       fontWeight: '600',
-      fontSize: 18,
+      fontSize: 16,
+      lineHeight: 22,
     },
     routeId: {
-      ...typography(theme, 'body'),
+      ...typography(theme, 'caption'),
       color: theme.colors.text.muted,
     },
     statusBadge: {
       flexDirection: 'row',
       alignItems: 'center',
       gap: spacing(theme, 'xxs'),
-      paddingHorizontal: spacing(theme, 'sm'),
+      paddingHorizontal: spacing(theme, 'xs'),
       paddingVertical: spacing(theme, 'xxs'),
       backgroundColor: statusConfig.bgColor,
       borderRadius: radius(theme, 'chip'),
@@ -83,15 +92,16 @@ export default function RouteCard({ route, onPress }: RouteCardProps) {
       borderColor: statusConfig.borderColor,
     },
     statusIcon: {
-      fontSize: 12,
+      fontSize: 10,
+      color: statusConfig.textColor,
     },
     statusText: {
-      ...typography(theme, 'caption'),
+      ...typography(theme, 'micro'),
       color: statusConfig.textColor,
       fontWeight: '600',
     },
     progressSection: {
-      gap: spacing(theme, 'xs'),
+      gap: 2,
     },
     progressHeader: {
       flexDirection: 'row',
@@ -99,21 +109,21 @@ export default function RouteCard({ route, onPress }: RouteCardProps) {
       alignItems: 'center',
     },
     progressLabel: {
-      ...typography(theme, 'body'),
+      ...typography(theme, 'caption'),
       color: theme.colors.text.secondary,
     },
     progressValue: {
-      ...typography(theme, 'sectionTitle'),
+      ...typography(theme, 'caption'),
       color: theme.colors.text.primary,
       fontWeight: '700',
     },
     statsRow: {
       flexDirection: 'row',
-      gap: spacing(theme, 'md'),
+      gap: spacing(theme, 'sm'),
     },
     statItem: {
       flex: 1,
-      gap: spacing(theme, 'xxs'),
+      gap: 2,
     },
     statLabel: {
       ...typography(theme, 'caption'),
@@ -121,10 +131,10 @@ export default function RouteCard({ route, onPress }: RouteCardProps) {
       fontWeight: '600',
       textTransform: 'uppercase',
       letterSpacing: 0.5,
+      fontSize: 10,
     },
     statValue: {
-      ...typography(theme, 'pageTitle'),
-      fontSize: 24,
+      ...typography(theme, 'body'),
       color: theme.colors.text.primary,
       fontWeight: '700',
     },
@@ -135,37 +145,41 @@ export default function RouteCard({ route, onPress }: RouteCardProps) {
 
   const content = (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <View style={styles.titleSection}>
-          <Text style={styles.routeName}>{route.name}</Text>
-          <Text style={styles.routeId}>ID: {route.routeId}</Text>
+      <View style={styles.content}>
+        <View style={styles.header}>
+          <View style={styles.titleSection}>
+            <Text style={styles.routeName} numberOfLines={1}>
+              {route.name}
+            </Text>
+            <Text style={styles.routeId}>ID: {route.routeId}</Text>
+          </View>
+
+          <View style={styles.statusBadge}>
+            <Text style={styles.statusIcon}>{statusConfig.icon}</Text>
+            <Text style={styles.statusText}>{statusConfig.label}</Text>
+          </View>
         </View>
 
-        <View style={styles.statusBadge}>
-          <Text style={styles.statusIcon}>{statusConfig.icon}</Text>
-          <Text style={styles.statusText}>{statusConfig.label}</Text>
-        </View>
-      </View>
-
-      <View style={styles.progressSection}>
-        <View style={styles.progressHeader}>
-          <Text style={styles.progressLabel}>Collection Progress</Text>
-          <Text style={styles.progressValue}>{route.progress}%</Text>
-        </View>
-        <ProgressBar progress={route.progress} />
-      </View>
-
-      <View style={styles.statsRow}>
-        <View style={styles.statItem}>
-          <Text style={styles.statLabel}>Total Customers</Text>
-          <Text style={styles.statValue}>{route.totalCustomers}</Text>
+        <View style={styles.progressSection}>
+          <View style={styles.progressHeader}>
+            <Text style={styles.progressLabel}>Collection Progress</Text>
+            <Text style={styles.progressValue}>{route.progress}%</Text>
+          </View>
+          <ProgressBar progress={route.progress} height={4} />
         </View>
 
-        <View style={styles.statItem}>
-          <Text style={styles.statLabel}>Pending</Text>
-          <Text style={[styles.statValue, styles.pendingValue]}>
-            {route.pendingCustomers}
-          </Text>
+        <View style={styles.statsRow}>
+          <View style={styles.statItem}>
+            <Text style={styles.statLabel}>Total Customers</Text>
+            <Text style={styles.statValue}>{route.totalCustomers}</Text>
+          </View>
+
+          <View style={styles.statItem}>
+            <Text style={styles.statLabel}>Pending</Text>
+            <Text style={[styles.statValue, styles.pendingValue]}>
+              {route.pendingCustomers}
+            </Text>
+          </View>
         </View>
       </View>
     </View>

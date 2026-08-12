@@ -16,7 +16,12 @@ import type { State, Dispatch } from '@/utils/store';
 import { useTheme, typography, spacing, radius } from '@/theme';
 import AddCustomerHeader from '@/components/elements/AddCustomerHeader';
 import BottomSheet from '@/components/elements/BottomSheet';
-import { selectAllRoutes, selectAllBranches, selectAllAgents } from '@/slices/settings.slice';
+import {
+  selectAllRoutes,
+  selectAllBranches,
+  selectAllAgents,
+  selectSession,
+} from '@/slices/settings.slice';
 import {
   addCustomer,
   addKYCDocument,
@@ -28,7 +33,9 @@ import {
   addScheme,
   persistAccounts,
   selectAllSchemes,
+  selectAllAccounts,
 } from '@/slices/accounts.slice';
+import { createDelegation, persistDelegations } from '@/slices/delegations.slice';
 import {
   CustomerStatus,
   AccountStatus,
@@ -37,7 +44,11 @@ import {
 } from '@/types';
 import type { AddCustomerFormData } from '@/types/AddCustomerData';
 import type { Scheme } from '@/types/entities';
-import { maskKYCNumber, validatePhone } from '@/utils/businessLogic';
+import {
+  createDefaultDelegationWindow,
+  maskKYCNumber,
+  validatePhone,
+} from '@/utils/businessLogic';
 import { generateUUID } from '@/utils/uuid';
 
 const documentTypeOptions = [
@@ -85,7 +96,12 @@ function schemeNameFor(frequency: SchemeFrequency): string {
   }
 }
 
-export default function AddNewCustomer() {
+interface AddNewCustomerProps {
+  /** Route the screen was opened from (Route Details); locks the Route selection */
+  presetRouteId?: string;
+}
+
+export default function AddNewCustomer({ presetRouteId }: AddNewCustomerProps) {
   const router = useRouter();
   const dispatch = useDispatch<Dispatch>();
   const store = useStore<State>();
@@ -98,6 +114,11 @@ export default function AddNewCustomer() {
   const allRoutes = useSelector(selectAllRoutes);
   const allAgents = useSelector(selectAllAgents);
   const allSchemes = useSelector(selectAllSchemes);
+  const session = useSelector(selectSession);
+
+  // Same session fallback as Routes/RouteDetails so ownership matches the scope those
+  // screens resolve customers with
+  const sessionAgentId = session.agentId || 'demo-agent';
 
   const branchOptions = useMemo(() => {
     return allBranches.map(b => b.name || 'Hangamai Main Branch');
@@ -123,8 +144,12 @@ export default function AddNewCustomer() {
     },
     assignment: {
       branch: '',
-      route: '',
-      primaryAgent: '',
+      // Route Details passes the route it was opened from; entering from anywhere else
+      // leaves the normal route picker empty
+      route: presetRouteId || '',
+      // The customer belongs to the logged-in agent unless another primary agent is picked
+      primaryAgent: sessionAgentId,
+      delegatedAgent: '',
     },
     kyc: {
       documentType: 'Aadhaar Card',
@@ -138,6 +163,21 @@ export default function AddNewCustomer() {
       startDate: new Date().toLocaleDateString('en-US'),
     },
   });
+
+  const isRouteLocked = Boolean(presetRouteId);
+  const presetRoute = allRoutes.find(r => r.id === presetRouteId);
+
+  // Another agent as primary agent means the customer is being delegated: the delegate has
+  // to be named so the customer lands in someone's DELEGATED scope
+  const requiresDelegation =
+    Boolean(formData.assignment.primaryAgent) &&
+    formData.assignment.primaryAgent !== sessionAgentId;
+
+  const delegatedAgentOptions = useMemo(() => {
+    return allAgents
+      .filter(a => a.id !== formData.assignment.primaryAgent)
+      .map(a => `${a.name || 'Agent'} (${a.id})`);
+  }, [allAgents, formData.assignment.primaryAgent]);
 
   const styles = StyleSheet.create({
     container: {
@@ -214,6 +254,11 @@ export default function AddNewCustomer() {
       fontSize: 16,
       color: theme.colors.text.muted,
       marginLeft: spacing(theme, 'xs'),
+    },
+    readOnlyValue: {
+      ...typography(theme, 'body'),
+      color: theme.colors.text.muted,
+      flex: 1,
     },
     dropdown: {
       flexDirection: 'row',
@@ -449,6 +494,41 @@ export default function AddNewCustomer() {
       // agent would trust and a restart would silently discard
       await dispatch(persistCustomers()).unwrap();
 
+      if (requiresDelegation) {
+        try {
+          const { startAt, endAt } = createDefaultDelegationWindow();
+
+          dispatch(
+            createDelegation({
+              customerId: lastCustomerId,
+              accountId: undefined, // applies to all accounts of the customer
+              primaryAgentId: formData.assignment.primaryAgent,
+              secondaryAgentId: formData.assignment.delegatedAgent,
+              startAt,
+              endAt,
+              maxAmountPerDay: undefined,
+              maxCollectionsPerDay: undefined,
+              createdBy: sessionAgentId,
+            }),
+          );
+          await dispatch(persistDelegations()).unwrap();
+        } catch (delegationError) {
+          console.error('Error creating delegation:', delegationError);
+          Alert.alert(
+            'Partial Save',
+            'Customer was saved, but recording the delegation failed. The delegated agent will not see this customer until it is set again from Edit Customer.',
+            [
+              {
+                text: 'OK',
+                onPress: () =>
+                  router.replace(`/(app)/(route)/customer-detail/${lastCustomerId}`),
+              },
+            ],
+          );
+          return;
+        }
+      }
+
       if (formData.pigmyAccount.createAccount) {
         try {
           const scheme = resolveOrCreateScheme(
@@ -457,12 +537,16 @@ export default function AddNewCustomer() {
             formData.pigmyAccount.dailyAmount,
           );
 
+          const manualAccountNumber = formData.personal.accountNumber.trim();
+
           dispatch(
             addAccount({
               customerId: lastCustomerId,
               schemeId: scheme.id,
               installmentAmount: formData.pigmyAccount.dailyAmount,
               status: AccountStatus.ACTIVE,
+              // left undefined so the reducer keeps generating the sequential number
+              accountNumber: manualAccountNumber || undefined,
             }),
           );
           await dispatch(persistAccounts()).unwrap();
@@ -519,6 +603,13 @@ export default function AddNewCustomer() {
       Alert.alert('Validation Error', 'Please select primary agent');
       return;
     }
+    if (requiresDelegation && !formData.assignment.delegatedAgent) {
+      Alert.alert(
+        'Validation Error',
+        'Please select the agent this customer is delegated to, or set yourself as primary agent',
+      );
+      return;
+    }
     if (!validatePhone(formData.personal.mobileNumber)) {
       Alert.alert('Validation Error', 'Please enter a valid 10-digit mobile number');
       return;
@@ -529,6 +620,23 @@ export default function AddNewCustomer() {
     ) {
       Alert.alert('Validation Error', 'Please enter a valid installment amount');
       return;
+    }
+
+    // A manually entered account number must not collide with an existing one, including
+    // numbers already minted by the generated series
+    const manualAccountNumber = formData.personal.accountNumber.trim();
+    if (manualAccountNumber) {
+      const existingAccount = selectAllAccounts(store.getState()).find(
+        a => a.accountNumber.trim().toLowerCase() === manualAccountNumber.toLowerCase(),
+      );
+
+      if (existingAccount) {
+        Alert.alert(
+          'Validation Error',
+          `Account number ${existingAccount.accountNumber} is already in use. Enter a different number or leave the field blank to auto-generate one.`,
+        );
+        return;
+      }
     }
 
     const addressParts = formData.address.fullAddress.split(',').map(s => s.trim());
@@ -608,9 +716,23 @@ export default function AddNewCustomer() {
       });
     } else if (activeDropdown === 'agent') {
       const agentId = value.match(/\(([^)]+)\)/)?.[1] || '';
+      const keepsDelegate =
+        agentId !== sessionAgentId && agentId !== formData.assignment.delegatedAgent;
       setFormData({
         ...formData,
-        assignment: { ...formData.assignment, primaryAgent: agentId },
+        assignment: {
+          ...formData.assignment,
+          primaryAgent: agentId,
+          // a delegate is only meaningful for another primary agent, and can never be that
+          // same agent
+          delegatedAgent: keepsDelegate ? formData.assignment.delegatedAgent : '',
+        },
+      });
+    } else if (activeDropdown === 'delegatedAgent') {
+      const agentId = value.match(/\(([^)]+)\)/)?.[1] || '';
+      setFormData({
+        ...formData,
+        assignment: { ...formData.assignment, delegatedAgent: agentId },
       });
     } else if (activeDropdown === 'documentType') {
       setFormData({ ...formData, kyc: { ...formData.kyc, documentType: value } });
@@ -634,6 +756,8 @@ export default function AddNewCustomer() {
         return routeOptions;
       case 'agent':
         return agentOptions;
+      case 'delegatedAgent':
+        return delegatedAgentOptions;
       case 'documentType':
         return documentTypeOptions;
       case 'frequency':
@@ -657,6 +781,10 @@ export default function AddNewCustomer() {
         const agent = allAgents.find(a => a.id === formData.assignment.primaryAgent);
         return agent ? `${agent.name} (${agent.id})` : '';
       }
+      case 'delegatedAgent': {
+        const agent = allAgents.find(a => a.id === formData.assignment.delegatedAgent);
+        return agent ? `${agent.name} (${agent.id})` : '';
+      }
       case 'documentType':
         return formData.kyc.documentType;
       case 'frequency':
@@ -674,6 +802,8 @@ export default function AddNewCustomer() {
         return 'Select Route';
       case 'agent':
         return 'Select Primary Agent';
+      case 'delegatedAgent':
+        return 'Select Delegated Agent';
       case 'documentType':
         return 'Select Document Type';
       case 'frequency':
@@ -749,11 +879,24 @@ export default function AddNewCustomer() {
             <Text style={styles.label}>Account Number</Text>
             <TextInput
               style={styles.input}
-              placeholder="Auto-generated on save"
+              placeholder="Leave blank to auto-generate"
               placeholderTextColor={theme.colors.text.muted}
+              autoCapitalize="characters"
               value={formData.personal.accountNumber}
-              editable={false}
+              onChangeText={text =>
+                setFormData({
+                  ...formData,
+                  personal: { ...formData.personal, accountNumber: text },
+                })
+              }
             />
+            <View style={styles.infoBox}>
+              <Text style={styles.infoIcon}>ℹ️</Text>
+              <Text style={styles.infoText}>
+                Enter the passbook account number to use it as-is. It stays separate from the
+                Customer ID above.
+              </Text>
+            </View>
           </View>
           <View style={styles.field}>
             <Text style={styles.label}>
@@ -805,19 +948,32 @@ export default function AddNewCustomer() {
             <Text style={styles.label}>
               Route / Beat <Text style={styles.required}>*</Text>
             </Text>
-            <Pressable onPress={() => openDropdown('route')} style={styles.dropdown}>
-              <Text
-                style={formData.assignment.route ? styles.dropdownText : styles.dropdownPlaceholder}
-              >
-                {formData.assignment.route
-                  ? (() => {
-                      const route = allRoutes.find(r => r.id === formData.assignment.route);
-                      return route ? `${route.routeCode} - ${route.name}` : 'Select Route';
-                    })()
-                  : 'Select Route'}
-              </Text>
-              <Text style={styles.dropdownIcon}>▼</Text>
-            </Pressable>
+            {isRouteLocked ? (
+              <View style={styles.inputWithIcon}>
+                <Text style={styles.readOnlyValue}>
+                  {presetRoute
+                    ? `${presetRoute.routeCode} - ${presetRoute.name}`
+                    : 'Route selected on the previous screen'}
+                </Text>
+                <Text style={styles.inputIcon}>🔒</Text>
+              </View>
+            ) : (
+              <Pressable onPress={() => openDropdown('route')} style={styles.dropdown}>
+                <Text
+                  style={
+                    formData.assignment.route ? styles.dropdownText : styles.dropdownPlaceholder
+                  }
+                >
+                  {formData.assignment.route
+                    ? (() => {
+                        const route = allRoutes.find(r => r.id === formData.assignment.route);
+                        return route ? `${route.routeCode} - ${route.name}` : 'Select Route';
+                      })()
+                    : 'Select Route'}
+                </Text>
+                <Text style={styles.dropdownIcon}>▼</Text>
+              </Pressable>
+            )}
           </View>
 
           <View style={styles.field}>
@@ -837,7 +993,11 @@ export default function AddNewCustomer() {
                       const agent = allAgents.find(
                         a => a.id === formData.assignment.primaryAgent,
                       );
-                      return agent ? `${agent.name} (${agent.id})` : 'Select Agent';
+                      // the session agent may have no Agent record yet, so show the id
+                      // rather than implying nothing is selected
+                      return agent
+                        ? `${agent.name} (${agent.id})`
+                        : formData.assignment.primaryAgent;
                     })()
                   : 'Select Agent'}
               </Text>
@@ -845,12 +1005,40 @@ export default function AddNewCustomer() {
             </Pressable>
           </View>
 
+          {requiresDelegation && (
+            <View style={styles.field}>
+              <Text style={styles.label}>
+                Delegated Agent <Text style={styles.required}>*</Text>
+              </Text>
+              <Pressable onPress={() => openDropdown('delegatedAgent')} style={styles.dropdown}>
+                <Text
+                  style={
+                    formData.assignment.delegatedAgent
+                      ? styles.dropdownText
+                      : styles.dropdownPlaceholder
+                  }
+                >
+                  {formData.assignment.delegatedAgent
+                    ? (() => {
+                        const agent = allAgents.find(
+                          a => a.id === formData.assignment.delegatedAgent,
+                        );
+                        return agent ? `${agent.name} (${agent.id})` : 'Select Agent';
+                      })()
+                    : 'Select Agent'}
+                </Text>
+                <Text style={styles.dropdownIcon}>▼</Text>
+              </Pressable>
+            </View>
+          )}
+
           <View style={styles.field}>
             <View style={styles.infoBox}>
               <Text style={styles.infoIcon}>ℹ️</Text>
               <Text style={styles.infoText}>
-                The selected agent will be responsible for daily pigmy collections from this
-                customer.
+                {requiresDelegation
+                  ? 'The customer stays owned by the primary agent and is delegated to the selected agent for collections.'
+                  : 'The selected agent will be responsible for daily pigmy collections from this customer.'}
               </Text>
             </View>
           </View>

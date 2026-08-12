@@ -72,8 +72,8 @@ export default function OfflineQueue() {
       backgroundColor: theme.colors.background.app,
     },
     scrollContent: {
-      paddingVertical: spacing(theme, 'md'),
-      paddingBottom: spacing(theme, 'xxl') + 80,
+      paddingTop: spacing(theme, 'sm'),
+      paddingBottom: spacing(theme, 'sm') + 64,
     },
     transactionsSection: {
       paddingHorizontal: spacing(theme, 'screenPadding'),
@@ -81,20 +81,21 @@ export default function OfflineQueue() {
     transactionsHeader: {
       flexDirection: 'row',
       justifyContent: 'space-between',
-      alignItems: 'center',
-      marginBottom: spacing(theme, 'md'),
+      alignItems: 'baseline',
+      marginBottom: spacing(theme, 'xs'),
     },
     transactionsTitle: {
-      ...typography(theme, 'pageTitle'),
+      ...typography(theme, 'sectionTitle'),
       color: theme.colors.text.primary,
       fontWeight: '700',
     },
     totalAmount: {
-      ...typography(theme, 'body'),
+      ...typography(theme, 'caption'),
       color: theme.colors.text.muted,
+      fontWeight: '600',
     },
     transactionsList: {
-      gap: spacing(theme, 'sm'),
+      gap: spacing(theme, 'xs'),
     },
     actionButtons: {
       position: 'absolute',
@@ -102,7 +103,8 @@ export default function OfflineQueue() {
       left: 0,
       right: 0,
       backgroundColor: theme.colors.background.card,
-      padding: spacing(theme, 'screenPadding'),
+      paddingHorizontal: spacing(theme, 'screenPadding'),
+      paddingVertical: spacing(theme, 'sm'),
       borderTopWidth: 1,
       borderTopColor: theme.colors.background.divider,
       flexDirection: 'row',

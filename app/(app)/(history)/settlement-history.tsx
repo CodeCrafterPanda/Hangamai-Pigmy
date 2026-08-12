@@ -40,8 +40,10 @@ export default function SettlementHistory() {
       borderRadius: radius(theme, 'card'),
       borderWidth: 1,
       borderColor: theme.colors.background.divider,
-      padding: spacing(theme, 'md'),
+      borderLeftWidth: 4,
+      padding: spacing(theme, 'sm'),
       gap: spacing(theme, 'xs'),
+      overflow: 'hidden',
     },
     cardHeader: {
       flexDirection: 'row',
@@ -129,7 +131,10 @@ export default function SettlementHistory() {
               <Pressable
                 key={settlement.id}
                 onPress={() => navigateToSettlementDetail(settlement.id)}
-                style={({ pressed }) => [styles.card, { opacity: pressed ? 0.7 : 1 }]}
+                style={({ pressed }) => [
+                  styles.card,
+                  { borderLeftColor: color, opacity: pressed ? 0.7 : 1 },
+                ]}
               >
                 <View style={styles.cardHeader}>
                   <Text style={styles.businessDate}>{settlement.businessDate}</Text>

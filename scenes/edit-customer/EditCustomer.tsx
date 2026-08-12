@@ -16,9 +16,26 @@ import type { State, Dispatch } from '@/utils/store';
 import { useTheme, typography, spacing, radius } from '@/theme';
 import EditCustomerHeader from '@/components/elements/EditCustomerHeader';
 import BottomSheet from '@/components/elements/BottomSheet';
-import { selectAllRoutes, selectAllAgents, selectCurrentBranch } from '@/slices/settings.slice';
+import {
+  selectAllRoutes,
+  selectAllAgents,
+  selectCurrentBranch,
+  selectSession,
+} from '@/slices/settings.slice';
 import { updateCustomer, persistCustomers } from '@/slices/customers.slice';
+import {
+  updateAccountNumber,
+  persistAccounts,
+  selectAllAccounts,
+} from '@/slices/accounts.slice';
+import {
+  createDelegation,
+  revokeDelegation,
+  persistDelegations,
+  selectActiveDelegationsByCustomer,
+} from '@/slices/delegations.slice';
 import type { EditCustomerData } from '@/types/EditCustomerData';
+import { createDefaultDelegationWindow } from '@/utils/businessLogic';
 
 interface EditCustomerProps {
   customerId?: string;
@@ -70,18 +87,34 @@ export default function EditCustomer({ customerId }: EditCustomerProps) {
   const allRoutes = useSelector(selectAllRoutes);
   const allAgents = useSelector(selectAllAgents);
   const branch = useSelector(selectCurrentBranch);
+  const session = useSelector(selectSession);
+
+  // Same session fallback as Routes/RouteDetails so ownership matches the scope those
+  // screens resolve customers with
+  const sessionAgentId = session.agentId || 'demo-agent';
+
+  // Delegations currently covering this customer, so an edit replaces them instead of
+  // stacking a second, contradictory active delegation
+  const activeDelegations = useSelector((state: State) =>
+    selectActiveDelegationsByCustomer(state, customerId ?? ''),
+  );
 
   // Get actual customer data from Redux if customerId is provided
   const actualCustomer = useSelector((state: State) =>
     customerId ? state.customers.customers.byId[customerId] : null
   );
   const allAccountsData = useSelector((state: State) => state.accounts.accounts);
+  const allAccounts = useSelector(selectAllAccounts);
   const customerAccounts = useMemo(() => {
     if (!customerId) return [];
     return allAccountsData.allIds
       .map(id => allAccountsData.byId[id])
       .filter(a => a?.customerId === customerId);
   }, [customerId, allAccountsData]);
+
+  // The account number shown in Personal Information belongs to this record; without an
+  // account there is nothing to rename, so the field stays read-only in that case.
+  const primaryAccount = customerAccounts[0];
 
   // Format options for dropdowns
   const routeOptions = useMemo(() => {
@@ -138,6 +171,21 @@ export default function EditCustomer({ customerId }: EditCustomerProps) {
   } : EMPTY_CUSTOMER_DATA;
 
   const [customerData, setCustomerData] = useState<EditCustomerData>(initialData);
+  const [delegatedAgentId, setDelegatedAgentId] = useState<string>(
+    activeDelegations[0]?.secondaryAgentId ?? '',
+  );
+
+  // Another agent as primary agent means the customer is delegated: the delegate has to be
+  // named so the customer lands in someone's DELEGATED scope
+  const requiresDelegation =
+    Boolean(customerData.collectionMapping.agentId) &&
+    customerData.collectionMapping.agentId !== sessionAgentId;
+
+  const delegatedAgentOptions = useMemo(() => {
+    return allAgents
+      .filter(a => a.id !== customerData.collectionMapping.agentId)
+      .map(a => `${a.name || 'Agent'} (${a.id})`);
+  }, [allAgents, customerData.collectionMapping.agentId]);
 
   const styles = StyleSheet.create({
     container: {
@@ -281,6 +329,12 @@ export default function EditCustomer({ customerId }: EditCustomerProps) {
       ...typography(theme, 'body'),
       color: theme.colors.text.primary,
       height: 48,
+    },
+    fieldHint: {
+      ...typography(theme, 'caption'),
+      color: theme.colors.text.muted,
+      fontSize: 11,
+      marginTop: spacing(theme, 'xxs'),
     },
     multilineInput: {
       height: 80,
@@ -591,6 +645,37 @@ export default function EditCustomer({ customerId }: EditCustomerProps) {
       return;
     }
 
+    // The manual account number must stay unique across accounts, including numbers already
+    // minted by the generated series
+    const nextAccountNumber = customerData.personalInfo.accountNumber.trim();
+    if (primaryAccount) {
+      if (!nextAccountNumber) {
+        Alert.alert('Validation Error', 'Please enter the account number');
+        return;
+      }
+
+      const collision = allAccounts.find(
+        a =>
+          a.id !== primaryAccount.id &&
+          a.accountNumber.trim().toLowerCase() === nextAccountNumber.toLowerCase(),
+      );
+      if (collision) {
+        Alert.alert(
+          'Validation Error',
+          `Account number ${collision.accountNumber} is already in use. Enter a different number.`,
+        );
+        return;
+      }
+    }
+
+    if (requiresDelegation && !delegatedAgentId) {
+      Alert.alert(
+        'Validation Error',
+        'Please select the agent this customer is delegated to, or set yourself as primary agent',
+      );
+      return;
+    }
+
     try {
       console.log('Updating customer:', customerData);
 
@@ -617,6 +702,67 @@ export default function EditCustomer({ customerId }: EditCustomerProps) {
       // unwrap so a failed device write surfaces as an error instead of a success the
       // agent would trust and a restart would silently discard
       await dispatch(persistCustomers()).unwrap();
+
+      // Only the number changes: the account id, its customer and every ledger/collection
+      // reference to it stay as they are
+      if (primaryAccount && nextAccountNumber !== primaryAccount.accountNumber.trim()) {
+        try {
+          dispatch(
+            updateAccountNumber({ id: primaryAccount.id, accountNumber: nextAccountNumber }),
+          );
+          await dispatch(persistAccounts()).unwrap();
+        } catch (accountError) {
+          console.error('Error updating account number:', accountError);
+          Alert.alert(
+            'Partial Save',
+            'Customer details were saved, but the new account number could not be stored. Please enter it again.',
+          );
+          return;
+        }
+      }
+
+      const nextPrimaryAgentId = customerData.collectionMapping.agentId;
+      const primaryAgentChanged = nextPrimaryAgentId !== (actualCustomer?.primaryAgentId ?? '');
+      const delegationChanged =
+        primaryAgentChanged || delegatedAgentId !== (activeDelegations[0]?.secondaryAgentId ?? '');
+
+      try {
+        if (requiresDelegation && delegationChanged) {
+          activeDelegations.forEach(delegation => {
+            dispatch(revokeDelegation(delegation.id));
+          });
+
+          const { startAt, endAt } = createDefaultDelegationWindow();
+          dispatch(
+            createDelegation({
+              customerId: customerData.basicInfo.id,
+              accountId: undefined, // applies to all accounts of the customer
+              primaryAgentId: nextPrimaryAgentId,
+              secondaryAgentId: delegatedAgentId,
+              startAt,
+              endAt,
+              maxAmountPerDay: undefined,
+              maxCollectionsPerDay: undefined,
+              createdBy: sessionAgentId,
+            }),
+          );
+          await dispatch(persistDelegations()).unwrap();
+        } else if (!requiresDelegation && primaryAgentChanged && activeDelegations.length > 0) {
+          // Ownership moved back to the logged-in agent, so delegations naming the previous
+          // primary agent no longer describe this customer
+          activeDelegations.forEach(delegation => {
+            dispatch(revokeDelegation(delegation.id));
+          });
+          await dispatch(persistDelegations()).unwrap();
+        }
+      } catch (delegationError) {
+        console.error('Error updating delegation:', delegationError);
+        Alert.alert(
+          'Partial Save',
+          'Customer details were saved, but the delegation change could not be stored. Please set the agents again.',
+        );
+        return;
+      }
 
       Alert.alert('Success', 'Customer updated successfully!', [
         {
@@ -673,6 +819,14 @@ export default function EditCustomer({ customerId }: EditCustomerProps) {
           agentId: agentId,
         },
       });
+      // a delegate is only meaningful for another primary agent, and can never be that
+      // same agent
+      if (agentId === sessionAgentId || agentId === delegatedAgentId) {
+        setDelegatedAgentId('');
+      }
+    } else if (activeDropdown === 'delegatedAgent') {
+      const agentId = value.match(/\(([^)]+)\)/)?.[1] || '';
+      setDelegatedAgentId(agentId);
     }
     closeDropdown();
   };
@@ -681,6 +835,7 @@ export default function EditCustomer({ customerId }: EditCustomerProps) {
     switch (activeDropdown) {
       case 'route': return routeOptions;
       case 'agent': return agentOptions;
+      case 'delegatedAgent': return delegatedAgentOptions;
       default: return [];
     }
   };
@@ -689,6 +844,10 @@ export default function EditCustomer({ customerId }: EditCustomerProps) {
     switch (activeDropdown) {
       case 'route': return customerData.collectionMapping.assignedRoute;
       case 'agent': return customerData.collectionMapping.primaryAgent;
+      case 'delegatedAgent': {
+        const agent = allAgents.find(a => a.id === delegatedAgentId);
+        return agent ? `${agent.name} (${agent.id})` : '';
+      }
       default: return '';
     }
   };
@@ -697,6 +856,7 @@ export default function EditCustomer({ customerId }: EditCustomerProps) {
     switch (activeDropdown) {
       case 'route': return 'Select Route';
       case 'agent': return 'Select Primary Agent';
+      case 'delegatedAgent': return 'Select Delegated Agent';
       default: return '';
     }
   };
@@ -822,10 +982,27 @@ export default function EditCustomer({ customerId }: EditCustomerProps) {
 
             <View style={[styles.field, styles.halfWidth]}>
               <Text style={styles.label}>Account Number</Text>
-              <View style={styles.readOnlyField}>
-                <Text style={styles.readOnlyIcon}>🔢</Text>
-                <Text style={styles.readOnlyText}>{customerData.personalInfo.accountNumber}</Text>
-              </View>
+              {primaryAccount ? (
+                <>
+                  <TextInput
+                    style={styles.input}
+                    value={customerData.personalInfo.accountNumber}
+                    autoCapitalize="characters"
+                    onChangeText={(text) =>
+                      setCustomerData({
+                        ...customerData,
+                        personalInfo: { ...customerData.personalInfo, accountNumber: text },
+                      })
+                    }
+                  />
+                  <Text style={styles.fieldHint}>Passbook number, separate from Customer ID</Text>
+                </>
+              ) : (
+                <View style={styles.readOnlyField}>
+                  <Text style={styles.readOnlyIcon}>🔢</Text>
+                  <Text style={styles.readOnlyText}>{customerData.personalInfo.accountNumber}</Text>
+                </View>
+              )}
             </View>
           </View>
         </View>
@@ -859,6 +1036,23 @@ export default function EditCustomer({ customerId }: EditCustomerProps) {
               <Text style={styles.dropdownIcon}>▼</Text>
             </Pressable>
           </View>
+
+          {requiresDelegation && (
+            <View style={styles.field}>
+              <Text style={styles.label}>
+                Delegated Agent <Text style={styles.required}>*</Text>
+              </Text>
+              <Pressable onPress={() => openDropdown('delegatedAgent')} style={styles.dropdown}>
+                <Text style={styles.dropdownText}>
+                  {(() => {
+                    const agent = allAgents.find(a => a.id === delegatedAgentId);
+                    return agent ? `${agent.name} (ID: ${agent.id})` : 'Select Agent';
+                  })()}
+                </Text>
+                <Text style={styles.dropdownIcon}>▼</Text>
+              </Pressable>
+            </View>
+          )}
         </View>
         <View style={styles.actionButtons}>
           <Pressable

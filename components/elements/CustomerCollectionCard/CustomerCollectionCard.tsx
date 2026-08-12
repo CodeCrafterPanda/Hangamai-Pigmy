@@ -27,24 +27,21 @@ export default function CustomerCollectionCard({
     switch (status) {
       case 'pending':
         return {
-          statusColor: theme.colors.brand.primary,
+          statusColor: '#D4834D',
           statusLabel: 'PENDING',
-          showLeftBorder: false,
-          leftBorderColor: 'transparent',
+          leftBorderColor: '#D4834D',
         };
       case 'overdue':
         return {
           statusColor: theme.colors.status.error,
           statusLabel: 'OVERDUE',
-          showLeftBorder: true,
           leftBorderColor: theme.colors.status.error,
         };
       case 'collected':
         return {
           statusColor: theme.colors.status.success,
           statusLabel: 'COLLECTED',
-          showLeftBorder: false,
-          leftBorderColor: 'transparent',
+          leftBorderColor: theme.colors.status.success,
         };
     }
   };
@@ -57,14 +54,13 @@ export default function CustomerCollectionCard({
       borderRadius: radius(theme, 'card'),
       borderWidth: 1,
       borderColor: theme.colors.background.divider,
-      borderLeftWidth: statusConfig.showLeftBorder ? 4 : 1,
+      borderLeftWidth: 4,
       borderLeftColor: statusConfig.leftBorderColor,
       overflow: 'hidden',
     },
     content: {
-      paddingVertical: spacing(theme, 'sm'),
-      paddingHorizontal: spacing(theme, 'md'),
-      gap: spacing(theme, 'xs'),
+      padding: spacing(theme, 'sm'),
+      gap: spacing(theme, 'xxs'),
     },
     header: {
       flexDirection: 'row',
@@ -104,6 +100,8 @@ export default function CustomerCollectionCard({
     },
     customerName: {
       ...typography(theme, 'sectionTitle'),
+      fontSize: 16,
+      lineHeight: 22,
       color: theme.colors.text.primary,
       fontWeight: '600',
     },

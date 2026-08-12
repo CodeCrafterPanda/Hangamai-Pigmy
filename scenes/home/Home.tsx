@@ -174,7 +174,7 @@ export default function Home() {
     pendingSync: needsSyncCollections.length,
   };
 
-  const upNextRowGap = spacing(theme, 'xs');
+  const upNextRowGap = spacing(theme, 'sm');
 
   const styles = StyleSheet.create({
     container: {
