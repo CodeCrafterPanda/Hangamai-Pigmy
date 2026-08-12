@@ -445,7 +445,9 @@ export default function AddNewCustomer() {
         );
       }
 
-      await dispatch(persistCustomers());
+      // unwrap so a failed device write surfaces as an error instead of a success the
+      // agent would trust and a restart would silently discard
+      await dispatch(persistCustomers()).unwrap();
 
       if (formData.pigmyAccount.createAccount) {
         try {
@@ -463,7 +465,7 @@ export default function AddNewCustomer() {
               status: AccountStatus.ACTIVE,
             }),
           );
-          await dispatch(persistAccounts());
+          await dispatch(persistAccounts()).unwrap();
         } catch (accountError) {
           console.error('Error creating account/scheme:', accountError);
           Alert.alert(

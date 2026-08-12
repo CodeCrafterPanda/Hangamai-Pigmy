@@ -62,8 +62,9 @@ export default function CustomerCollectionCard({
       overflow: 'hidden',
     },
     content: {
-      padding: spacing(theme, 'md'),
-      gap: spacing(theme, 'md'),
+      paddingVertical: spacing(theme, 'sm'),
+      paddingHorizontal: spacing(theme, 'md'),
+      gap: spacing(theme, 'xs'),
     },
     header: {
       flexDirection: 'row',
@@ -76,6 +77,7 @@ export default function CustomerCollectionCard({
       alignItems: 'center',
       gap: spacing(theme, 'sm'),
       flex: 1,
+      minWidth: 0,
     },
     avatar: {
       width: 48,
@@ -151,8 +153,10 @@ export default function CustomerCollectionCard({
     collectButton: {
       backgroundColor: theme.colors.brand.primary,
       borderRadius: radius(theme, 'button'),
-      paddingHorizontal: spacing(theme, 'lg'),
-      paddingVertical: spacing(theme, 'sm'),
+      paddingHorizontal: spacing(theme, 'md'),
+      paddingVertical: spacing(theme, 'xs'),
+      minHeight: 36,
+      justifyContent: 'center',
       flexDirection: 'row',
       alignItems: 'center',
       gap: spacing(theme, 'xs'),
@@ -195,7 +199,6 @@ export default function CustomerCollectionCard({
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
-      marginTop: spacing(theme, 'xxs'),
     },
     editButton: {
       flexDirection: 'row',

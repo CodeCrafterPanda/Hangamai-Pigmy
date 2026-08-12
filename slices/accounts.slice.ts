@@ -92,8 +92,13 @@ export const persistAccounts = createAsyncThunk(
       const state = getState() as State;
       const { accounts, schemes } = state.accounts;
 
-      await setItemSafe(STORAGE_KEYS.ACCOUNTS, accounts);
-      await setItemSafe(STORAGE_KEYS.SCHEMES, schemes);
+      // setItemSafe swallows the write error and reports false, so the caller can only
+      // learn that a new account never reached storage if we reject here.
+      const persisted = await setItemSafe(STORAGE_KEYS.ACCOUNTS, accounts);
+      const persistedSchemes = await setItemSafe(STORAGE_KEYS.SCHEMES, schemes);
+      if (!persisted || !persistedSchemes) {
+        return rejectWithValue('Failed to persist accounts to device storage');
+      }
 
       return true;
     } catch (error: any) {

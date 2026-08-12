@@ -93,8 +93,13 @@ export const persistCustomers = createAsyncThunk(
       const state = getState() as State;
       const { customers, kycDocs } = state.customers;
 
-      await setItemSafe(STORAGE_KEYS.CUSTOMERS, customers);
-      await setItemSafe(STORAGE_KEYS.KYC_DOCS, kycDocs);
+      // setItemSafe swallows the write error and reports false, so the caller can only
+      // learn that a customer edit never reached storage if we reject here.
+      const persisted = await setItemSafe(STORAGE_KEYS.CUSTOMERS, customers);
+      const persistedKyc = await setItemSafe(STORAGE_KEYS.KYC_DOCS, kycDocs);
+      if (!persisted || !persistedKyc) {
+        return rejectWithValue('Failed to persist customers to device storage');
+      }
 
       return true;
     } catch (error: any) {

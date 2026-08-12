@@ -106,12 +106,19 @@ export const persistSettings = createAsyncThunk(
       const state = getState() as State;
       const { branchSettings, branches, agents, routes, session } = state.settings;
       
-      await setItemSafe(STORAGE_KEYS.SETTINGS, branchSettings);
-      await setItemSafe(STORAGE_KEYS.BRANCHES, branches);
-      await setItemSafe(STORAGE_KEYS.AGENTS, agents);
-      await setItemSafe(STORAGE_KEYS.ROUTES, routes);
-      await setItemSafe(STORAGE_KEYS.SESSION, session);
-      
+      // setItemSafe swallows the write error and reports false, so the caller can only
+      // learn that a route or session change never reached storage if we reject here.
+      const results = await Promise.all([
+        setItemSafe(STORAGE_KEYS.SETTINGS, branchSettings),
+        setItemSafe(STORAGE_KEYS.BRANCHES, branches),
+        setItemSafe(STORAGE_KEYS.AGENTS, agents),
+        setItemSafe(STORAGE_KEYS.ROUTES, routes),
+        setItemSafe(STORAGE_KEYS.SESSION, session),
+      ]);
+      if (results.some(persisted => !persisted)) {
+        return rejectWithValue('Failed to persist settings to device storage');
+      }
+
       return true;
     } catch (error: any) {
       return rejectWithValue(error.message || 'Failed to persist settings');

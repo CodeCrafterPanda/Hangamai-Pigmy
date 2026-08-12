@@ -1,16 +1,20 @@
 import { Stack } from 'expo-router';
+import { useSelector } from 'react-redux';
 import ProfileHeader from '@/components/elements/ProfileHeader';
 import type { UserProfile } from '@/types/HomeData';
 import { useTheme } from '@/theme';
+import { selectCurrentAgent, selectCurrentBranch } from '@/slices/settings.slice';
 
 export default function HomeStack() {
   const { theme } = useTheme();
+  const agent = useSelector(selectCurrentAgent);
+  const branch = useSelector(selectCurrentBranch);
 
-  // Mock data - TODO: Replace with actual data from Redux/Context
   const userProfile: UserProfile = {
-    name: 'Rahul K.',
-    branch: 'Shivaji Nagar Branch',
-    isOnline: true,
+    name: agent?.name || 'Agent',
+    branch: branch?.name || '—',
+    // The MVP is offline-first with no backend: there is nothing to be online with.
+    isOnline: false,
   };
 
   return (
@@ -49,4 +53,3 @@ export default function HomeStack() {
     </Stack>
   );
 }
-

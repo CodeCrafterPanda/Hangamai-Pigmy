@@ -1,15 +1,25 @@
 import { Stack } from 'expo-router';
+import { useSelector } from 'react-redux';
 import { useTheme } from '@/theme';
 import RouteHeader from '@/components/elements/RouteHeader';
 import AddCustomerHeader from '@/components/elements/AddCustomerHeader';
+import { selectBranchTimezone } from '@/slices/settings.slice';
+import { getCurrentBusinessDate } from '@/utils/businessLogic';
 
 export default function RouteStack() {
   const { theme } = useTheme();
+  const timezone = useSelector(selectBranchTimezone);
 
-  // Mock data - TODO: Replace with actual data from Redux/Context
   const headerData = {
-    date: 'Oct 24, 2023',
-    isOnline: true,
+    // Branch business date, not the device calendar date: the header must agree with the
+    // date collections are actually booked against.
+    date: new Date(`${getCurrentBusinessDate(timezone)}T00:00:00`).toLocaleDateString('en-IN', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+    }),
+    // The MVP is offline-first with no backend: there is nothing to be online with.
+    isOnline: false,
   };
 
   return (

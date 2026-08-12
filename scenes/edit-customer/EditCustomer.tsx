@@ -16,13 +16,48 @@ import type { State, Dispatch } from '@/utils/store';
 import { useTheme, typography, spacing, radius } from '@/theme';
 import EditCustomerHeader from '@/components/elements/EditCustomerHeader';
 import BottomSheet from '@/components/elements/BottomSheet';
-import { selectAllRoutes, selectAllAgents } from '@/slices/settings.slice';
+import { selectAllRoutes, selectAllAgents, selectCurrentBranch } from '@/slices/settings.slice';
 import { updateCustomer, persistCustomers } from '@/slices/customers.slice';
 import type { EditCustomerData } from '@/types/EditCustomerData';
 
 interface EditCustomerProps {
   customerId?: string;
 }
+
+/**
+ * Placeholder shape used only to satisfy the form state hook before the "customer not
+ * found" guard renders. It is never displayed and never saved — an unresolved customer
+ * must not be shown as an editable record.
+ */
+const EMPTY_CUSTOMER_DATA: EditCustomerData = {
+  basicInfo: {
+    id: '',
+    customerId: '',
+    name: '',
+    idNumber: '',
+    avatarUrl: undefined,
+    isVerified: false,
+    assignedAgent: '',
+    activeAccountsCount: 0,
+  },
+  personalInfo: {
+    fullName: '',
+    mobileNumber: '',
+    address: '',
+    customerId: '',
+    currentBalance: 0,
+    accountNumber: '',
+    homeBranch: '',
+  },
+  collectionMapping: {
+    assignedRoute: '',
+    routeId: '',
+    primaryAgent: '',
+    agentId: '',
+  },
+  kycDocuments: [],
+  associatedAccounts: [],
+};
 
 export default function EditCustomer({ customerId }: EditCustomerProps) {
   const router = useRouter();
@@ -34,6 +69,7 @@ export default function EditCustomer({ customerId }: EditCustomerProps) {
   // Get dropdown options from Redux
   const allRoutes = useSelector(selectAllRoutes);
   const allAgents = useSelector(selectAllAgents);
+  const branch = useSelector(selectCurrentBranch);
 
   // Get actual customer data from Redux if customerId is provided
   const actualCustomer = useSelector((state: State) =>
@@ -56,7 +92,6 @@ export default function EditCustomer({ customerId }: EditCustomerProps) {
     return allAgents.map(a => `${a.name || 'Agent'} (${a.id})`);
   }, [allAgents]);
 
-  // Use actual data from Redux if available, otherwise use mock data
   const getInitials = (name: string) => {
     const parts = name.split(' ');
     if (parts.length >= 2) {
@@ -83,7 +118,7 @@ export default function EditCustomer({ customerId }: EditCustomerProps) {
       customerId: actualCustomer.customerCode.replace('CUST-', ''),
       currentBalance: customerAccounts[0]?.currentBalance || 0,
       accountNumber: customerAccounts[0]?.accountNumber || 'N/A',
-      homeBranch: 'Hanga',
+      homeBranch: branch?.name || '—',
     },
     collectionMapping: {
       assignedRoute: allRoutes.find(r => r.id === actualCustomer.routeId)?.name || 'Unknown',
@@ -100,35 +135,7 @@ export default function EditCustomer({ customerId }: EditCustomerProps) {
       icon: '💰',
       iconColor: '#2ED47A',
     })),
-  } : {
-    basicInfo: {
-      id: 'CUST-8921',
-      customerId: '#CUST-8921',
-      name: 'Ramesh Kumar',
-      idNumber: '89212003',
-      avatarUrl: undefined,
-      isVerified: true,
-      assignedAgent: 'Suresh P.',
-      activeAccountsCount: 3,
-    },
-    personalInfo: {
-      fullName: 'Ramesh Kumar',
-      mobileNumber: '+91 98765 43210',
-      address: 'No. 24, 2nd Cross, Gandhi Nagar, Bengaluru, Karnataka 560009',
-      customerId: '8921',
-      currentBalance: 12500,
-      accountNumber: '001239882',
-      homeBranch: 'Main Br.',
-    },
-    collectionMapping: {
-      assignedRoute: 'Industrial Area',
-      routeId: 'RT-04',
-      primaryAgent: 'Suresh P.',
-      agentId: 'AG-102',
-    },
-    kycDocuments: [],
-    associatedAccounts: [],
-  };
+  } : EMPTY_CUSTOMER_DATA;
 
   const [customerData, setCustomerData] = useState<EditCustomerData>(initialData);
 
@@ -546,6 +553,27 @@ export default function EditCustomer({ customerId }: EditCustomerProps) {
       color: '#FFFFFF',
       fontWeight: '600',
     },
+    emptyState: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      padding: spacing(theme, 'xl'),
+      gap: spacing(theme, 'sm'),
+    },
+    emptyIcon: {
+      fontSize: 40,
+    },
+    emptyText: {
+      ...typography(theme, 'sectionTitle'),
+      color: theme.colors.text.primary,
+      fontWeight: '600',
+      textAlign: 'center',
+    },
+    emptyHint: {
+      ...typography(theme, 'body'),
+      color: theme.colors.text.muted,
+      textAlign: 'center',
+    },
   });
 
   const handleUpdate = async () => {
@@ -586,8 +614,9 @@ export default function EditCustomer({ customerId }: EditCustomerProps) {
         })
       );
 
-      // Persist changes
-      await dispatch(persistCustomers());
+      // unwrap so a failed device write surfaces as an error instead of a success the
+      // agent would trust and a restart would silently discard
+      await dispatch(persistCustomers()).unwrap();
 
       Alert.alert('Success', 'Customer updated successfully!', [
         {
@@ -671,6 +700,22 @@ export default function EditCustomer({ customerId }: EditCustomerProps) {
       default: return '';
     }
   };
+
+  // Without the persisted customer there is nothing to edit: an editable form here would
+  // show invented details and its save would report success while updating no record.
+  if (!actualCustomer) {
+    return (
+      <SafeAreaView style={styles.container} edges={['top']}>
+        <View style={styles.emptyState}>
+          <Text style={styles.emptyIcon}>👤</Text>
+          <Text style={styles.emptyText}>Customer not found</Text>
+          <Text style={styles.emptyHint}>
+            This customer may have been removed or the link is invalid.
+          </Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>

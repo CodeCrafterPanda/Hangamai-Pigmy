@@ -85,9 +85,11 @@ export default function Home() {
   // Filter data based on active tab
   const activeCustomers = activeTab === 'primary' ? primaryCustomers : delegatedCustomers;
 
-  // Convert to CustomerCollection format with account data
+  // "Up Next" is the agent's work queue for the active scope: every eligible customer, with
+  // the ones still to visit today ahead of the ones already collected. The list is not
+  // truncated — the section itself is a bounded, scrollable viewport (see upNextViewport).
   const upNextCustomers: CustomerCollection[] = useMemo(() => {
-    return activeCustomers.slice(0, 5).map(customer => {
+    const rows: CustomerCollection[] = activeCustomers.map(customer => {
       // Find customer's active accounts
       const customerAccounts = allAccounts.filter(
         a => a.customerId === customer.id && a.status === 'ACTIVE'
@@ -124,6 +126,14 @@ export default function Home() {
         initials: getInitials(customer.fullName),
       };
     });
+
+    // Pending first, already-collected after, from the same per-customer collection status
+    // the row itself renders. Partitioning by filter keeps each group in the order the scope
+    // already provides rather than imposing a second sort of its own.
+    return [
+      ...rows.filter(row => row.status !== 'collected'),
+      ...rows.filter(row => row.status === 'collected'),
+    ];
   }, [activeCustomers, allAccounts, todayCollections]);
 
   // Context-specific stats from real persisted todayCollections.
@@ -164,13 +174,15 @@ export default function Home() {
     pendingSync: needsSyncCollections.length,
   };
 
+  const upNextRowGap = spacing(theme, 'xs');
+
   const styles = StyleSheet.create({
     container: {
       flex: 1,
       backgroundColor: theme.colors.background.app,
     },
-    scrollContent: {
-      paddingVertical: spacing(theme, 'xl'),
+    summarySection: {
+      paddingTop: spacing(theme, 'xl'),
     },
     statsRow: {
       flexDirection: 'row',
@@ -253,6 +265,7 @@ export default function Home() {
       marginBottom: spacing(theme, 'md'),
     },
     upNextSection: {
+      flex: 1,
       paddingHorizontal: spacing(theme, 'screenPadding'),
     },
     upNextHeader: {
@@ -271,8 +284,14 @@ export default function Home() {
       color: theme.colors.brand.primary,
       fontWeight: '600',
     },
+    upNextViewport: {
+      // Takes whatever height is left under the fixed summary, so the queue scrolls inside
+      // this region and its own header stays put.
+      flex: 1,
+    },
     customerList: {
-      gap: spacing(theme, 'sm'),
+      gap: upNextRowGap,
+      paddingBottom: spacing(theme, 'xl'),
     },
   });
 
@@ -341,17 +360,22 @@ export default function Home() {
 
   return (
     <View style={styles.container}>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+      {/* Fixed summary: only the Up Next queue below it scrolls. */}
+      <View style={styles.summarySection}>
         <CollectedTodayCard amount={dailyStats.collectedToday} />
 
         <View style={styles.statsRow}>
-          <StatCard type="pending" value={dailyStats.pendingCount} />
+          {/* Pending is narrower, In Hand and Online equal. It cannot go much below 0.9:
+              "PENDING" plus the icon, gap and card padding needs ~105dp, which is close to an
+              even third of the row on a normal phone. */}
+          <StatCard type="pending" value={dailyStats.pendingCount} flex={0.9} />
           <StatCard
             type="inHand"
             value={dailyStats.inHandAmount}
+            flex={1}
             onPress={() => navigateToSettlement(activeScope)}
           />
-          <StatCard type="online" value={dailyStats.onlineAmount} />
+          <StatCard type="online" value={dailyStats.onlineAmount} flex={1} />
         </View>
 
         <View style={styles.tabsContainer}>
@@ -385,28 +409,28 @@ export default function Home() {
         <View style={styles.attentionSection}>
           <AttentionBanner alert={attentionAlert} onPress={handleAttentionPress} />
         </View>
+      </View>
 
-        <View style={styles.upNextSection}>
-          <View style={styles.upNextHeader}>
-            <Text style={styles.upNextTitle}>Up Next</Text>
-            <Pressable onPress={handleViewAll}>
-              <Text style={styles.viewAllButton}>View All</Text>
-            </Pressable>
-          </View>
-
-          <View style={styles.customerList}>
-            {upNextCustomers.map((customer) => (
-              <CustomerCollectionCard
-                key={customer.id}
-                customer={customer}
-                onCollect={handleCollect}
-                onCollectAll={handleCollectAll}
-                onReceipt={handleReceipt}
-              />
-            ))}
-          </View>
+      <View style={styles.upNextSection}>
+        <View style={styles.upNextHeader}>
+          <Text style={styles.upNextTitle}>Up Next</Text>
+          <Pressable onPress={handleViewAll}>
+            <Text style={styles.viewAllButton}>View All</Text>
+          </Pressable>
         </View>
-      </ScrollView>
+
+        <ScrollView style={styles.upNextViewport} contentContainerStyle={styles.customerList}>
+          {upNextCustomers.map((customer) => (
+            <CustomerCollectionCard
+              key={customer.id}
+              customer={customer}
+              onCollect={handleCollect}
+              onCollectAll={handleCollectAll}
+              onReceipt={handleReceipt}
+            />
+          ))}
+        </ScrollView>
+      </View>
 
       <BottomSheet isOpen={isBottomSheetOpen} onClose={handleCloseBottomSheet}>
         {selectedCustomerId && (() => {

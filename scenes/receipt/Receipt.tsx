@@ -38,39 +38,32 @@ export default function Receipt({ collectionId, onClose }: ReceiptProps) {
 
   const isUpiPayment = collection?.mode === 'UPI';
 
-  // Use real data if collection is provided, otherwise mock data
-  const receiptData: ReceiptData = collection && customer && account ? {
-    receiptNumber: collection.receiptNo,
-    totalAmount: collection.amount + collection.penaltyAmount,
-    customerName: customer.fullName,
-    accountNumber: account.accountNumber.slice(-4),
-    accountNumberMasked: `•••• •••• ${account.accountNumber.slice(-4)}`,
-    date: new Date(collection.collectedAt).toLocaleDateString('en-IN', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-    }),
-    time: new Date(collection.collectedAt).toLocaleTimeString('en-IN', {
-      hour: '2-digit',
-      minute: '2-digit',
-    }),
-    paymentMode: collection.mode === 'CASH' ? 'Cash Deposit' : 'UPI Payment',
-    agentId: collection.collectedByAgentId,
-    isSavedLocally: collection.status === 'CREATED',
-    initials: getInitials(customer.fullName),
-  } : {
-    receiptNumber: 'RCPT-2023-8892',
-    totalAmount: 2000.0,
-    customerName: 'Rajesh Kumar',
-    accountNumber: '4592',
-    accountNumberMasked: '•••• •••• 4592',
-    date: 'Oct 24, 2023',
-    time: '10:45 AM',
-    paymentMode: 'Cash Deposit',
-    agentId: 'AGT-SOUTH-04 (Self)',
-    isSavedLocally: true,
-    initials: 'RK',
-  };
+  // A receipt is evidence of a real transaction. When the collection, its customer or its
+  // account cannot be resolved there is nothing to evidence, so the screen says so rather
+  // than rendering placeholder figures that would read as a genuine receipt.
+  const receiptData: ReceiptData | undefined =
+    collection && customer && account
+      ? {
+          receiptNumber: collection.receiptNo,
+          totalAmount: collection.amount + collection.penaltyAmount,
+          customerName: customer.fullName,
+          accountNumber: account.accountNumber.slice(-4),
+          accountNumberMasked: `•••• •••• ${account.accountNumber.slice(-4)}`,
+          date: new Date(collection.collectedAt).toLocaleDateString('en-IN', {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric',
+          }),
+          time: new Date(collection.collectedAt).toLocaleTimeString('en-IN', {
+            hour: '2-digit',
+            minute: '2-digit',
+          }),
+          paymentMode: collection.mode === 'CASH' ? 'Cash Deposit' : 'UPI Payment',
+          agentId: collection.collectedByAgentId,
+          isSavedLocally: collection.status === 'CREATED',
+          initials: getInitials(customer.fullName),
+        }
+      : undefined;
 
   const styles = StyleSheet.create({
     container: {
@@ -292,6 +285,25 @@ export default function Receipt({ collectionId, onClose }: ReceiptProps) {
       fontSize: 16,
       color: '#FFFFFF',
     },
+    emptyState: {
+      padding: spacing(theme, 'xl'),
+      alignItems: 'center',
+      gap: spacing(theme, 'xs'),
+    },
+    emptyIcon: {
+      fontSize: 40,
+    },
+    emptyText: {
+      ...typography(theme, 'sectionTitle'),
+      color: theme.colors.text.primary,
+      fontWeight: '600',
+      textAlign: 'center',
+    },
+    emptyHint: {
+      ...typography(theme, 'body'),
+      color: theme.colors.text.muted,
+      textAlign: 'center',
+    },
   });
 
   const handleClose = () => {
@@ -306,11 +318,15 @@ export default function Receipt({ collectionId, onClose }: ReceiptProps) {
   };
 
   const handleCopyReceipt = () => {
-    console.log('Copy receipt number:', receiptData.receiptNumber);
+    console.log('Copy receipt number:', receiptData?.receiptNumber);
     // TODO: Copy to clipboard
   };
 
   const handleShare = (method: ShareMethod) => {
+    if (!receiptData) {
+      return;
+    }
+
     console.log('Share via:', method);
     const message = `Receipt: ${receiptData.receiptNumber}\nAmount: ₹${receiptData.totalAmount.toLocaleString('en-IN')}\nCustomer: ${receiptData.customerName}`;
 
@@ -322,6 +338,19 @@ export default function Receipt({ collectionId, onClose }: ReceiptProps) {
     }
   };
 
+  if (!receiptData) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.emptyState}>
+          <Text style={styles.emptyIcon}>🧾</Text>
+          <Text style={styles.emptyText}>Receipt not available</Text>
+          <Text style={styles.emptyHint}>
+            The transaction behind this receipt could not be found on this device.
+          </Text>
+        </View>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>

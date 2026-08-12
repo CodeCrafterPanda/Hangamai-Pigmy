@@ -70,8 +70,13 @@ export const persistDelegations = createAsyncThunk(
       const state = getState() as State;
       const { delegations } = state.delegations;
       
-      await setItemSafe(STORAGE_KEYS.DELEGATIONS, delegations);
-      
+      // setItemSafe swallows the write error and reports false, so the caller can only
+      // learn that a delegation change never reached storage if we reject here.
+      const persisted = await setItemSafe(STORAGE_KEYS.DELEGATIONS, delegations);
+      if (!persisted) {
+        return rejectWithValue('Failed to persist delegations to device storage');
+      }
+
       return true;
     } catch (error: any) {
       return rejectWithValue(error.message || 'Failed to persist delegations');

@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, ScrollView, Pressable } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Pressable, Alert } from 'react-native';
 import { useMemo } from 'react';
 import { useSelector } from 'react-redux';
 import { useTheme, typography, spacing } from '@/theme';
@@ -6,7 +6,8 @@ import SyncStatusCard from '@/components/elements/SyncStatusCard';
 import OfflineTransactionCard from '@/components/elements/OfflineTransactionCard';
 import { selectCollectionsNeedingSync } from '@/slices/collections.slice';
 import { selectAllCustomers } from '@/slices/customers.slice';
-import { selectSession } from '@/slices/settings.slice';
+import { selectSession, selectBranchTimezone } from '@/slices/settings.slice';
+import { getCurrentBusinessDate } from '@/utils/businessLogic';
 import type { OfflineTransaction, SyncStatus } from '@/types/OfflineQueueData';
 
 export default function OfflineQueue() {
@@ -16,20 +17,19 @@ export default function OfflineQueue() {
   const session = useSelector(selectSession);
   const agentId = session.agentId || 'demo-agent';
 
-  // Get today's business date
-  const today = new Date();
-  const todayBusinessDate = today.toISOString().split('T')[0]; // YYYY-MM-DD format
+  const timezone = useSelector(selectBranchTimezone);
+  const todayBusinessDate = getCurrentBusinessDate(timezone);
 
   // Get collections needing sync (only TODAY's)
   const needsSyncCollections = useSelector(selectCollectionsNeedingSync);
   const allCustomers = useSelector(selectAllCustomers);
 
-  // Filter for current agent and TODAY only
+  // Filter for current agent and TODAY only, comparing against the branch business date
+  // already stored on each collection rather than re-deriving a date from the timestamp.
   const todayNeedsSyncCollections = useMemo(() => {
-    return needsSyncCollections.filter(c => {
-      const collectionDate = c.collectedAt.split('T')[0];
-      return c.collectedByAgentId === agentId && collectionDate === todayBusinessDate;
-    });
+    return needsSyncCollections.filter(
+      c => c.collectedByAgentId === agentId && c.businessDate === todayBusinessDate,
+    );
   }, [needsSyncCollections, agentId, todayBusinessDate]);
 
   // Calculate sync status
@@ -40,7 +40,9 @@ export default function OfflineQueue() {
   const syncStatus: SyncStatus = {
     pendingCount,
     failedCount,
-    lastSyncTime: '2 hours ago', // TODO: Get from sync queue
+    // This build has no backend to sync with, so no sync has ever succeeded. Showing a
+    // plausible elapsed time here would claim collections had left the device.
+    lastSyncTime: 'Never',
     totalAmount,
   };
 
@@ -148,21 +150,25 @@ export default function OfflineQueue() {
     },
   });
 
-  const handleRetryTransaction = (transactionId: string) => {
-    console.log('Retry transaction:', transactionId);
-    // TODO: Retry failed transaction
+  // No backend exists in this MVP build. These controls say so instead of appearing to
+  // upload, which would leave the agent believing collections had left the device.
+  const notifySyncUnavailable = () => {
+    Alert.alert(
+      'Sync unavailable',
+      'This build has no server connection. Collections are stored on this device and stay available after a restart.',
+    );
+  };
+
+  const handleRetryTransaction = (_transactionId: string) => {
+    notifySyncUnavailable();
   };
 
   const handleRetryAllFailed = () => {
-    console.log('Retry all failed transactions');
-    const failedTransactions = transactions.filter((t) => t.status === 'failed');
-    // TODO: Retry all failed transactions
-    console.log('Failed transactions:', failedTransactions.length);
+    notifySyncUnavailable();
   };
 
   const handleSyncNow = () => {
-    console.log('Sync now pressed');
-    // TODO: Trigger sync
+    notifySyncUnavailable();
   };
 
   return (

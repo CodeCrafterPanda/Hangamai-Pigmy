@@ -2,6 +2,20 @@ import { Stack } from 'expo-router';
 import { useTheme } from '@/theme';
 import HistoryHeader from '@/components/elements/HistoryHeader';
 
+/**
+ * Anchor this stack at the History root.
+ *
+ * The Home "In Hand" tile pushes straight to `settlement`, which lives in this stack but is
+ * reached from another tab. Without an anchor the section is built holding only that one
+ * route, so History had no root beneath it: selecting the History tab reopened Settlement,
+ * and the tab-press reset in `app/(app)/_layout.tsx` correctly did nothing because a
+ * single-entry stack is already at its top. Anchoring puts `index` underneath any route
+ * entered this way, which is what makes History open at History and back leave Settlement.
+ */
+export const unstable_settings = {
+  anchor: 'index',
+};
+
 export default function HistoryStack() {
   const { theme } = useTheme();
 

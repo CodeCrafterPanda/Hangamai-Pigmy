@@ -150,7 +150,9 @@ export default function AddRoute() {
     try {
       setIsSaving(true);
       dispatch(addRoute(newRoute));
-      await dispatch(persistSettings());
+      // unwrap so a failed device write surfaces as an error instead of navigating on to a
+      // route the next restart would not have
+      await dispatch(persistSettings()).unwrap();
       router.replace(`/(app)/(route)/route-customers/${newRoute.id}`);
     } catch {
       Alert.alert('Error', 'Failed to add route');

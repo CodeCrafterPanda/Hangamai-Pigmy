@@ -13,8 +13,12 @@ import {
   selectDelegationCollectionCountForDate,
 } from '@/slices/collections.slice';
 import { selectSession, selectBranchTimezone } from '@/slices/settings.slice';
-import { selectSchemeForAccount } from '@/slices/accounts.slice';
-import { selectActiveDelegations } from '@/slices/delegations.slice';
+import { selectAccountById, selectSchemeForAccount } from '@/slices/accounts.slice';
+import { selectCustomerById } from '@/slices/customers.slice';
+import {
+  selectActiveDelegations,
+  selectDelegationsBySecondaryAgent,
+} from '@/slices/delegations.slice';
 import {
   calculateMissedDaysForMonth,
   checkDelegationEligibility,
@@ -23,17 +27,32 @@ import {
   resolvePenalty,
 } from '@/utils/businessLogic';
 import type { CollectDepositData, PaymentMode } from '@/types/CollectDepositData';
-import type { Customer, Account } from '@/types';
+import type { Collection, Customer, Account } from '@/types';
 import { CollectionMode } from '@/types';
+
+/** Stable reference so the "no account yet" read does not re-render on every store change */
+const EMPTY_COLLECTIONS: Collection[] = [];
 
 interface CollectDepositProps {
   onClose?: () => void;
   customer?: Customer;
   account?: Account;
   delegationId?: string;
+  /**
+   * Route entry point (`collect-deposit/[accountId]`). The in-app bottom sheets pass the
+   * resolved entities directly; a deep link only carries the account id, so the account,
+   * its customer and any delegation are resolved here from the same persisted state.
+   */
+  accountId?: string;
 }
 
-export default function CollectDeposit({ onClose, customer, account, delegationId }: CollectDepositProps) {
+export default function CollectDeposit({
+  onClose,
+  customer: customerProp,
+  account: accountProp,
+  delegationId: delegationIdProp,
+  accountId,
+}: CollectDepositProps) {
   const router = useRouter();
   const dispatch = useDispatch<Dispatch>();
   const { theme } = useTheme();
@@ -53,11 +72,29 @@ export default function CollectDeposit({ onClose, customer, account, delegationI
   // Get session data — timezone from Branch entity, not BranchSettings cache
   const session = useSelector(selectSession);
   const timezone = useSelector(selectBranchTimezone);
+  const agentId = session.agentId || 'demo-agent';
+
+  const routeAccount = useSelector((state: State) =>
+    !accountProp && accountId ? selectAccountById(state, accountId) : undefined,
+  );
+  const account = accountProp ?? routeAccount;
+
+  const routeCustomer = useSelector((state: State) =>
+    !customerProp && account ? selectCustomerById(state, account.customerId) : undefined,
+  );
+  const customer = customerProp ?? routeCustomer;
+
+  const myDelegations = useSelector((state: State) =>
+    selectDelegationsBySecondaryAgent(state, agentId),
+  );
+  const delegationId =
+    delegationIdProp ?? (customer ? myDelegations.find(d => d.customerId === customer.id)?.id : undefined);
+
   const scheme = useSelector((state: State) =>
     account ? selectSchemeForAccount(state, account.id) : undefined,
   );
   const accountCollections = useSelector((state: State) =>
-    account ? selectCollectionsByAccount(state, account.id) : [],
+    account ? selectCollectionsByAccount(state, account.id) : EMPTY_COLLECTIONS,
   );
   const activeDelegations = useSelector(selectActiveDelegations);
 
@@ -76,63 +113,51 @@ export default function CollectDeposit({ onClose, customer, account, delegationI
       : 0,
   );
 
-  // Real path: compute customer/month missed days, then resolve penalty separately
-  const depositData: CollectDepositData = useMemo(() => {
-    if (customer && account) {
-      const currentBusinessDate = getCurrentBusinessDate(timezone);
-      const [yearStr, monthStr] = currentBusinessDate.split('-');
-      const year = Number(yearStr);
-      const month = Number(monthStr);
-
-      const missedDays =
-        scheme != null
-          ? calculateMissedDaysForMonth(
-              account,
-              scheme,
-              accountCollections,
-              year,
-              month,
-              currentBusinessDate,
-              timezone,
-            )
-          : 0;
-
-      const penaltyAmount = scheme != null ? resolvePenalty(scheme, missedDays) : 0;
-
-      return {
-        customer: {
-          id: customer.id,
-          name: customer.fullName,
-          accountNumber: account.accountNumber,
-          avatarUrl: undefined,
-          isOnline: true,
-        },
-        depositInfo: {
-          dueAmount: account.installmentAmount,
-          missedDays,
-          penaltyAmount,
-        },
-      };
+  // Customer/month missed days first, then penalty resolved separately from scheme policy
+  const depositData: CollectDepositData | undefined = useMemo(() => {
+    if (!customer || !account) {
+      return undefined;
     }
+
+    const currentBusinessDate = getCurrentBusinessDate(timezone);
+    const [yearStr, monthStr] = currentBusinessDate.split('-');
+    const year = Number(yearStr);
+    const month = Number(monthStr);
+
+    const missedDays =
+      scheme != null
+        ? calculateMissedDaysForMonth(
+            account,
+            scheme,
+            accountCollections,
+            year,
+            month,
+            currentBusinessDate,
+            timezone,
+          )
+        : 0;
+
+    const penaltyAmount = scheme != null ? resolvePenalty(scheme, missedDays) : 0;
 
     return {
       customer: {
-        id: 'CUST-001',
-        name: 'Rajesh Kumar',
-        accountNumber: '1029 3847 56',
+        id: customer.id,
+        name: customer.fullName,
+        accountNumber: account.accountNumber,
         avatarUrl: undefined,
         isOnline: true,
       },
       depositInfo: {
-        dueAmount: 500,
-        missedDays: 2,
-        penaltyAmount: 20,
+        dueAmount: account.installmentAmount,
+        missedDays,
+        penaltyAmount,
       },
     };
   }, [customer, account, scheme, accountCollections, timezone]);
 
-  const fullDueAmount =
-    depositData.depositInfo.dueAmount + depositData.depositInfo.penaltyAmount;
+  const fullDueAmount = depositData
+    ? depositData.depositInfo.dueAmount + depositData.depositInfo.penaltyAmount
+    : 0;
 
   const styles = StyleSheet.create({
     container: {
@@ -251,6 +276,26 @@ export default function CollectDeposit({ onClose, customer, account, delegationI
     cancelButtonText: {
       color: theme.colors.status.error,
     },
+    emptyState: {
+      paddingHorizontal: spacing(theme, 'screenPadding'),
+      paddingVertical: spacing(theme, 'xl'),
+      alignItems: 'center',
+      gap: spacing(theme, 'xs'),
+    },
+    emptyIcon: {
+      fontSize: 40,
+    },
+    emptyText: {
+      ...typography(theme, 'sectionTitle'),
+      color: theme.colors.text.primary,
+      fontWeight: '600',
+      textAlign: 'center',
+    },
+    emptyHint: {
+      ...typography(theme, 'body'),
+      color: theme.colors.text.muted,
+      textAlign: 'center',
+    },
   });
 
   const handleBack = () => {
@@ -269,7 +314,7 @@ export default function CollectDeposit({ onClose, customer, account, delegationI
         return;
       }
 
-      if (!customer || !account) {
+      if (!customer || !account || !depositData) {
         Alert.alert('Error', 'Customer or account data missing');
         return;
       }
@@ -360,6 +405,22 @@ export default function CollectDeposit({ onClose, customer, account, delegationI
     }
     return name.substring(0, 2).toUpperCase();
   };
+
+  // Never invent a customer or a due amount: without the real records there is nothing
+  // to collect against, and a placeholder here would be shown as a live collection form.
+  if (!depositData) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.emptyState}>
+          <Text style={styles.emptyIcon}>💵</Text>
+          <Text style={styles.emptyText}>Account not found</Text>
+          <Text style={styles.emptyHint}>
+            This account may have been removed or the link is invalid.
+          </Text>
+        </View>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>

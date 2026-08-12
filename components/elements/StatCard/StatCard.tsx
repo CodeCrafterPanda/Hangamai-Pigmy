@@ -7,13 +7,15 @@ interface StatCardProps {
   type: StatType;
   value: number | string;
   onPress?: () => void;
+  /** Relative row width. Pending uses a smaller flex than In Hand / Online. */
+  flex?: number;
 }
 
 function formatRupeeAmount(value: number): string {
   return value >= 1000 ? `₹ ${(value / 1000).toFixed(1)}k` : `₹ ${value}`;
 }
 
-export default function StatCard({ type, value, onPress }: StatCardProps) {
+export default function StatCard({ type, value, onPress, flex = 1 }: StatCardProps) {
   const { theme } = useTheme();
 
   const config = {
@@ -41,7 +43,12 @@ export default function StatCard({ type, value, onPress }: StatCardProps) {
 
   const styles = StyleSheet.create({
     container: {
-      flex: 1,
+      // The card is a single box in the stats row: grow/basis size it across the row, and its
+      // height stays content-driven. Nesting it in a flexed wrapper would reinterpret this as
+      // a vertical basis of 0 and collapse the card.
+      flexGrow: flex,
+      flexShrink: 1,
+      flexBasis: 0,
       minWidth: 0,
       backgroundColor: theme.colors.background.card,
       borderRadius: radius(theme, 'card'),
@@ -58,6 +65,7 @@ export default function StatCard({ type, value, onPress }: StatCardProps) {
     iconContainer: {
       width: 28,
       height: 28,
+      flexShrink: 0,
       borderRadius: 8,
       backgroundColor: currentConfig.iconBg,
       justifyContent: 'center',
@@ -88,28 +96,32 @@ export default function StatCard({ type, value, onPress }: StatCardProps) {
       : value.toString();
 
   const content = (
-    <View style={styles.container}>
+    <>
       <View style={styles.header}>
         <View style={styles.iconContainer}>
           <Text style={styles.iconText}>{currentConfig.icon}</Text>
         </View>
-        <Text style={styles.label}>{currentConfig.label}</Text>
+        <Text style={styles.label} numberOfLines={1}>
+          {currentConfig.label}
+        </Text>
       </View>
-      <Text style={styles.value}>{formattedValue}</Text>
-    </View>
+      <Text style={styles.value} numberOfLines={1}>
+        {formattedValue}
+      </Text>
+    </>
   );
 
   if (onPress) {
     return (
       <Pressable
         onPress={onPress}
-        style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1 }]}
+        style={({ pressed }) => [styles.container, { opacity: pressed ? 0.7 : 1 }]}
       >
         {content}
       </Pressable>
     );
   }
 
-  return content;
+  return <View style={styles.container}>{content}</View>;
 }
 

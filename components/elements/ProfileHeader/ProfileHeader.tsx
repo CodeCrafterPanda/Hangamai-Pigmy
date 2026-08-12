@@ -94,10 +94,12 @@ export default function ProfileHeader({ profile }: ProfileHeaderProps) {
         </View>
       </View>
 
-      <View style={styles.onlineStatus}>
-        <View style={styles.onlineIcon} />
-        <Text style={styles.onlineText}>Online</Text>
-      </View>
+      {profile.isOnline && (
+        <View style={styles.onlineStatus}>
+          <View style={styles.onlineIcon} />
+          <Text style={styles.onlineText}>Online</Text>
+        </View>
+      )}
     </View>
   );
 }

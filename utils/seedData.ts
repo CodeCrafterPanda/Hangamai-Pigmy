@@ -2,9 +2,14 @@
  * Seed dummy data for development/testing
  */
 
-import type { Dispatch } from '@/utils/store';
-import { addCustomer, persistCustomers } from '@/slices/customers.slice';
-import { addAccount, addScheme, persistAccounts } from '@/slices/accounts.slice';
+import type { Dispatch, State } from '@/utils/store';
+import { addCustomer, persistCustomers, selectAllCustomers } from '@/slices/customers.slice';
+import {
+  addAccount,
+  addScheme,
+  persistAccounts,
+  selectAllAccounts,
+} from '@/slices/accounts.slice';
 import {
   updateSession,
   addRoute,
@@ -12,8 +17,12 @@ import {
   addAgent,
   persistSettings,
 } from '@/slices/settings.slice';
-import { createDelegation, persistDelegations } from '@/slices/delegations.slice';
-import { CustomerStatus, AccountStatus, SchemeFrequency } from '@/types';
+import {
+  createDelegation,
+  persistDelegations,
+  selectAllDelegations,
+} from '@/slices/delegations.slice';
+import { CustomerStatus, AccountStatus, SchemeFrequency, DelegationStatus } from '@/types';
 
 // Dummy agent ID
 export const DEMO_AGENT_ID = 'agent-demo-001';
@@ -25,7 +34,7 @@ export const DEMO_ROUTE_HANGA = 'route-hanga';
 /**
  * Seed dummy customers and accounts
  */
-export async function seedDummyData(dispatch: Dispatch, getState: () => any) {
+export async function seedDummyData(dispatch: Dispatch, getState: () => State) {
   console.log('[SeedData] Starting to seed dummy data...');
 
   // Set up logged-in session
@@ -189,16 +198,28 @@ export async function seedDummyData(dispatch: Dispatch, getState: () => any) {
     },
   ];
 
-  // Add customers
-  customers.forEach(customer => {
-    dispatch(addCustomer(customer));
-  });
+  // This function also serves as the recovery path when the seed marker survived but the
+  // domain baseline did not hydrate, so every step below has to be safe to run against a
+  // store that already holds records. Branch/agent/route/scheme use fixed ids and upsert;
+  // customers, accounts and delegations get generated ids, so they are matched against
+  // what is already present instead of being added again.
+  const seedKey = (customer: { fullName: string; phone?: string }) =>
+    `${customer.fullName}|${customer.phone ?? ''}`;
 
-  // Get the created customers to find their IDs
-  const state = getState();
-  const allCustomers =
-    state.customers?.customers?.allIds?.map((id: string) => state.customers.customers.byId[id]) ||
-    [];
+  const existingSeedKeys = new Set(selectAllCustomers(getState()).map(seedKey));
+
+  customers
+    .filter(customer => !existingSeedKeys.has(seedKey(customer)))
+    .forEach(customer => {
+      dispatch(addCustomer(customer));
+    });
+
+  // Resolve the seeded customers only — accounts must not be created for customers an
+  // agent added themselves.
+  const customersBySeedKey = new Map(selectAllCustomers(getState()).map(c => [seedKey(c), c]));
+  const seededCustomers = customers
+    .map(c => customersBySeedKey.get(seedKey(c)))
+    .filter((c): c is NonNullable<typeof c> => Boolean(c));
 
   // Seed the demo scheme referenced by seeded accounts (MVP: NONE penalty)
   const demoSchemeId = 'scheme-pigmy-daily-1yr';
@@ -215,31 +236,47 @@ export async function seedDummyData(dispatch: Dispatch, getState: () => any) {
     }),
   );
 
-  // Create accounts for each customer
+  // Create one account per seeded customer that does not have one yet
   console.log('[SeedData] Creating accounts for customers...');
-  allCustomers.forEach((customer: any, index: number) => {
-    if (customer) {
-      dispatch(
-        addAccount({
-          customerId: customer.id,
-          schemeId: demoSchemeId,
-          installmentAmount: 500 - index * 50, // Varying amounts
-          status: AccountStatus.ACTIVE,
-        }),
-      );
+  const customerIdsWithAccounts = new Set(selectAllAccounts(getState()).map(a => a.customerId));
+  let accountsCreated = 0;
+
+  seededCustomers.forEach((customer, index) => {
+    if (customerIdsWithAccounts.has(customer.id)) {
+      return;
     }
+
+    dispatch(
+      addAccount({
+        customerId: customer.id,
+        schemeId: demoSchemeId,
+        installmentAmount: 500 - index * 50, // Varying amounts
+        status: AccountStatus.ACTIVE,
+      }),
+    );
+    accountsCreated += 1;
   });
-  console.log('[SeedData] Accounts created:', allCustomers.length);
+  console.log('[SeedData] Accounts created:', accountsCreated);
 
   // Find delegated customers by name
-  const rameshCustomer = allCustomers.find((c: any) => c?.fullName === 'Ramesh General Stores');
-  const priyaCustomer = allCustomers.find((c: any) => c?.fullName === 'Priya Textiles');
+  const rameshCustomer = seededCustomers.find(c => c.fullName === 'Ramesh General Stores');
+  const priyaCustomer = seededCustomers.find(c => c.fullName === 'Priya Textiles');
 
   // Create delegations for customers 4 and 5 (delegated TO the logged-in agent)
   const today = new Date();
   const in30Days = new Date(today.getTime() + 30 * 24 * 60 * 60 * 1000);
 
-  if (rameshCustomer) {
+  const existingDelegations = selectAllDelegations(getState());
+  const hasDelegation = (customerId: string, primaryAgentId: string) =>
+    existingDelegations.some(
+      d =>
+        d.customerId === customerId &&
+        d.primaryAgentId === primaryAgentId &&
+        d.secondaryAgentId === DEMO_AGENT_ID &&
+        d.status !== DelegationStatus.REVOKED,
+    );
+
+  if (rameshCustomer && !hasDelegation(rameshCustomer.id, 'agent-other-001')) {
     // Delegation 1: Ramesh General Stores (from agent-other-001 to logged-in agent)
     dispatch(
       createDelegation({
@@ -254,7 +291,7 @@ export async function seedDummyData(dispatch: Dispatch, getState: () => any) {
     );
   }
 
-  if (priyaCustomer) {
+  if (priyaCustomer && !hasDelegation(priyaCustomer.id, 'agent-other-002')) {
     // Delegation 2: Priya Textiles (from agent-other-002 to logged-in agent)
     dispatch(
       createDelegation({
@@ -285,6 +322,6 @@ export async function seedDummyData(dispatch: Dispatch, getState: () => any) {
   console.log('[SeedData] Routes: SUPA, PARNER, HANGA (3 routes)');
   console.log('[SeedData] Primary customers: 3 (SUPA: 2, PARNER: 1)');
   console.log('[SeedData] Delegated customers: 2 (HANGA: 2)');
-  console.log('[SeedData] Total customers:', customers.length);
-  console.log('[SeedData] Accounts created:', allCustomers.length);
+  console.log('[SeedData] Total seeded customers:', seededCustomers.length);
+  console.log('[SeedData] Accounts created this run:', accountsCreated);
 }

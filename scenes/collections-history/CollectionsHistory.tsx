@@ -1,6 +1,6 @@
 import { View, Text, StyleSheet, ScrollView, Pressable } from 'react-native';
-import { useState, useMemo } from 'react';
-import { useRouter } from 'expo-router';
+import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { useSelector } from 'react-redux';
 import { useTheme, typography, spacing, radius } from '@/theme';
 import BottomSheet from '@/components/elements/BottomSheet';
@@ -8,7 +8,10 @@ import Receipt from '@/scenes/receipt';
 import { selectAllCollections } from '@/slices/collections.slice';
 import { selectAllCustomers } from '@/slices/customers.slice';
 import { selectSession, selectBranchTimezone } from '@/slices/settings.slice';
-import { getBusinessDate } from '@/utils/businessLogic';
+import { getCurrentBusinessDate } from '@/utils/businessLogic';
+
+/** Day cell width, shared by the strip styles and its opening scroll offset. */
+const DAY_BUTTON_WIDTH = 56;
 
 /**
  * History root — today's summary and navigation into Monthly Collections.
@@ -17,7 +20,8 @@ import { getBusinessDate } from '@/utils/businessLogic';
 export default function CollectionsHistory() {
   const router = useRouter();
   const { theme } = useTheme();
-  const [selectedDate, setSelectedDate] = useState(new Date());
+  // Day-of-month within the current business month; null follows the current business day.
+  const [pickedDay, setPickedDay] = useState<number | null>(null);
   const [activeFilter, setActiveFilter] = useState<'all' | 'synced' | 'pending'>('all');
   const [isReceiptOpen, setIsReceiptOpen] = useState(false);
   const [selectedCollectionId, setSelectedCollectionId] = useState<string | null>(null);
@@ -37,11 +41,16 @@ export default function CollectionsHistory() {
     return new Set(myPrimaryCustomers.map(c => c.id));
   }, [myPrimaryCustomers]);
 
-  // Root stays on the current calendar month — month switching belongs on Monthly Collections.
-  const now = new Date();
-  const currentMonth = now.getMonth();
-  const currentYear = now.getFullYear();
-  const monthPrefix = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}`;
+  // Root stays on the current business month — month switching belongs on Monthly
+  // Collections. The month is read off the branch business date so the strip cannot drift
+  // a day (or a month boundary) away from the dates collections are booked against.
+  const today = getCurrentBusinessDate(timezone);
+  const monthPrefix = today.slice(0, 7);
+  const currentYear = Number(today.slice(0, 4));
+  const currentMonth = Number(today.slice(5, 7)) - 1;
+  const todayDay = Number(today.slice(8, 10));
+  /** Local-noon anchor for month/day labels only — never used to derive a business date. */
+  const businessMonthDate = new Date(`${today}T00:00:00`);
 
   const monthCollections = useMemo(() => {
     return allCollections.filter(c => {
@@ -54,24 +63,62 @@ export default function CollectionsHistory() {
     });
   }, [allCollections, agentId, monthPrefix, myPrimaryCustomerIds]);
 
-  const today = getBusinessDate(new Date().toISOString(), timezone);
   const todayCollections = monthCollections.filter(c => c.businessDate === today);
   const todayAmount = todayCollections.reduce((sum, c) => sum + c.amount + c.penaltyAmount, 0);
   const monthAmount = monthCollections.reduce((sum, c) => sum + c.amount + c.penaltyAmount, 0);
   const monthProgress = monthAmount > 0 ? Math.round((todayAmount / monthAmount) * 100) : 0;
 
   const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+  // Chronological, whole month. The current business date is only where the strip is scrolled
+  // to (see below) — earlier days stay in the list and remain reachable by scrolling back.
   const monthDays = Array.from({ length: daysInMonth }, (_, i) => i + 1);
 
-  // Day strip only moves within the current month
-  const selectedDay =
-    selectedDate.getMonth() === currentMonth && selectedDate.getFullYear() === currentYear
-      ? selectedDate.getDate()
-      : now.getDate();
-  const selectedBusinessDate = getBusinessDate(
-    new Date(currentYear, currentMonth, selectedDay).toISOString(),
-    timezone
+  const dayStripGap = spacing(theme, 'xs');
+  const dayStripRef = useRef<ScrollView>(null);
+  const dayStripContentWidthRef = useRef(0);
+  /** Armed on focus, cleared once the strip has actually been scrolled back to today. */
+  const dayStripResetPendingRef = useRef(true);
+
+  /**
+   * Scroll the strip to the current business date without touching the list itself. Does
+   * nothing unless a reset is pending and the row has been measured, so it can be called
+   * from both focus and layout without scrolling the user twice or fighting their scrolling.
+   */
+  const positionDayStripOnToday = useCallback(() => {
+    if (!dayStripResetPendingRef.current || dayStripContentWidthRef.current <= 0) {
+      return;
+    }
+    dayStripResetPendingRef.current = false;
+
+    // A day's content x is contentPadding + index * (width + gap), so scrolling by exactly
+    // the index offset leaves the current day at the strip's normal left inset.
+    dayStripRef.current?.scrollTo({
+      x: (todayDay - 1) * (DAY_BUTTON_WIDTH + dayStripGap),
+      y: 0,
+      animated: false,
+    });
+  }, [todayDay, dayStripGap]);
+
+  // The tab keeps this screen mounted, so returning to History root must restore its default
+  // state on focus rather than on mount: current business date selected and at the start of
+  // the strip. On first focus the row has no width yet and onContentSizeChange finishes the job.
+  useFocusEffect(
+    useCallback(() => {
+      setPickedDay(null);
+      dayStripResetPendingRef.current = true;
+      positionDayStripOnToday();
+    }, [positionDayStripOnToday]),
   );
+
+  // Business-date rollover while the screen stays mounted.
+  useEffect(() => {
+    dayStripResetPendingRef.current = true;
+    positionDayStripOnToday();
+  }, [monthPrefix, positionDayStripOnToday]);
+
+  // Day strip only moves within the current month
+  const selectedDay = pickedDay && pickedDay <= daysInMonth ? pickedDay : todayDay;
+  const selectedBusinessDate = `${monthPrefix}-${String(selectedDay).padStart(2, '0')}`;
   const dayCollections = monthCollections.filter(c => c.businessDate === selectedBusinessDate);
 
   const filteredCollections = dayCollections.filter(c => {
@@ -162,10 +209,10 @@ export default function CollectionsHistory() {
     },
     daysContainer: {
       flexDirection: 'row',
-      gap: spacing(theme, 'xs'),
+      gap: dayStripGap,
     },
     dayButton: {
-      width: 56,
+      width: DAY_BUTTON_WIDTH,
       paddingVertical: spacing(theme, 'sm'),
       borderRadius: radius(theme, 'button'),
       backgroundColor: theme.colors.background.card,
@@ -354,11 +401,14 @@ export default function CollectionsHistory() {
   };
 
   const handleMonthCardPress = () => {
-    const month = now.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+    const month = businessMonthDate.toLocaleDateString('en-US', {
+      month: 'long',
+      year: 'numeric',
+    });
     router.push(`/(app)/(history)/monthly-collections?month=${encodeURIComponent(month)}`);
   };
 
-  const currentMonthLabel = now.toLocaleDateString('en-US', { month: 'long' });
+  const currentMonthLabel = businessMonthDate.toLocaleDateString('en-US', { month: 'long' });
 
   return (
     <View style={styles.container}>
@@ -390,14 +440,19 @@ export default function CollectionsHistory() {
         <View style={styles.calendarSection}>
           <View style={styles.calendarHeader}>
             <Text style={styles.monthText}>
-              {now.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+              {businessMonthDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
             </Text>
           </View>
 
           <ScrollView
+            ref={dayStripRef}
             horizontal
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.calendarScroll}
+            onContentSizeChange={width => {
+              dayStripContentWidthRef.current = width;
+              positionDayStripOnToday();
+            }}
           >
             <View style={styles.daysContainer}>
               {monthDays.map(day => {
@@ -405,7 +460,7 @@ export default function CollectionsHistory() {
                 return (
                   <Pressable
                     key={day}
-                    onPress={() => setSelectedDate(new Date(currentYear, currentMonth, day))}
+                    onPress={() => setPickedDay(day)}
                     style={({ pressed }) => [
                       styles.dayButton,
                       isSelected && styles.dayButtonActive,
@@ -441,7 +496,7 @@ export default function CollectionsHistory() {
               <Text style={styles.transactionsTitle}>Transactions</Text>
               <Text style={styles.transactionsCount}>
                 ({filteredCollections.length}{' '}
-                {new Date(currentYear, currentMonth, selectedDay).toLocaleDateString('en-US', {
+                {new Date(`${selectedBusinessDate}T00:00:00`).toLocaleDateString('en-US', {
                   month: 'short',
                   day: 'numeric',
                 })}
