@@ -12,6 +12,8 @@ import type {
   LedgerType,
   CollectionMode,
   SchemeFrequency,
+  Scheme,
+  PenaltyType,
 } from '@/types';
 
 // ===========================
@@ -248,6 +250,137 @@ export function calculateDueMissedPenalty(
     totalDue,
     lastCollectionDate,
   };
+}
+
+// ===========================
+// CALENDAR-MONTH MISSED DAYS (customer/month)
+// ===========================
+
+function parseYmdParts(ymd: string): { y: number; m: number; d: number } {
+  const [y, m, d] = ymd.split('-').map(Number);
+  return { y, m, d };
+}
+
+function weekdayOfYmd(ymd: string): number {
+  const { y, m, d } = parseYmdParts(ymd);
+  return new Date(Date.UTC(y, m - 1, d)).getUTCDay();
+}
+
+/**
+ * Whether `businessDate` is an expected collection opportunity for the scheme frequency,
+ * anchored to the account's opened business date (weekday for WEEKLY, day-of-month for MONTHLY).
+ */
+function isExpectedCollectionOpportunity(
+  businessDate: string,
+  openedBusinessDate: string,
+  frequency: SchemeFrequency | string,
+): boolean {
+  switch (frequency) {
+    case 'WEEKLY':
+      return weekdayOfYmd(businessDate) === weekdayOfYmd(openedBusinessDate);
+    case 'MONTHLY': {
+      const openedDay = parseYmdParts(openedBusinessDate).d;
+      const { y, m, d } = parseYmdParts(businessDate);
+      const daysInMonth = new Date(Date.UTC(y, m, 0)).getUTCDate();
+      const expectedDay = Math.min(openedDay, daysInMonth);
+      return d === expectedDay;
+    }
+    case 'DAILY':
+    default:
+      return true;
+  }
+}
+
+/**
+ * Customer/account calendar-month missed days ("N missed days this month").
+ *
+ * Iterates expected days from max(1st, opened business date) through the day before
+ * `currentBusinessDate` (today and future days are never counted). A day is missed only
+ * when no non-REVERSED collection matches that businessDate + accountId.
+ *
+ * Assumptions (handoff edge defaults):
+ * - Exclude "today" itself until product says otherwise.
+ * - Only ACTIVE accounts are counted; no historical status timeline exists.
+ *
+ * @param year Calendar year (e.g. 2026)
+ * @param month Calendar month 1–12
+ * @param timezone Branch IANA timezone — needed to convert account.openedAt to business date
+ */
+export function calculateMissedDaysForMonth(
+  account: Account,
+  scheme: Pick<Scheme, 'frequency'>,
+  collections: Collection[],
+  year: number,
+  month: number,
+  currentBusinessDate: string,
+  timezone: string,
+): number {
+  if (account.status !== 'ACTIVE') {
+    return 0;
+  }
+
+  const openedBusinessDate = getBusinessDate(account.openedAt, timezone);
+  const monthPrefix = `${year}-${String(month).padStart(2, '0')}`;
+  const daysInMonth = new Date(Date.UTC(year, month, 0)).getUTCDate();
+
+  let missedDays = 0;
+
+  for (let day = 1; day <= daysInMonth; day++) {
+    const businessDate = `${monthPrefix}-${String(day).padStart(2, '0')}`;
+
+    // Never count today or future days
+    if (businessDate >= currentBusinessDate) {
+      break;
+    }
+
+    // Skip days before the account opened (business-date boundary)
+    if (businessDate < openedBusinessDate) {
+      continue;
+    }
+
+    if (!isExpectedCollectionOpportunity(businessDate, openedBusinessDate, scheme.frequency)) {
+      continue;
+    }
+
+    const satisfied = collections.some(
+      c =>
+        c.accountId === account.id &&
+        c.businessDate === businessDate &&
+        c.status !== 'REVERSED',
+    );
+
+    if (!satisfied) {
+      missedDays += 1;
+    }
+  }
+
+  return missedDays;
+}
+
+/**
+ * Resolve monetary penalty from scheme policy and missed days.
+ * Kept strictly downstream of missed-day detection (REQUEST §14).
+ *
+ * PERCENTAGE returns 0: percentage base is UNKNOWN — do not invent one.
+ */
+export function resolvePenalty(
+  scheme: Pick<Scheme, 'penaltyType' | 'penaltyPerDay' | 'penaltyPercentage'>,
+  missedDays: number,
+): number {
+  const penaltyType: PenaltyType = scheme.penaltyType ?? 'NONE';
+
+  switch (penaltyType) {
+    case 'NONE':
+      return 0;
+    case 'FIXED':
+      return missedDays > 0 ? missedDays * (scheme.penaltyPerDay || 0) : 0;
+    case 'PERCENTAGE':
+      // UNKNOWN: percentage base (scheduled / missed / balance / other) not decided.
+      // Architecture permits PERCENTAGE + penaltyPercentage; do not compute until product decides.
+      return 0;
+    default:
+      return 0;
+  }
 }
 
 // ===========================
@@ -614,6 +747,8 @@ export default {
   generateAccountNumber,
   generateIdempotencyKey,
   calculateDueMissedPenalty,
+  calculateMissedDaysForMonth,
+  resolvePenalty,
   calculateAccountBalance,
   createLedgerEntriesForCollection,
   createReversalLedgerEntry,

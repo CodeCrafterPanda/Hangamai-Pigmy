@@ -4,7 +4,7 @@
 
 import type { Dispatch } from '@/utils/store';
 import { addCustomer, persistCustomers } from '@/slices/customers.slice';
-import { addAccount, persistAccounts } from '@/slices/accounts.slice';
+import { addAccount, addScheme, persistAccounts } from '@/slices/accounts.slice';
 import {
   updateSession,
   addRoute,
@@ -13,7 +13,7 @@ import {
   persistSettings,
 } from '@/slices/settings.slice';
 import { createDelegation, persistDelegations } from '@/slices/delegations.slice';
-import { CustomerStatus, AccountStatus } from '@/types';
+import { CustomerStatus, AccountStatus, SchemeFrequency } from '@/types';
 
 // Dummy agent ID
 export const DEMO_AGENT_ID = 'agent-demo-001';
@@ -200,13 +200,25 @@ export async function seedDummyData(dispatch: Dispatch, getState: () => any) {
     state.customers?.customers?.allIds?.map((id: string) => state.customers.customers.byId[id]) ||
     [];
 
+  // Seed the demo scheme referenced by seeded accounts (MVP: NONE penalty)
+  const demoSchemeId = 'scheme-pigmy-daily-1yr';
+  dispatch(
+    addScheme({
+      id: demoSchemeId,
+      branchId: DEMO_BRANCH_ID,
+      name: 'Pigmy Daily 1 Year',
+      frequency: SchemeFrequency.DAILY,
+      minAmount: 100,
+      penaltyPerDay: 0,
+      penaltyType: 'NONE',
+      createdAt: now,
+    }),
+  );
+
   // Create accounts for each customer
   console.log('[SeedData] Creating accounts for customers...');
   allCustomers.forEach((customer: any, index: number) => {
     if (customer) {
-      // Find the scheme ID (for now use a demo scheme)
-      const demoSchemeId = 'scheme-pigmy-daily-1yr';
-
       dispatch(
         addAccount({
           customerId: customer.id,

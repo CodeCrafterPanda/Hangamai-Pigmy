@@ -2,11 +2,10 @@ import { View, Text, StyleSheet, ScrollView, Pressable } from 'react-native';
 import { useState, useMemo } from 'react';
 import { useRouter } from 'expo-router';
 import { useSelector } from 'react-redux';
-import type { State } from '@/utils/store';
 import { useTheme, typography, spacing, radius } from '@/theme';
 import { selectAllCollections } from '@/slices/collections.slice';
 import { selectAllCustomers } from '@/slices/customers.slice';
-import { selectSession } from '@/slices/settings.slice';
+import { selectSession, selectBranchTimezone } from '@/slices/settings.slice';
 import { getBusinessDate } from '@/utils/businessLogic';
 
 export default function CollectionsHistory() {
@@ -17,7 +16,7 @@ export default function CollectionsHistory() {
 
   // Get session
   const session = useSelector(selectSession);
-  const timezone = useSelector((state: State) => state.settings.branchSettings.timezone);
+  const timezone = useSelector(selectBranchTimezone);
   const agentId = session.agentId || 'demo-agent';
 
   // Get collections
@@ -36,19 +35,18 @@ export default function CollectionsHistory() {
   // Filter collections for current month and agent
   const currentMonth = selectedDate.getMonth();
   const currentYear = selectedDate.getFullYear();
+  const monthPrefix = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}`;
 
   const monthCollections = useMemo(() => {
     return allCollections.filter(c => {
-      const collectionDate = new Date(c.collectedAt);
       return (
         c.collectedByAgentId === agentId &&
         myPrimaryCustomerIds.has(c.customerId) && // Only primary customers
-        collectionDate.getMonth() === currentMonth &&
-        collectionDate.getFullYear() === currentYear &&
+        c.businessDate.startsWith(monthPrefix) &&
         c.status !== 'REVERSED'
       );
     });
-  }, [allCollections, agentId, currentMonth, currentYear, myPrimaryCustomerIds]);
+  }, [allCollections, agentId, monthPrefix, myPrimaryCustomerIds]);
 
   // Calculate today's and month's stats
   const today = getBusinessDate(new Date().toISOString(), timezone);

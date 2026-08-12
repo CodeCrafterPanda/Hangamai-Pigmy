@@ -67,7 +67,7 @@ export const STORAGE_KEYS = {
   SESSION: '@pigmy/session',
 } as const;
 
-export const CURRENT_STORAGE_VERSION = 1;
+export const CURRENT_STORAGE_VERSION = 2;
 
 /** Seed payload version tracked on StorageMetadata to prevent duplicate seeding */
 export const CURRENT_SEED_VERSION = 1;
@@ -264,7 +264,7 @@ async function migrateStorage(oldVersion: number, newVersion: number): Promise<v
   for (let version = oldVersion; version < newVersion; version++) {
     switch (version) {
       case 1:
-        // await migrateV1ToV2();
+        await migrateV1ToV2();
         break;
       // Add more migration cases as needed
       default:
@@ -273,6 +273,32 @@ async function migrateStorage(oldVersion: number, newVersion: number): Promise<v
   }
   
   console.log('[Storage] Migration completed');
+}
+
+/**
+ * v1 → v2: add Scheme.penaltyType default (NONE) for existing persisted schemes.
+ */
+async function migrateV1ToV2(): Promise<void> {
+  const schemes = await getItemSafe<NormalizedStore<any> | null>(STORAGE_KEYS.SCHEMES, null);
+  if (!schemes?.byId) {
+    return;
+  }
+
+  let changed = false;
+  for (const id of Object.keys(schemes.byId)) {
+    const scheme = schemes.byId[id];
+    if (scheme && scheme.penaltyType == null) {
+      schemes.byId[id] = {
+        ...scheme,
+        penaltyType: 'NONE',
+      };
+      changed = true;
+    }
+  }
+
+  if (changed) {
+    await setItemSafe(STORAGE_KEYS.SCHEMES, schemes);
+  }
 }
 
 // ===========================

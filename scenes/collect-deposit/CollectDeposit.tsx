@@ -1,17 +1,30 @@
 import { View, Text, StyleSheet, Pressable, Image, Alert } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useRouter } from 'expo-router';
 import { useDispatch, useSelector } from 'react-redux';
 import type { State, Dispatch } from '@/utils/store';
 import { useTheme, typography, spacing, radius } from '@/theme';
-import InfoCard from '@/components/elements/InfoCard';
 import AmountSelector from '@/components/elements/AmountSelector';
 import PaymentModeSelector from '@/components/elements/PaymentModeSelector';
-import { commitCollection } from '@/slices/collections.slice';
-import { selectSession } from '@/slices/settings.slice';
+import {
+  commitCollection,
+  selectCollectionsByAccount,
+  selectDelegationCollectionAmountForDate,
+  selectDelegationCollectionCountForDate,
+} from '@/slices/collections.slice';
+import { selectSession, selectBranchTimezone } from '@/slices/settings.slice';
+import { selectSchemeForAccount } from '@/slices/accounts.slice';
+import { selectActiveDelegations } from '@/slices/delegations.slice';
+import {
+  calculateMissedDaysForMonth,
+  checkDelegationEligibility,
+  getBusinessDate,
+  getCurrentBusinessDate,
+  resolvePenalty,
+} from '@/utils/businessLogic';
 import type { CollectDepositData, PaymentMode } from '@/types/CollectDepositData';
 import type { Customer, Account } from '@/types';
+import { CollectionMode } from '@/types';
 
 interface CollectDepositProps {
   onClose?: () => void;
@@ -37,38 +50,86 @@ export default function CollectDeposit({ onClose, customer, account, delegationI
   // Guards the commit against a second tap landing while the first is still in flight
   const isSubmittingRef = useRef(false);
 
-  // Get session data
+  // Get session data — timezone from Branch entity, not BranchSettings cache
   const session = useSelector(selectSession);
-  const timezone = useSelector((state: State) => state.settings.branchSettings.timezone);
+  const timezone = useSelector(selectBranchTimezone);
+  const scheme = useSelector((state: State) =>
+    account ? selectSchemeForAccount(state, account.id) : undefined,
+  );
+  const accountCollections = useSelector((state: State) =>
+    account ? selectCollectionsByAccount(state, account.id) : [],
+  );
+  const activeDelegations = useSelector(selectActiveDelegations);
 
-  // Use real data if provided, otherwise fall back to mock
-  const depositData: CollectDepositData = customer && account ? {
-    customer: {
-      id: customer.id,
-      name: customer.fullName,
-      accountNumber: account.accountNumber,
-      avatarUrl: undefined,
-      isOnline: true,
-    },
-    depositInfo: {
-      dueAmount: account.installmentAmount,
-      missedDays: 0, // TODO: Calculate from account
-      penaltyAmount: 0, // TODO: Calculate from missed days
-    },
-  } : {
-    customer: {
-      id: 'CUST-001',
-      name: 'Rajesh Kumar',
-      accountNumber: '1029 3847 56',
-      avatarUrl: undefined,
-      isOnline: true,
-    },
-    depositInfo: {
-      dueAmount: 500,
-      missedDays: 2,
-      penaltyAmount: 20,
-    },
-  };
+  const todayBusinessDate = useMemo(
+    () => getBusinessDate(collectedAt, timezone),
+    [collectedAt, timezone],
+  );
+  const todayDelegationCount = useSelector((state: State) =>
+    delegationId
+      ? selectDelegationCollectionCountForDate(state, delegationId, todayBusinessDate)
+      : 0,
+  );
+  const todayDelegationAmount = useSelector((state: State) =>
+    delegationId
+      ? selectDelegationCollectionAmountForDate(state, delegationId, todayBusinessDate)
+      : 0,
+  );
+
+  // Real path: compute customer/month missed days, then resolve penalty separately
+  const depositData: CollectDepositData = useMemo(() => {
+    if (customer && account) {
+      const currentBusinessDate = getCurrentBusinessDate(timezone);
+      const [yearStr, monthStr] = currentBusinessDate.split('-');
+      const year = Number(yearStr);
+      const month = Number(monthStr);
+
+      const missedDays =
+        scheme != null
+          ? calculateMissedDaysForMonth(
+              account,
+              scheme,
+              accountCollections,
+              year,
+              month,
+              currentBusinessDate,
+              timezone,
+            )
+          : 0;
+
+      const penaltyAmount = scheme != null ? resolvePenalty(scheme, missedDays) : 0;
+
+      return {
+        customer: {
+          id: customer.id,
+          name: customer.fullName,
+          accountNumber: account.accountNumber,
+          avatarUrl: undefined,
+          isOnline: true,
+        },
+        depositInfo: {
+          dueAmount: account.installmentAmount,
+          missedDays,
+          penaltyAmount,
+        },
+      };
+    }
+
+    return {
+      customer: {
+        id: 'CUST-001',
+        name: 'Rajesh Kumar',
+        accountNumber: '1029 3847 56',
+        avatarUrl: undefined,
+        isOnline: true,
+      },
+      depositInfo: {
+        dueAmount: 500,
+        missedDays: 2,
+        penaltyAmount: 20,
+      },
+    };
+  }, [customer, account, scheme, accountCollections, timezone]);
 
   const fullDueAmount =
     depositData.depositInfo.dueAmount + depositData.depositInfo.penaltyAmount;
@@ -213,6 +274,27 @@ export default function CollectDeposit({ onClose, customer, account, delegationI
         return;
       }
 
+      // Delegation eligibility before commitCollection (non-delegated path unchanged)
+      if (delegationId) {
+        const eligibility = checkDelegationEligibility(
+          session.agentId || 'demo-agent',
+          customer.id,
+          account.id,
+          activeDelegations,
+          collectedAt,
+          todayDelegationCount,
+          todayDelegationAmount,
+        );
+
+        if (!eligibility.isEligible) {
+          Alert.alert(
+            'Not Eligible',
+            eligibility.reason || 'This delegation is not eligible for collection',
+          );
+          return;
+        }
+      }
+
       // Collection, ledger entries and balance cache are committed as one unit
       const result = await dispatch(
         commitCollection({
@@ -224,7 +306,7 @@ export default function CollectDeposit({ onClose, customer, account, delegationI
           delegationId: delegationId,
           amount: amount,
           penaltyAmount: depositData.depositInfo.penaltyAmount,
-          mode: paymentMode === 'cash' ? 'CASH' : 'UPI',
+          mode: paymentMode === 'cash' ? CollectionMode.CASH : CollectionMode.UPI,
           collectedAt: collectedAt,
           timezone: timezone,
           deviceFingerprint: session.deviceFingerprint || 'demo-device',
@@ -363,4 +445,3 @@ export default function CollectDeposit({ onClose, customer, account, delegationI
     </View>
   );
 }
-

@@ -6,7 +6,7 @@ import type { State } from '@/utils/store';
 import { useTheme, typography, spacing, radius } from '@/theme';
 import RouteCard from '@/components/elements/RouteCard';
 import FloatingActionButton from '@/components/elements/FloatingActionButton';
-import { selectRoutesByBranch, selectSession } from '@/slices/settings.slice';
+import { selectRoutesByBranch, selectSession, selectBranchTimezone } from '@/slices/settings.slice';
 import { selectAllCustomers, selectCustomersByAgent } from '@/slices/customers.slice';
 import { selectTodayCollectionsByAgent } from '@/slices/collections.slice';
 import { selectDelegationsBySecondaryAgent } from '@/slices/delegations.slice';
@@ -19,7 +19,7 @@ export default function Routes() {
 
   // Get session and settings
   const session = useSelector(selectSession);
-  const timezone = useSelector((state: State) => state.settings.branchSettings.timezone);
+  const timezone = useSelector(selectBranchTimezone);
   const agentId = session.agentId || 'demo-agent';
   const branchId = session.branchId || '';
 

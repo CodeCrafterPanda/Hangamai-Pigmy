@@ -9,7 +9,7 @@ import MonthlyCollectionsHeader from '@/components/elements/MonthlyCollectionsHe
 import BottomSheet from '@/components/elements/BottomSheet';
 import { selectAllCollections } from '@/slices/collections.slice';
 import { selectAllCustomers, selectCustomersByAgent } from '@/slices/customers.slice';
-import { selectSession } from '@/slices/settings.slice';
+import { selectSession, selectBranchTimezone } from '@/slices/settings.slice';
 import { getBusinessDate } from '@/utils/businessLogic';
 import type { MonthlyCollectionsData, FilterOption } from '@/types/MonthlyCollectionsData';
 
@@ -22,7 +22,7 @@ export default function MonthlyCollections() {
 
   // Get session
   const session = useSelector(selectSession);
-  const timezone = useSelector((state: State) => state.settings.branchSettings.timezone);
+  const timezone = useSelector(selectBranchTimezone);
   const agentId = session.agentId || 'demo-agent';
 
   // Get data from Redux - only PRIMARY customers (not delegated)
@@ -71,19 +71,18 @@ export default function MonthlyCollections() {
     dateIsValid: !isNaN(currentDate.getTime()),
   });
 
-  // Get collections for this month (only primary customers)
+  // Get collections for this month via businessDate yyyy-MM (branch-local), not device calendar
+  const monthPrefix = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}`;
   const monthCollections = useMemo(() => {
     return allCollections.filter(c => {
-      const collectionDate = new Date(c.collectedAt);
       return (
         c.collectedByAgentId === agentId &&
         myPrimaryCustomerIds.has(c.customerId) && // Only primary customers
-        collectionDate.getMonth() === currentMonth &&
-        collectionDate.getFullYear() === currentYear &&
+        c.businessDate.startsWith(monthPrefix) &&
         c.status !== 'REVERSED'
       );
     });
-  }, [allCollections, agentId, myPrimaryCustomerIds, currentMonth, currentYear]);
+  }, [allCollections, agentId, myPrimaryCustomerIds, monthPrefix]);
 
   // Build customer data with daily collections
   const customers = useMemo(() => {

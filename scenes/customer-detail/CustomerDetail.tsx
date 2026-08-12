@@ -15,7 +15,7 @@ import {
   selectKYCDocsByCustomer,
 } from '@/slices/customers.slice';
 import { selectAccountsByCustomer } from '@/slices/accounts.slice';
-import { selectAllRoutes, selectAllAgents, selectSession } from '@/slices/settings.slice';
+import { selectAllRoutes, selectAllAgents, selectSession, selectBranchTimezone } from '@/slices/settings.slice';
 import { selectTodayCollectionsByAgent } from '@/slices/collections.slice';
 import { selectDelegationsBySecondaryAgent } from '@/slices/delegations.slice';
 import { SchemeFrequency, KYCType } from '@/types';
@@ -58,7 +58,7 @@ export default function CustomerDetail({ customerId }: CustomerDetailProps) {
   const [isReceiptOpen, setIsReceiptOpen] = useState(false);
 
   const session = useSelector(selectSession);
-  const timezone = useSelector((state: State) => state.settings.branchSettings.timezone);
+  const timezone = useSelector(selectBranchTimezone);
   const agentId = session.agentId || 'demo-agent';
 
   const customer = useSelector((state: State) =>

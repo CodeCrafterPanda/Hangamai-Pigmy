@@ -2,11 +2,11 @@ import { View, Text, StyleSheet, ScrollView, Pressable } from 'react-native';
 import { useMemo } from 'react';
 import { useRouter } from 'expo-router';
 import { useSelector } from 'react-redux';
-import type { State } from '@/utils/store';
 import { useTheme, typography, spacing, radius } from '@/theme';
 import { selectCollectionsNeedingSync, selectAllCollections } from '@/slices/collections.slice';
-import { selectSession } from '@/slices/settings.slice';
+import { selectSession, selectBranchTimezone } from '@/slices/settings.slice';
 import SyncStatusCard from '@/components/elements/SyncStatusCard';
+import { getCurrentBusinessDate } from '@/utils/businessLogic';
 
 export default function SyncStatus() {
   const router = useRouter();
@@ -14,29 +14,26 @@ export default function SyncStatus() {
 
   // Get session
   const session = useSelector(selectSession);
-  const timezone = useSelector((state: State) => state.settings.branchSettings.timezone);
+  const timezone = useSelector(selectBranchTimezone);
   const agentId = session.agentId || 'demo-agent';
 
-  // Get today's business date
-  const today = new Date();
-  const todayBusinessDate = today.toISOString().split('T')[0]; // YYYY-MM-DD format
+  // Get today's business date (branch timezone)
+  const todayBusinessDate = getCurrentBusinessDate(timezone);
 
   // Get collections needing sync (only TODAY's)
   const needsSyncCollections = useSelector(selectCollectionsNeedingSync);
   const allCollections = useSelector(selectAllCollections);
 
-  // Filter for current agent and TODAY only
+  // Filter for current agent and TODAY only (by persisted businessDate)
   const todayNeedsSyncCollections = useMemo(() => {
     return needsSyncCollections.filter(c => {
-      const collectionDate = c.collectedAt.split('T')[0]; // Get YYYY-MM-DD
-      return c.collectedByAgentId === agentId && collectionDate === todayBusinessDate;
+      return c.collectedByAgentId === agentId && c.businessDate === todayBusinessDate;
     });
   }, [needsSyncCollections, agentId, todayBusinessDate]);
 
   const todayAllCollections = useMemo(() => {
     return allCollections.filter(c => {
-      const collectionDate = c.collectedAt.split('T')[0];
-      return c.collectedByAgentId === agentId && collectionDate === todayBusinessDate;
+      return c.collectedByAgentId === agentId && c.businessDate === todayBusinessDate;
     });
   }, [allCollections, agentId, todayBusinessDate]);
 

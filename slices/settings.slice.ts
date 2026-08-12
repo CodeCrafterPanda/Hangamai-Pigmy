@@ -285,6 +285,17 @@ export const selectCurrentBranch = (state: State): Branch | undefined => {
   return branchId ? selectBranchById(state, branchId) : undefined;
 };
 
+/** Documented fallback when session has no resolved branch (matches seeded default). */
+export const DEFAULT_BRANCH_TIMEZONE = 'Asia/Kolkata';
+
+/**
+ * Authoritative branch timezone for business-date calculation.
+ * Reads Branch.timezone via session.branchId — not BranchSettings.timezone cache.
+ */
+export const selectBranchTimezone = (state: State): string => {
+  return selectCurrentBranch(state)?.timezone || DEFAULT_BRANCH_TIMEZONE;
+};
+
 /**
  * Get agent by ID
  */

@@ -19,7 +19,7 @@ import {
 import { selectCustomersByAgent, selectAllCustomers } from '@/slices/customers.slice';
 import { selectDelegationsBySecondaryAgent } from '@/slices/delegations.slice';
 import { selectAllAccounts } from '@/slices/accounts.slice';
-import { selectSession, selectRouteById } from '@/slices/settings.slice';
+import { selectSession, selectRouteById, selectBranchTimezone } from '@/slices/settings.slice';
 import type {
   CustomerCollection,
   RouteDetailsHeader as RouteDetailsHeaderType,
@@ -42,7 +42,7 @@ export default function RouteDetails({ routeId }: RouteDetailsProps) {
 
   // Get session and settings
   const session = useSelector(selectSession);
-  const timezone = useSelector((state: State) => state.settings.branchSettings.timezone);
+  const timezone = useSelector(selectBranchTimezone);
   const agentId = session.agentId || 'demo-agent';
   const route = useSelector((state: State) =>
     routeId ? selectRouteById(state, routeId) : undefined

@@ -1,10 +1,16 @@
 import { View, Text, StyleSheet, ScrollView, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useRouter } from 'expo-router';
+import { useSelector } from 'react-redux';
+import type { State } from '@/utils/store';
 import { useTheme, typography, spacing } from '@/theme';
 import InfoBanner from '@/components/elements/InfoBanner';
 import DelegatedCustomerCard from '@/components/elements/DelegatedCustomerCard';
+import { selectSession, selectAllAgents } from '@/slices/settings.slice';
+import { selectAllCustomers } from '@/slices/customers.slice';
+import { selectAllAccounts } from '@/slices/accounts.slice';
+import { selectDelegationsBySecondaryAgent } from '@/slices/delegations.slice';
 import type { DelegatedCustomer, DelegationInfo } from '@/types/DelegatedData';
 
 export default function DelegatedCustomers() {
@@ -12,48 +18,65 @@ export default function DelegatedCustomers() {
   const { theme } = useTheme();
   const [showBanner, setShowBanner] = useState(true);
 
-  // Mock data - replace with actual data from Redux/API
+  const session = useSelector(selectSession);
+  const agentId = session.agentId || 'demo-agent';
+
+  // Same pattern as RouteDetails: real delegations where logged-in agent is secondary
+  const myDelegations = useSelector((state: State) =>
+    selectDelegationsBySecondaryAgent(state, agentId),
+  );
+  const allCustomersData = useSelector(selectAllCustomers);
+  const allAccounts = useSelector(selectAllAccounts);
+  const allAgents = useSelector(selectAllAgents);
+
+  const delegatedCustomers: DelegatedCustomer[] = useMemo(() => {
+    const results: DelegatedCustomer[] = [];
+
+    for (const delegation of myDelegations) {
+      const customer = allCustomersData.find(c => c.id === delegation.customerId);
+      if (!customer) {
+        continue;
+      }
+
+      const account =
+        allAccounts.find(
+          a =>
+            a.customerId === customer.id &&
+            a.status === 'ACTIVE' &&
+            (!delegation.accountId || a.id === delegation.accountId),
+        ) ?? allAccounts.find(a => a.customerId === customer.id);
+
+      const primaryAgent = allAgents.find(a => a.id === delegation.primaryAgentId);
+      const endDate = new Date(delegation.endAt);
+      const validTill = endDate.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+      });
+      const accountNumber = account?.accountNumber ?? '';
+      const accountNumberMasked =
+        accountNumber.length >= 4 ? `•••• ${accountNumber.slice(-4)}` : accountNumber;
+
+      results.push({
+        id: delegation.id,
+        customerId: customer.id,
+        customerName: customer.fullName,
+        accountNumber,
+        accountNumberMasked,
+        primaryAgent: primaryAgent?.name ?? 'Unknown',
+        validTill,
+        delegatedDate: delegation.startAt,
+        avatarUrl: undefined,
+      });
+    }
+
+    return results;
+  }, [myDelegations, allCustomersData, allAccounts, allAgents]);
+
   const delegationInfo: DelegationInfo = {
     showBanner: true,
     title: 'Temporary Assignment',
     message: 'These customers are temporarily assigned to you for collection today.',
   };
-
-  const delegatedCustomers: DelegatedCustomer[] = [
-    {
-      id: '1',
-      customerId: 'CUST-4291',
-      customerName: 'Ramesh Gupta',
-      accountNumber: '4291',
-      accountNumberMasked: '•••• 4291',
-      primaryAgent: 'Suresh K.',
-      validTill: 'Oct 24',
-      delegatedDate: '2023-10-24',
-      avatarUrl: undefined,
-    },
-    {
-      id: '2',
-      customerId: 'CUST-8821',
-      customerName: 'Anita Desai',
-      accountNumber: '8821',
-      accountNumberMasked: '•••• 8821',
-      primaryAgent: 'Suresh K.',
-      validTill: 'Oct 24',
-      delegatedDate: '2023-10-24',
-      avatarUrl: undefined,
-    },
-    {
-      id: '3',
-      customerId: 'CUST-1034',
-      customerName: 'Vikram Singh',
-      accountNumber: '1034',
-      accountNumberMasked: '•••• 1034',
-      primaryAgent: 'Suresh K.',
-      validTill: 'Oct 25',
-      delegatedDate: '2023-10-25',
-      avatarUrl: undefined,
-    },
-  ];
 
   const styles = StyleSheet.create({
     container: {
@@ -137,8 +160,7 @@ export default function DelegatedCustomers() {
   };
 
   const handleCollectDeposit = (customerId: string) => {
-    console.log('Collect deposit pressed for customer:', customerId);
-    // TODO: Navigate to deposit collection screen
+    router.push(`/(app)/(route)/customer-detail/${customerId}`);
   };
 
   const handleCloseBanner = () => {
@@ -146,8 +168,7 @@ export default function DelegatedCustomers() {
   };
 
   const handleInfoPress = () => {
-    console.log('Info button pressed');
-    // TODO: Show delegation details modal
+    setShowBanner(true);
   };
 
   return (
@@ -170,7 +191,7 @@ export default function DelegatedCustomers() {
 
         <View style={styles.customersList}>
           {delegatedCustomers.length > 0 ? (
-            delegatedCustomers.map((customer) => (
+            delegatedCustomers.map(customer => (
               <DelegatedCustomerCard
                 key={customer.id}
                 customer={customer}
@@ -180,9 +201,7 @@ export default function DelegatedCustomers() {
           ) : (
             <View style={styles.emptyState}>
               <Text style={styles.emptyIcon}>📋</Text>
-              <Text style={styles.emptyText}>
-                No delegated customers at the moment
-              </Text>
+              <Text style={styles.emptyText}>No delegated customers at the moment</Text>
             </View>
           )}
         </View>
@@ -197,4 +216,3 @@ export default function DelegatedCustomers() {
     </SafeAreaView>
   );
 }
-

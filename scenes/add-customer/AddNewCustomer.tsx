@@ -396,6 +396,7 @@ export default function AddNewCustomer() {
       frequency,
       minAmount: amount,
       penaltyPerDay: 0,
+      penaltyType: 'NONE',
       createdAt: new Date().toISOString(),
     };
     dispatch(addScheme(scheme));

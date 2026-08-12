@@ -44,6 +44,12 @@ export enum SchemeFrequency {
   MONTHLY = 'MONTHLY',
 }
 
+/**
+ * Penalty policy kind on a Scheme.
+ * PERCENTAGE base amount is intentionally UNKNOWN — do not invent one.
+ */
+export type PenaltyType = 'NONE' | 'FIXED' | 'PERCENTAGE';
+
 export enum CollectionMode {
   CASH = 'CASH',
   UPI = 'UPI',
@@ -209,6 +215,13 @@ export interface Scheme {
   frequency: SchemeFrequency;
   minAmount: number;
   penaltyPerDay: number;
+  /** Policy kind; MVP default NONE keeps effective penalty ₹0 while missedDays stay real */
+  penaltyType: PenaltyType;
+  /**
+   * Optional percentage rate for PERCENTAGE policy.
+   * Calculation base (scheduled / missed / balance / other) is UNKNOWN — unused until product decides.
+   */
+  penaltyPercentage?: number;
   createdAt: string;
 }
 
