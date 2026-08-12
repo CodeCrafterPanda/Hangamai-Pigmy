@@ -110,54 +110,38 @@ export default function Home() {
     });
   }, [activeCustomers, allAccounts, todayCollections]);
 
-  // Calculate tab-specific stats from real data
+  // Tab-specific stats from real persisted todayCollections.
+  // selectDailySummary is agent-wide with no Primary/Delegated dimension — do not use it here
+  // (and do not fork reports.slice); scope with the same active-tab customer filter as pendingCount.
   const dailyStats: DailyStats = useMemo(() => {
-    // Get customer IDs for active tab
     const activeCustomerIds = activeCustomers.map(c => c.id);
-
-    // Filter today's collections for active tab customers
     const tabCollections = todayCollections.filter(c =>
-      activeCustomerIds.includes(c.customerId)
+      activeCustomerIds.includes(c.customerId),
     );
 
-    // Calculate collected amount for this tab (all collections)
-    const tabCollectedAmount = tabCollections
+    const collectedToday = tabCollections
       .filter(c => c.status !== 'REVERSED')
       .reduce((sum, c) => sum + c.amount + c.penaltyAmount, 0);
 
-    // Calculate in-hand amount (only CASH collections, not yet settled)
-    const cashCollections = tabCollections.filter(c => c.status !== 'REVERSED' && c.mode === 'CASH');
-    const inHandAmount = cashCollections.reduce((sum, c) => sum + c.amount + c.penaltyAmount, 0);
+    const inHandAmount = tabCollections
+      .filter(c => c.status !== 'REVERSED' && c.mode === 'CASH')
+      .reduce((sum, c) => sum + c.amount + c.penaltyAmount, 0);
 
-    console.log('[Home Stats]', {
-      tab: activeTab,
-      totalCollections: tabCollections.length,
-      cashCollections: cashCollections.length,
-      collectedToday: tabCollectedAmount,
-      inHandAmount,
-      collections: tabCollections.map(c => ({ mode: c.mode, amount: c.amount, status: c.status })),
-    });
-
-    // Get customer IDs that were collected today
-    const collectedCustomerIds = new Set(
-      tabCollections.map(c => c.customerId)
-    );
-
-    // Calculate pending (customers not yet collected)
-    const pendingCount = activeCustomers.filter(
-      c => !collectedCustomerIds.has(c.id)
-    ).length;
+    const collectedCustomerIds = new Set(tabCollections.map(c => c.customerId));
+    const pendingCount = activeCustomers.filter(c => !collectedCustomerIds.has(c.id)).length;
 
     return {
-      collectedToday: tabCollectedAmount,
-      pendingCount: pendingCount,
-      inHandAmount: inHandAmount,
+      collectedToday,
+      pendingCount,
+      inHandAmount,
     };
   }, [activeCustomers, todayCollections]);
 
   // Calculate attention alerts from real data
   const attentionAlert: AttentionAlert = {
-    overdueCustomers: 0, // TODO: Calculate from accounts slice
+    // Deferred to PIGMY-MVP-004 (missed-day/penalty). Future wiring:
+    // selectOverdueCustomers (slices/reports.slice.ts) once 004 owns overdue calculation.
+    overdueCustomers: 0,
     pendingSync: needsSyncCollections.length,
   };
 
@@ -274,8 +258,7 @@ export default function Home() {
   });
 
   const handleStartRoute = () => {
-    console.log('Start Route pressed');
-    // TODO: Navigate to route screen
+    router.push('/(app)/(route)');
   };
 
   const handleSearch = () => {

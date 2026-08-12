@@ -17,10 +17,28 @@ import { useTheme, typography, spacing, radius } from '@/theme';
 import AddCustomerHeader from '@/components/elements/AddCustomerHeader';
 import BottomSheet from '@/components/elements/BottomSheet';
 import { selectAllRoutes, selectAllBranches, selectAllAgents } from '@/slices/settings.slice';
-import { addCustomer, persistCustomers } from '@/slices/customers.slice';
-import { addAccount, persistAccounts } from '@/slices/accounts.slice';
-import { CustomerStatus, AccountStatus } from '@/types';
+import {
+  addCustomer,
+  addKYCDocument,
+  persistCustomers,
+  selectPotentialDuplicates,
+} from '@/slices/customers.slice';
+import {
+  addAccount,
+  addScheme,
+  persistAccounts,
+  selectAllSchemes,
+} from '@/slices/accounts.slice';
+import {
+  CustomerStatus,
+  AccountStatus,
+  SchemeFrequency,
+  KYCType,
+} from '@/types';
 import type { AddCustomerFormData } from '@/types/AddCustomerData';
+import type { Scheme } from '@/types/entities';
+import { maskKYCNumber, validatePhone } from '@/utils/businessLogic';
+import { generateUUID } from '@/utils/uuid';
 
 const documentTypeOptions = [
   'Aadhaar Card',
@@ -30,6 +48,43 @@ const documentTypeOptions = [
   'Passport',
 ];
 
+const frequencyOptions: { label: string; value: SchemeFrequency }[] = [
+  { label: 'Daily', value: SchemeFrequency.DAILY },
+  { label: 'Weekly', value: SchemeFrequency.WEEKLY },
+  { label: 'Monthly', value: SchemeFrequency.MONTHLY },
+];
+
+function mapDocumentTypeToKYC(documentType: string): KYCType {
+  switch (documentType) {
+    case 'Aadhaar Card':
+      return KYCType.AADHAR;
+    case 'PAN Card':
+      return KYCType.PAN;
+    case 'Voter ID':
+      return KYCType.VOTER_ID;
+    case 'Driving License':
+    case 'Passport':
+    default:
+      return KYCType.OTHER;
+  }
+}
+
+function frequencyDisplayLabel(frequency: SchemeFrequency): string {
+  return frequencyOptions.find(o => o.value === frequency)?.label ?? 'Daily';
+}
+
+function schemeNameFor(frequency: SchemeFrequency): string {
+  switch (frequency) {
+    case SchemeFrequency.WEEKLY:
+      return 'Pigmy Weekly';
+    case SchemeFrequency.MONTHLY:
+      return 'Pigmy Monthly';
+    case SchemeFrequency.DAILY:
+    default:
+      return 'Pigmy Daily';
+  }
+}
+
 export default function AddNewCustomer() {
   const router = useRouter();
   const dispatch = useDispatch<Dispatch>();
@@ -37,13 +92,13 @@ export default function AddNewCustomer() {
   const { theme } = useTheme();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
-  // Get dropdown options from Redux
   const allBranches = useSelector(selectAllBranches);
   const allRoutes = useSelector(selectAllRoutes);
   const allAgents = useSelector(selectAllAgents);
+  const allSchemes = useSelector(selectAllSchemes);
 
-  // Format options for dropdowns
   const branchOptions = useMemo(() => {
     return allBranches.map(b => b.name || 'Hangamai Main Branch');
   }, [allBranches]);
@@ -78,9 +133,9 @@ export default function AddNewCustomer() {
     },
     pigmyAccount: {
       createAccount: true,
-      schemeType: 'Daily Deposit (1 Year)',
+      frequency: SchemeFrequency.DAILY,
       dailyAmount: 500,
-      startDate: '10/27/2023',
+      startDate: new Date().toLocaleDateString('en-US'),
     },
   });
 
@@ -153,43 +208,33 @@ export default function AddNewCustomer() {
       flex: 1,
       ...typography(theme, 'body'),
       color: theme.colors.text.primary,
-      paddingVertical: spacing(theme, 'sm'),
+      height: '100%',
     },
     inputIcon: {
       fontSize: 16,
       color: theme.colors.text.muted,
-    },
-    helpText: {
-      ...typography(theme, 'caption'),
-      color: theme.colors.text.muted,
-      marginTop: spacing(theme, 'xxs'),
-    },
-    row: {
-      flexDirection: 'row',
-      gap: spacing(theme, 'sm'),
-    },
-    halfWidth: {
-      flex: 1,
+      marginLeft: spacing(theme, 'xs'),
     },
     dropdown: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
       backgroundColor: theme.colors.background.cardElevated,
       borderRadius: radius(theme, 'input'),
       borderWidth: 1,
       borderColor: theme.colors.background.divider,
       paddingHorizontal: spacing(theme, 'md'),
-      paddingVertical: spacing(theme, 'sm'),
       height: 48,
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
     },
     dropdownText: {
       ...typography(theme, 'body'),
       color: theme.colors.text.primary,
+      flex: 1,
     },
     dropdownPlaceholder: {
       ...typography(theme, 'body'),
       color: theme.colors.text.muted,
+      flex: 1,
     },
     dropdownIcon: {
       fontSize: 12,
@@ -250,52 +295,18 @@ export default function AddNewCustomer() {
       color: theme.colors.brand.primary,
       flex: 1,
     },
-    uploadArea: {
-      backgroundColor: theme.colors.background.cardElevated,
-      borderRadius: radius(theme, 'input'),
-      borderWidth: 2,
-      borderColor: theme.colors.background.divider,
-      borderStyle: 'dashed',
-      padding: spacing(theme, 'xl'),
-      alignItems: 'center',
-      gap: spacing(theme, 'xs'),
-    },
-    uploadIcon: {
-      fontSize: 32,
-      color: theme.colors.text.muted,
-    },
-    uploadText: {
-      ...typography(theme, 'body'),
-      color: theme.colors.text.secondary,
-    },
-    uploadLink: {
-      color: theme.colors.brand.primary,
-      fontWeight: '600',
-    },
-    uploadHint: {
-      ...typography(theme, 'caption'),
-      color: theme.colors.text.muted,
-    },
     toggleSection: {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
-      padding: spacing(theme, 'md'),
       backgroundColor: theme.colors.background.cardElevated,
       borderRadius: radius(theme, 'input'),
       borderWidth: 1,
       borderColor: theme.colors.background.divider,
+      paddingHorizontal: spacing(theme, 'md'),
+      paddingVertical: spacing(theme, 'sm'),
       marginBottom: spacing(theme, 'md'),
-    },
-    toggleLeft: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: spacing(theme, 'xs'),
-      flex: 1,
-    },
-    toggleIcon: {
-      fontSize: 18,
-      color: theme.colors.status.success,
+      gap: spacing(theme, 'sm'),
     },
     toggleContent: {
       flex: 1,
@@ -351,8 +362,140 @@ export default function AddNewCustomer() {
     },
   });
 
+  const resolveOrCreateScheme = (
+    branchId: string,
+    frequency: SchemeFrequency,
+    amount: number,
+  ): Scheme => {
+    const existing = allSchemes.find(
+      s =>
+        s.branchId === branchId &&
+        s.frequency === frequency &&
+        s.minAmount === amount,
+    );
+    if (existing) {
+      return existing;
+    }
+
+    // Also check live store in case schemes were just added in this session
+    const liveSchemes = selectAllSchemes(store.getState());
+    const liveExisting = liveSchemes.find(
+      s =>
+        s.branchId === branchId &&
+        s.frequency === frequency &&
+        s.minAmount === amount,
+    );
+    if (liveExisting) {
+      return liveExisting;
+    }
+
+    const scheme: Scheme = {
+      id: generateUUID(),
+      branchId,
+      name: schemeNameFor(frequency),
+      frequency,
+      minAmount: amount,
+      penaltyPerDay: 0,
+      createdAt: new Date().toISOString(),
+    };
+    dispatch(addScheme(scheme));
+    return scheme;
+  };
+
+  const proceedWithSave = async () => {
+    if (isSaving) return;
+    setIsSaving(true);
+
+    try {
+      const addressParts = formData.address.fullAddress.split(',').map(s => s.trim());
+
+      dispatch(
+        addCustomer({
+          branchId: formData.assignment.branch,
+          routeId: formData.assignment.route,
+          primaryAgentId: formData.assignment.primaryAgent,
+          fullName: formData.personal.fullName,
+          phone: formData.personal.mobileNumber,
+          addressLine1: formData.address.fullAddress,
+          addressLine2: '',
+          city: addressParts[addressParts.length - 2] || 'Mumbai',
+          pincode: addressParts[addressParts.length - 1] || '400001',
+          state: 'Maharashtra',
+          status: CustomerStatus.ACTIVE,
+        }),
+      );
+
+      const stateAfterCustomer = store.getState();
+      const customers = stateAfterCustomer.customers?.customers?.allIds || [];
+      const lastCustomerId = customers[customers.length - 1];
+
+      if (!lastCustomerId) {
+        throw new Error('Customer ID was not created');
+      }
+
+      // Persist basic KYC when a document number is provided
+      if (formData.kyc.documentNumber.trim()) {
+        dispatch(
+          addKYCDocument({
+            customerId: lastCustomerId,
+            kycType: mapDocumentTypeToKYC(formData.kyc.documentType),
+            kycNumberMasked: maskKYCNumber(formData.kyc.documentNumber.trim()),
+          }),
+        );
+      }
+
+      await dispatch(persistCustomers());
+
+      if (formData.pigmyAccount.createAccount) {
+        try {
+          const scheme = resolveOrCreateScheme(
+            formData.assignment.branch,
+            formData.pigmyAccount.frequency,
+            formData.pigmyAccount.dailyAmount,
+          );
+
+          dispatch(
+            addAccount({
+              customerId: lastCustomerId,
+              schemeId: scheme.id,
+              installmentAmount: formData.pigmyAccount.dailyAmount,
+              status: AccountStatus.ACTIVE,
+            }),
+          );
+          await dispatch(persistAccounts());
+        } catch (accountError) {
+          console.error('Error creating account/scheme:', accountError);
+          Alert.alert(
+            'Partial Save',
+            'Customer was saved, but creating the Pigmy account failed. You can retry from Edit Customer later.',
+            [
+              {
+                text: 'OK',
+                onPress: () =>
+                  router.replace(`/(app)/(route)/customer-detail/${lastCustomerId}`),
+              },
+            ],
+          );
+          return;
+        }
+      }
+
+      Alert.alert('Success', 'Customer added successfully!', [
+        {
+          text: 'OK',
+          onPress: () =>
+            router.replace(`/(app)/(route)/customer-detail/${lastCustomerId}`),
+        },
+      ]);
+    } catch (error) {
+      console.error('Error adding customer:', error);
+      Alert.alert('Error', 'Failed to add customer');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   const handleSave = async () => {
-    // Validate required fields
     if (!formData.personal.fullName.trim()) {
       Alert.alert('Validation Error', 'Please enter customer name');
       return;
@@ -373,61 +516,52 @@ export default function AddNewCustomer() {
       Alert.alert('Validation Error', 'Please select primary agent');
       return;
     }
-
-    try {
-      console.log('Saving customer:', formData);
-
-      // Parse address into components (simplified - using full address as addressLine1)
-      const addressParts = formData.address.fullAddress.split(',').map(s => s.trim());
-
-      // Add customer to Redux
-      const customerAction = dispatch(
-        addCustomer({
-          branchId: formData.assignment.branch,
-          routeId: formData.assignment.route,
-          primaryAgentId: formData.assignment.primaryAgent,
-          fullName: formData.personal.fullName,
-          phone: formData.personal.mobileNumber,
-          addressLine1: formData.address.fullAddress,
-          addressLine2: '',
-          city: addressParts[addressParts.length - 2] || 'Mumbai',
-          pincode: addressParts[addressParts.length - 1] || '400001',
-          state: 'Maharashtra',
-          status: CustomerStatus.ACTIVE,
-        })
-      );
-
-      // Persist customers
-      await dispatch(persistCustomers());
-
-      // Get the created customer ID from state after adding
-      const state = store.getState();
-      const customers = state.customers?.customers?.allIds || [];
-      const lastCustomerId = customers[customers.length - 1];
-
-      // Create account if requested
-      if (formData.pigmyAccount.createAccount && lastCustomerId) {
-        dispatch(
-          addAccount({
-            customerId: lastCustomerId,
-            schemeId: 'scheme-pigmy-daily',
-            installmentAmount: formData.pigmyAccount.dailyAmount,
-            status: AccountStatus.ACTIVE,
-          })
-        );
-        await dispatch(persistAccounts());
-      }
-
-      Alert.alert('Success', 'Customer added successfully!', [
-        {
-          text: 'OK',
-          onPress: () => router.back(),
-        },
-      ]);
-    } catch (error) {
-      console.error('Error adding customer:', error);
-      Alert.alert('Error', 'Failed to add customer');
+    if (!validatePhone(formData.personal.mobileNumber)) {
+      Alert.alert('Validation Error', 'Please enter a valid 10-digit mobile number');
+      return;
     }
+    if (
+      formData.pigmyAccount.createAccount &&
+      (!formData.pigmyAccount.dailyAmount || formData.pigmyAccount.dailyAmount <= 0)
+    ) {
+      Alert.alert('Validation Error', 'Please enter a valid installment amount');
+      return;
+    }
+
+    const addressParts = formData.address.fullAddress.split(',').map(s => s.trim());
+    const duplicates = selectPotentialDuplicates(
+      store.getState(),
+      formData.assignment.branch,
+      formData.personal.mobileNumber || undefined,
+      formData.personal.fullName,
+      addressParts[0] || formData.address.fullAddress,
+    );
+
+    if (duplicates.length > 0) {
+      const summary = duplicates
+        .slice(0, 3)
+        .map(c => `${c.fullName}${c.phone ? ` (${c.phone})` : ''}`)
+        .join('\n');
+
+      Alert.alert(
+        'Possible Duplicate',
+        `A similar customer may already exist:\n\n${summary}${
+          duplicates.length > 3 ? `\n…and ${duplicates.length - 3} more` : ''
+        }\n\nYou can continue anyway if this is a different person.`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Continue Anyway',
+            onPress: () => {
+              void proceedWithSave();
+            },
+          },
+        ],
+      );
+      return;
+    }
+
+    await proceedWithSave();
   };
 
   const handleCancel = () => {
@@ -441,7 +575,7 @@ export default function AddNewCustomer() {
           style: 'destructive',
           onPress: () => router.back(),
         },
-      ]
+      ],
     );
   };
 
@@ -457,14 +591,12 @@ export default function AddNewCustomer() {
 
   const handleDropdownSelect = (value: string) => {
     if (activeDropdown === 'branch') {
-      // Find the branch ID from the name
       const branch = allBranches.find(b => (b.name || 'Hangamai Main Branch') === value);
       setFormData({
         ...formData,
         assignment: { ...formData.assignment, branch: branch?.id || value },
       });
     } else if (activeDropdown === 'route') {
-      // Extract route ID from "CODE - Name" format
       const routeCode = value.split(' - ')[0];
       const route = allRoutes.find(r => r.routeCode === routeCode);
       setFormData({
@@ -472,7 +604,6 @@ export default function AddNewCustomer() {
         assignment: { ...formData.assignment, route: route?.id || value },
       });
     } else if (activeDropdown === 'agent') {
-      // Extract agent ID from "Name (ID)" format
       const agentId = value.match(/\(([^)]+)\)/)?.[1] || '';
       setFormData({
         ...formData,
@@ -480,17 +611,32 @@ export default function AddNewCustomer() {
       });
     } else if (activeDropdown === 'documentType') {
       setFormData({ ...formData, kyc: { ...formData.kyc, documentType: value } });
+    } else if (activeDropdown === 'frequency') {
+      const selected = frequencyOptions.find(o => o.label === value);
+      if (selected) {
+        setFormData({
+          ...formData,
+          pigmyAccount: { ...formData.pigmyAccount, frequency: selected.value },
+        });
+      }
     }
     closeDropdown();
   };
 
   const getDropdownOptions = () => {
     switch (activeDropdown) {
-      case 'branch': return branchOptions;
-      case 'route': return routeOptions;
-      case 'agent': return agentOptions;
-      case 'documentType': return documentTypeOptions;
-      default: return [];
+      case 'branch':
+        return branchOptions;
+      case 'route':
+        return routeOptions;
+      case 'agent':
+        return agentOptions;
+      case 'documentType':
+        return documentTypeOptions;
+      case 'frequency':
+        return frequencyOptions.map(o => o.label);
+      default:
+        return [];
     }
   };
 
@@ -508,18 +654,29 @@ export default function AddNewCustomer() {
         const agent = allAgents.find(a => a.id === formData.assignment.primaryAgent);
         return agent ? `${agent.name} (${agent.id})` : '';
       }
-      case 'documentType': return formData.kyc.documentType;
-      default: return '';
+      case 'documentType':
+        return formData.kyc.documentType;
+      case 'frequency':
+        return frequencyDisplayLabel(formData.pigmyAccount.frequency);
+      default:
+        return '';
     }
   };
 
   const getDropdownTitle = () => {
     switch (activeDropdown) {
-      case 'branch': return 'Select Branch';
-      case 'route': return 'Select Route';
-      case 'agent': return 'Select Primary Agent';
-      case 'documentType': return 'Select Document Type';
-      default: return '';
+      case 'branch':
+        return 'Select Branch';
+      case 'route':
+        return 'Select Route';
+      case 'agent':
+        return 'Select Primary Agent';
+      case 'documentType':
+        return 'Select Document Type';
+      case 'frequency':
+        return 'Select Frequency';
+      default:
+        return '';
     }
   };
 
@@ -528,7 +685,6 @@ export default function AddNewCustomer() {
       <AddCustomerHeader />
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-        {/* Personal Details */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionIcon}>👤</Text>
@@ -544,7 +700,7 @@ export default function AddNewCustomer() {
               placeholder="e.g. Rajesh Kumar"
               placeholderTextColor={theme.colors.text.muted}
               value={formData.personal.fullName}
-              onChangeText={(text) =>
+              onChangeText={text =>
                 setFormData({
                   ...formData,
                   personal: { ...formData.personal, fullName: text },
@@ -563,7 +719,7 @@ export default function AddNewCustomer() {
                 keyboardType="phone-pad"
                 maxLength={10}
                 value={formData.personal.mobileNumber}
-                onChangeText={(text) =>
+                onChangeText={text =>
                   setFormData({
                     ...formData,
                     personal: { ...formData.personal, mobileNumber: text },
@@ -590,15 +746,10 @@ export default function AddNewCustomer() {
             <Text style={styles.label}>Account Number</Text>
             <TextInput
               style={styles.input}
-              placeholder="e.g. PG-9902"
+              placeholder="Auto-generated on save"
               placeholderTextColor={theme.colors.text.muted}
               value={formData.personal.accountNumber}
-              onChangeText={(text) =>
-                setFormData({
-                  ...formData,
-                  personal: { ...formData.personal, accountNumber: text },
-                })
-              }
+              editable={false}
             />
           </View>
           <View style={styles.field}>
@@ -612,7 +763,7 @@ export default function AddNewCustomer() {
               multiline
               numberOfLines={3}
               value={formData.address.fullAddress}
-              onChangeText={(text) =>
+              onChangeText={text =>
                 setFormData({
                   ...formData,
                   address: { ...formData.address, fullAddress: text },
@@ -621,7 +772,7 @@ export default function AddNewCustomer() {
             />
           </View>
         </View>
-        {/* Assignment */}
+
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionIcon}>📋</Text>
@@ -633,9 +784,14 @@ export default function AddNewCustomer() {
               Branch <Text style={styles.required}>*</Text>
             </Text>
             <Pressable onPress={() => openDropdown('branch')} style={styles.dropdown}>
-              <Text style={formData.assignment.branch ? styles.dropdownText : styles.dropdownPlaceholder}>
+              <Text
+                style={
+                  formData.assignment.branch ? styles.dropdownText : styles.dropdownPlaceholder
+                }
+              >
                 {formData.assignment.branch
-                  ? allBranches.find(b => b.id === formData.assignment.branch)?.name || 'Hangamai Main Branch'
+                  ? allBranches.find(b => b.id === formData.assignment.branch)?.name ||
+                    'Hangamai Main Branch'
                   : 'Select Branch'}
               </Text>
               <Text style={styles.dropdownIcon}>▼</Text>
@@ -643,14 +799,18 @@ export default function AddNewCustomer() {
           </View>
 
           <View style={styles.field}>
-            <Text style={styles.label}>Route / Beat</Text>
+            <Text style={styles.label}>
+              Route / Beat <Text style={styles.required}>*</Text>
+            </Text>
             <Pressable onPress={() => openDropdown('route')} style={styles.dropdown}>
-              <Text style={formData.assignment.route ? styles.dropdownText : styles.dropdownPlaceholder}>
+              <Text
+                style={formData.assignment.route ? styles.dropdownText : styles.dropdownPlaceholder}
+              >
                 {formData.assignment.route
                   ? (() => {
-                    const route = allRoutes.find(r => r.id === formData.assignment.route);
-                    return route ? `${route.routeCode} - ${route.name}` : 'Select Route';
-                  })()
+                      const route = allRoutes.find(r => r.id === formData.assignment.route);
+                      return route ? `${route.routeCode} - ${route.name}` : 'Select Route';
+                    })()
                   : 'Select Route'}
               </Text>
               <Text style={styles.dropdownIcon}>▼</Text>
@@ -658,14 +818,24 @@ export default function AddNewCustomer() {
           </View>
 
           <View style={styles.field}>
-            <Text style={styles.label}>Primary Agent</Text>
+            <Text style={styles.label}>
+              Primary Agent <Text style={styles.required}>*</Text>
+            </Text>
             <Pressable onPress={() => openDropdown('agent')} style={styles.dropdown}>
-              <Text style={formData.assignment.primaryAgent ? styles.dropdownText : styles.dropdownPlaceholder}>
+              <Text
+                style={
+                  formData.assignment.primaryAgent
+                    ? styles.dropdownText
+                    : styles.dropdownPlaceholder
+                }
+              >
                 {formData.assignment.primaryAgent
                   ? (() => {
-                    const agent = allAgents.find(a => a.id === formData.assignment.primaryAgent);
-                    return agent ? `${agent.name} (${agent.id})` : 'Select Agent';
-                  })()
+                      const agent = allAgents.find(
+                        a => a.id === formData.assignment.primaryAgent,
+                      );
+                      return agent ? `${agent.name} (${agent.id})` : 'Select Agent';
+                    })()
                   : 'Select Agent'}
               </Text>
               <Text style={styles.dropdownIcon}>▼</Text>
@@ -676,13 +846,13 @@ export default function AddNewCustomer() {
             <View style={styles.infoBox}>
               <Text style={styles.infoIcon}>ℹ️</Text>
               <Text style={styles.infoText}>
-                The selected agent will be responsible for daily pigmy collections from this customer.
+                The selected agent will be responsible for daily pigmy collections from this
+                customer.
               </Text>
             </View>
           </View>
         </View>
 
-        {/* KYC Compliance */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionIcon}>✓</Text>
@@ -704,7 +874,7 @@ export default function AddNewCustomer() {
               placeholder="XXXX XXXX 1234"
               placeholderTextColor={theme.colors.text.muted}
               value={formData.kyc.documentNumber}
-              onChangeText={(text) =>
+              onChangeText={text =>
                 setFormData({
                   ...formData,
                   kyc: { ...formData.kyc, documentNumber: text },
@@ -713,6 +883,75 @@ export default function AddNewCustomer() {
             />
           </View>
         </View>
+
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionIcon}>💰</Text>
+            <Text style={styles.sectionTitle}>Pigmy Account</Text>
+          </View>
+
+          <View style={styles.toggleSection}>
+            <View style={styles.toggleContent}>
+              <Text style={styles.toggleTitle}>Create Pigmy Account</Text>
+              <Text style={styles.toggleSubtitle}>
+                Link a savings scheme with frequency and installment amount
+              </Text>
+            </View>
+            <Switch
+              value={formData.pigmyAccount.createAccount}
+              onValueChange={value =>
+                setFormData({
+                  ...formData,
+                  pigmyAccount: { ...formData.pigmyAccount, createAccount: value },
+                })
+              }
+              trackColor={{
+                false: theme.colors.background.divider,
+                true: theme.colors.brand.primary,
+              }}
+            />
+          </View>
+
+          {formData.pigmyAccount.createAccount && (
+            <>
+              <View style={styles.field}>
+                <Text style={styles.label}>
+                  Frequency <Text style={styles.required}>*</Text>
+                </Text>
+                <Pressable onPress={() => openDropdown('frequency')} style={styles.dropdown}>
+                  <Text style={styles.dropdownText}>
+                    {frequencyDisplayLabel(formData.pigmyAccount.frequency)}
+                  </Text>
+                  <Text style={styles.dropdownIcon}>▼</Text>
+                </Pressable>
+              </View>
+
+              <View style={styles.field}>
+                <Text style={styles.label}>
+                  Installment Amount (₹) <Text style={styles.required}>*</Text>
+                </Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="e.g. 500"
+                  placeholderTextColor={theme.colors.text.muted}
+                  keyboardType="numeric"
+                  value={String(formData.pigmyAccount.dailyAmount || '')}
+                  onChangeText={text => {
+                    const parsed = parseInt(text.replace(/[^0-9]/g, ''), 10);
+                    setFormData({
+                      ...formData,
+                      pigmyAccount: {
+                        ...formData.pigmyAccount,
+                        dailyAmount: Number.isFinite(parsed) ? parsed : 0,
+                      },
+                    });
+                  }}
+                />
+              </View>
+            </>
+          )}
+        </View>
+
         <View style={styles.actionButtons}>
           <Pressable
             onPress={handleCancel}
@@ -723,10 +962,16 @@ export default function AddNewCustomer() {
 
           <Pressable
             onPress={handleSave}
-            style={({ pressed }) => [styles.saveButton, { opacity: pressed ? 0.8 : 1 }]}
+            disabled={isSaving}
+            style={({ pressed }) => [
+              styles.saveButton,
+              { opacity: isSaving ? 0.5 : pressed ? 0.8 : 1 },
+            ]}
           >
             <Text style={styles.saveButtonIcon}>💾</Text>
-            <Text style={styles.saveButtonText}>Save Customer</Text>
+            <Text style={styles.saveButtonText}>
+              {isSaving ? 'Saving…' : 'Save Customer'}
+            </Text>
           </Pressable>
         </View>
       </ScrollView>
@@ -734,7 +979,7 @@ export default function AddNewCustomer() {
         <View style={styles.bottomSheetContent}>
           <Text style={styles.bottomSheetTitle}>{getDropdownTitle()}</Text>
           <View style={styles.optionsList}>
-            {getDropdownOptions().map((option) => (
+            {getDropdownOptions().map(option => (
               <Pressable
                 key={option}
                 onPress={() => handleDropdownSelect(option)}
@@ -760,4 +1005,3 @@ export default function AddNewCustomer() {
     </SafeAreaView>
   );
 }
-

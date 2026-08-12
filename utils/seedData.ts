@@ -3,12 +3,17 @@
  */
 
 import type { Dispatch } from '@/utils/store';
-import { addCustomer } from '@/slices/customers.slice';
-import { addAccount } from '@/slices/accounts.slice';
-import { updateSession, addRoute, addBranch, addAgent } from '@/slices/settings.slice';
-import { createDelegation } from '@/slices/delegations.slice';
-import { CustomerStatus, AccountStatus, DelegationStatus } from '@/types';
-import { generateUUID } from '@/utils/uuid';
+import { addCustomer, persistCustomers } from '@/slices/customers.slice';
+import { addAccount, persistAccounts } from '@/slices/accounts.slice';
+import {
+  updateSession,
+  addRoute,
+  addBranch,
+  addAgent,
+  persistSettings,
+} from '@/slices/settings.slice';
+import { createDelegation, persistDelegations } from '@/slices/delegations.slice';
+import { CustomerStatus, AccountStatus } from '@/types';
 
 // Dummy agent ID
 export const DEMO_AGENT_ID = 'agent-demo-001';
@@ -252,7 +257,17 @@ export async function seedDummyData(dispatch: Dispatch, getState: () => any) {
     );
   }
 
-  console.log('[SeedData] Dummy data seeded successfully');
+  // Persist seeded domain state — Redux-only seed previously left AsyncStorage empty,
+  // so subsequent launches hydrated empty stores when the seed guard skipped re-seed.
+  console.log('[SeedData] Persisting seeded domain data...');
+  await Promise.all([
+    dispatch(persistSettings()).unwrap(),
+    dispatch(persistCustomers()).unwrap(),
+    dispatch(persistAccounts()).unwrap(),
+    dispatch(persistDelegations()).unwrap(),
+  ]);
+
+  console.log('[SeedData] Dummy data seeded and persisted successfully');
   console.log('[SeedData] Branch: Hangamai Main Branch (Hanga)');
   console.log('[SeedData] Agent ID:', DEMO_AGENT_ID);
   console.log('[SeedData] Routes: SUPA, PARNER, HANGA (3 routes)');

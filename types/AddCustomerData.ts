@@ -2,6 +2,8 @@
  * Type definitions for Add New Customer form data
  */
 
+import type { SchemeFrequency } from './entities';
+
 export interface PersonalDetails {
   fullName: string;
   mobileNumber: string;
@@ -27,7 +29,7 @@ export interface KYCDetails {
 
 export interface PigmyAccountDetails {
   createAccount: boolean;
-  schemeType: string;
+  frequency: SchemeFrequency;
   dailyAmount: number;
   startDate: string;
 }
@@ -39,4 +41,3 @@ export interface AddCustomerFormData {
   kyc: KYCDetails;
   pigmyAccount: PigmyAccountDetails;
 }
-

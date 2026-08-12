@@ -4,11 +4,11 @@ import { loadImages, loadFonts } from '@/theme';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { initializeStorage } from '@/utils/storage';
+import { hasCompletedSeed, initializeStorage, markSeedCompleted } from '@/utils/storage';
 import { seedDummyData } from '@/utils/seedData';
 import { useDispatch, useSelector, useStore } from 'react-redux';
 import type { State, Dispatch } from '@/utils/store';
-import { setLoggedIn } from '@/slices/app.slice';
+import { setInitStatus, setLoggedIn } from '@/slices/app.slice';
 import {
   hydrateSettings,
   hydrateCustomers,
@@ -42,10 +42,12 @@ function Router() {
     async function initializeApp() {
       try {
         console.log('[App] Starting initialization...');
+        dispatch(setInitStatus('INITIALIZING'));
 
         // Set timeout to ensure we don't hang forever
         timeoutId = setTimeout(() => {
           console.warn('[App] Initialization timeout - forcing to auth screen');
+          dispatch(setInitStatus('FAILED'));
           dispatch(setLoggedIn(false));
           SplashScreen.hideAsync();
         }, 10000); // 10 second timeout
@@ -62,6 +64,7 @@ function Router() {
 
         // Hydrate all slices from AsyncStorage
         console.log('[App] Hydrating slices...');
+        dispatch(setInitStatus('HYDRATING'));
         const hydrateResults = await Promise.allSettled([
           dispatch(hydrateSettings()),
           dispatch(hydrateCustomers()),
@@ -85,10 +88,30 @@ function Router() {
         // Clear timeout
         clearTimeout(timeoutId);
 
-        // Seed dummy data for development
-        console.log('[App] Seeding dummy data...');
-        await seedDummyData(dispatch, store.getState);
-        console.log('[App] Dummy data seeded');
+        // Seed once when uninitialized, or recover if the seed marker exists but
+        // required persisted domain baseline failed to hydrate (prior marker-only bug).
+        // Do NOT reseed when hydrated domain state is present.
+        const alreadySeeded = await hasCompletedSeed();
+        const stateAfterHydrate = store.getState();
+        const baselineMissing =
+          stateAfterHydrate.settings.branches.allIds.length === 0 ||
+          stateAfterHydrate.settings.agents.allIds.length === 0 ||
+          stateAfterHydrate.settings.routes.allIds.length === 0 ||
+          !stateAfterHydrate.settings.session?.branchId ||
+          !stateAfterHydrate.settings.session?.agentId;
+
+        if (!alreadySeeded || baselineMissing) {
+          console.log(
+            alreadySeeded
+              ? '[App] Seed marker present but required domain baseline missing after hydrate — recovering seed once...'
+              : '[App] Seeding dummy data...',
+          );
+          await seedDummyData(dispatch, store.getState);
+          await markSeedCompleted();
+          console.log('[App] Dummy data seeded and persisted');
+        } else {
+          console.log('[App] Seed already completed and domain hydrated - skipping seedDummyData');
+        }
 
         // TODO: Auth temporarily disabled - always set logged in to true
         // When re-enabling auth, uncomment the session check below:
@@ -107,6 +130,7 @@ function Router() {
         // For now: Skip auth and set as logged in
         console.log('[App] Auth disabled - setting logged in to true');
         dispatch(setLoggedIn(true));
+        dispatch(setInitStatus('READY'));
 
         // Hide splash screen
         console.log('[App] Hiding splash screen');
@@ -115,7 +139,8 @@ function Router() {
       } catch (error) {
         console.error('[App] Initialization error:', error);
         clearTimeout(timeoutId);
-        // Always set checked to true even on error
+        // Non-destructive: narrate failure only — do not clear persisted local data
+        dispatch(setInitStatus('FAILED'));
         dispatch(setLoggedIn(false));
         await SplashScreen.hideAsync();
       }

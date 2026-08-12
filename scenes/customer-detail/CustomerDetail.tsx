@@ -1,48 +1,151 @@
 import { View, Text, StyleSheet, ScrollView, Pressable, Linking } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useMemo, useState } from 'react';
 import { useRouter } from 'expo-router';
-import { useTheme, typography, spacing } from '@/theme';
+import { useSelector } from 'react-redux';
+import type { State } from '@/utils/store';
+import { useTheme, typography, spacing, radius } from '@/theme';
 import CustomerProfileCard from '@/components/elements/CustomerProfileCard';
 import AccountCard from '@/components/elements/AccountCard';
-import type { CustomerDetailData } from '@/types/CustomerDetailData';
+import BottomSheet from '@/components/elements/BottomSheet';
+import CollectDeposit from '@/scenes/collect-deposit';
+import Receipt from '@/scenes/receipt';
+import {
+  selectCustomerById,
+  selectKYCDocsByCustomer,
+} from '@/slices/customers.slice';
+import { selectAccountsByCustomer } from '@/slices/accounts.slice';
+import { selectAllRoutes, selectAllAgents, selectSession } from '@/slices/settings.slice';
+import { selectTodayCollectionsByAgent } from '@/slices/collections.slice';
+import { selectDelegationsBySecondaryAgent } from '@/slices/delegations.slice';
+import { SchemeFrequency, KYCType } from '@/types';
+import type { CustomerAccount, CustomerDetailData } from '@/types/CustomerDetailData';
 
-export default function CustomerDetail() {
+interface CustomerDetailProps {
+  customerId?: string;
+}
+
+function frequencyLabel(frequency?: SchemeFrequency): string {
+  switch (frequency) {
+    case SchemeFrequency.WEEKLY:
+      return 'Weekly Collection';
+    case SchemeFrequency.MONTHLY:
+      return 'Monthly Collection';
+    case SchemeFrequency.DAILY:
+    default:
+      return 'Daily Collection';
+  }
+}
+
+function kycTypeLabel(kycType: KYCType): string {
+  switch (kycType) {
+    case KYCType.AADHAR:
+      return 'Aadhaar';
+    case KYCType.PAN:
+      return 'PAN';
+    case KYCType.VOTER_ID:
+      return 'Voter ID';
+    case KYCType.OTHER:
+    default:
+      return 'Other';
+  }
+}
+
+export default function CustomerDetail({ customerId }: CustomerDetailProps) {
   const router = useRouter();
   const { theme } = useTheme();
+  const [isCollectOpen, setIsCollectOpen] = useState(false);
+  const [isReceiptOpen, setIsReceiptOpen] = useState(false);
 
-  // Mock data - replace with actual data from Redux/API
-  const customerData: CustomerDetailData = {
-    customer: {
-      id: 'CUST-001',
-      name: 'Rajesh Kumar',
-      phone: '+91 98765 43210',
-      address: 'Shop No. 4, Main Market, Tilakwadi, Belgaum',
-      avatarUrl: undefined,
-      isOnline: true,
-    },
-    accounts: [
-      {
-        id: 'ACC-001',
-        accountType: 'pigmy',
-        accountNumber: '#PGM-8821',
-        label: 'Daily Collection',
-        amount: 500.0,
-        dueToday: 500,
-        status: 'pending',
-        progress: 60,
-      },
-      {
-        id: 'ACC-002',
-        accountType: 'loan',
-        accountNumber: '#LN-4421',
-        label: 'Monthly EMI',
-        amount: 1200.0,
-        dueToday: 0,
-        status: 'paid',
+  const session = useSelector(selectSession);
+  const timezone = useSelector((state: State) => state.settings.branchSettings.timezone);
+  const agentId = session.agentId || 'demo-agent';
+
+  const customer = useSelector((state: State) =>
+    customerId ? selectCustomerById(state, customerId) : undefined,
+  );
+  const accounts = useSelector((state: State) =>
+    customerId ? selectAccountsByCustomer(state, customerId) : [],
+  );
+  const kycDocs = useSelector((state: State) =>
+    customerId ? selectKYCDocsByCustomer(state, customerId) : [],
+  );
+  const allRoutes = useSelector(selectAllRoutes);
+  const allAgents = useSelector(selectAllAgents);
+  const schemesById = useSelector((state: State) => state.accounts.schemes.byId);
+  const todayCollections = useSelector((state: State) =>
+    selectTodayCollectionsByAgent(state, agentId, timezone),
+  );
+  const myDelegations = useSelector((state: State) =>
+    selectDelegationsBySecondaryAgent(state, agentId),
+  );
+
+  const route = useMemo(
+    () => allRoutes.find(r => r.id === customer?.routeId),
+    [allRoutes, customer?.routeId],
+  );
+  const agent = useMemo(
+    () => allAgents.find(a => a.id === customer?.primaryAgentId),
+    [allAgents, customer?.primaryAgentId],
+  );
+
+  // Same active-account + today's collection lookup used by Home / Route Details
+  const activeAccount = useMemo(
+    () => accounts.find(a => a.status === 'ACTIVE'),
+    [accounts],
+  );
+  const todayCollection = useMemo(() => {
+    if (!customer || !activeAccount) return undefined;
+    return todayCollections.find(
+      c =>
+        c.customerId === customer.id &&
+        c.accountId === activeAccount.id &&
+        c.status !== 'REVERSED',
+    );
+  }, [customer, activeAccount, todayCollections]);
+  const isCollectedToday = Boolean(todayCollection);
+  const delegationId = useMemo(
+    () => (customerId ? myDelegations.find(d => d.customerId === customerId)?.id : undefined),
+    [myDelegations, customerId],
+  );
+
+  const customerData: CustomerDetailData | undefined = useMemo(() => {
+    if (!customer) return undefined;
+
+    const mappedAccounts: CustomerAccount[] = accounts.map(account => {
+      const scheme = schemesById[account.schemeId];
+      return {
+        id: account.id,
+        accountType: 'pigmy' as const,
+        accountNumber: account.accountNumber,
+        label: frequencyLabel(scheme?.frequency),
+        amount: account.installmentAmount,
+        dueToday: account.status === 'ACTIVE' ? account.installmentAmount : 0,
+        status: account.status === 'ACTIVE' ? ('pending' as const) : ('paid' as const),
         progress: undefined,
+      };
+    });
+
+    return {
+      customer: {
+        id: customer.id,
+        name: customer.fullName,
+        phone: customer.phone || '—',
+        address: [
+          customer.addressLine1,
+          customer.addressLine2,
+          customer.city,
+          customer.state,
+          customer.pincode,
+        ]
+          .filter(Boolean)
+          .join(', '),
+        avatarUrl: undefined,
+        isOnline: customer.status === 'ACTIVE',
       },
-    ],
-  };
+      accounts: mappedAccounts,
+    };
+  }, [customer, accounts, schemesById]);
 
   const styles = StyleSheet.create({
     container: {
@@ -97,6 +200,33 @@ export default function CustomerDetail() {
       paddingTop: spacing(theme, 'lg'),
       paddingBottom: spacing(theme, 'xxl') + 80,
     },
+    metaSection: {
+      marginHorizontal: spacing(theme, 'screenPadding'),
+      marginBottom: spacing(theme, 'lg'),
+      backgroundColor: theme.colors.background.card,
+      borderRadius: radius(theme, 'card'),
+      borderWidth: 1,
+      borderColor: theme.colors.background.divider,
+      padding: spacing(theme, 'md'),
+      gap: spacing(theme, 'sm'),
+    },
+    metaRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      gap: spacing(theme, 'sm'),
+    },
+    metaLabel: {
+      ...typography(theme, 'caption'),
+      color: theme.colors.text.muted,
+      fontWeight: '600',
+    },
+    metaValue: {
+      ...typography(theme, 'body'),
+      color: theme.colors.text.primary,
+      fontWeight: '500',
+      flexShrink: 1,
+      textAlign: 'right',
+    },
     accountsSection: {
       paddingHorizontal: spacing(theme, 'screenPadding'),
     },
@@ -120,6 +250,33 @@ export default function CustomerDetail() {
     },
     accountsList: {
       gap: spacing(theme, 'md'),
+    },
+    emptyAccounts: {
+      ...typography(theme, 'body'),
+      color: theme.colors.text.muted,
+      textAlign: 'center',
+      paddingVertical: spacing(theme, 'lg'),
+    },
+    emptyState: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      padding: spacing(theme, 'xl'),
+      gap: spacing(theme, 'sm'),
+    },
+    emptyIcon: {
+      fontSize: 40,
+    },
+    emptyText: {
+      ...typography(theme, 'sectionTitle'),
+      color: theme.colors.text.primary,
+      fontWeight: '600',
+      textAlign: 'center',
+    },
+    emptyHint: {
+      ...typography(theme, 'body'),
+      color: theme.colors.text.muted,
+      textAlign: 'center',
     },
     actionButtons: {
       position: 'absolute',
@@ -166,6 +323,9 @@ export default function CustomerDetail() {
       justifyContent: 'center',
       gap: spacing(theme, 'xs'),
     },
+    primaryButtonDisabled: {
+      opacity: 0.5,
+    },
     primaryButtonIcon: {
       fontSize: 20,
       color: '#FFFFFF',
@@ -181,25 +341,60 @@ export default function CustomerDetail() {
     router.back();
   };
 
+  if (!customer || !customerData) {
+    return (
+      <SafeAreaView style={styles.container} edges={['top']}>
+        <View style={styles.header}>
+          <View style={styles.headerLeft}>
+            <Pressable onPress={handleBack} style={styles.backButton}>
+              <Text style={styles.backIcon}>←</Text>
+            </Pressable>
+            <Text style={styles.title}>Customer Detail</Text>
+          </View>
+        </View>
+        <View style={styles.emptyState}>
+          <Text style={styles.emptyIcon}>👤</Text>
+          <Text style={styles.emptyText}>Customer not found</Text>
+          <Text style={styles.emptyHint}>
+            This customer may have been removed or the link is invalid.
+          </Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   const handleCallCustomer = () => {
-    const phoneNumber = customerData.customer.phone.replace(/\s/g, '');
+    const phoneNumber = (customer.phone || '').replace(/\s/g, '');
+    if (!phoneNumber) {
+      return;
+    }
     Linking.openURL(`tel:${phoneNumber}`);
   };
 
   const handleViewPassbook = () => {
-    console.log('View passbook pressed');
-    // TODO: Navigate to passbook screen
+    // Passbook / ledger owned by later MVP stories
   };
 
-  const handleCollectDeposit = () => {
-    console.log('Collect deposit pressed');
-    // TODO: Navigate to collection screen
+  const handlePrimaryCollectionAction = () => {
+    if (!activeAccount) {
+      return;
+    }
+    if (isCollectedToday && todayCollection) {
+      setIsReceiptOpen(true);
+      return;
+    }
+    setIsCollectOpen(true);
   };
 
-  const handleAccountPress = (accountId: string) => {
-    console.log('Account pressed:', accountId);
-    // TODO: Navigate to account details
+  const handleCloseCollect = () => {
+    setIsCollectOpen(false);
   };
+
+  const handleAccountPress = (_accountId: string) => {
+    // Account deep-dive owned by later stories
+  };
+
+  const primaryKyc = kycDocs[0];
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -219,20 +414,56 @@ export default function CustomerDetail() {
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         <CustomerProfileCard customer={customerData.customer} />
 
+        <View style={styles.metaSection}>
+          <View style={styles.metaRow}>
+            <Text style={styles.metaLabel}>Customer Code</Text>
+            <Text style={styles.metaValue}>{customer.customerCode}</Text>
+          </View>
+          <View style={styles.metaRow}>
+            <Text style={styles.metaLabel}>Status</Text>
+            <Text style={styles.metaValue}>{customer.status}</Text>
+          </View>
+          <View style={styles.metaRow}>
+            <Text style={styles.metaLabel}>Route</Text>
+            <Text style={styles.metaValue}>
+              {route ? `${route.routeCode} — ${route.name}` : '—'}
+            </Text>
+          </View>
+          <View style={styles.metaRow}>
+            <Text style={styles.metaLabel}>Agent</Text>
+            <Text style={styles.metaValue}>{agent?.name || '—'}</Text>
+          </View>
+          <View style={styles.metaRow}>
+            <Text style={styles.metaLabel}>KYC</Text>
+            <Text style={styles.metaValue}>
+              {primaryKyc
+                ? `${kycTypeLabel(primaryKyc.kycType)} · ${primaryKyc.kycNumberMasked}`
+                : 'Not captured'}
+            </Text>
+          </View>
+        </View>
+
         <View style={styles.accountsSection}>
           <View style={styles.accountsHeader}>
             <Text style={styles.accountsTitle}>ACTIVE ACCOUNTS</Text>
-            <Text style={styles.accountsCount}>{customerData.accounts.length} Accounts</Text>
+            <Text style={styles.accountsCount}>
+              {customerData.accounts.length} Account
+              {customerData.accounts.length === 1 ? '' : 's'}
+            </Text>
           </View>
 
           <View style={styles.accountsList}>
-            {customerData.accounts.map((account) => (
-              <AccountCard
-                key={account.id}
-                account={account}
-                onPress={handleAccountPress}
-              />
-            ))}
+            {customerData.accounts.length === 0 ? (
+              <Text style={styles.emptyAccounts}>No accounts linked to this customer.</Text>
+            ) : (
+              customerData.accounts.map(account => (
+                <AccountCard
+                  key={account.id}
+                  account={account}
+                  onPress={handleAccountPress}
+                />
+              ))
+            )}
           </View>
         </View>
       </ScrollView>
@@ -263,14 +494,46 @@ export default function CustomerDetail() {
         </View>
 
         <Pressable
-          onPress={handleCollectDeposit}
-          style={({ pressed }) => [styles.primaryButton, { opacity: pressed ? 0.8 : 1 }]}
+          onPress={handlePrimaryCollectionAction}
+          disabled={!activeAccount}
+          style={({ pressed }) => [
+            styles.primaryButton,
+            !activeAccount && styles.primaryButtonDisabled,
+            { opacity: !activeAccount ? 0.5 : pressed ? 0.8 : 1 },
+          ]}
         >
-          <Text style={styles.primaryButtonIcon}>💵</Text>
-          <Text style={styles.primaryButtonText}>Collect Deposit</Text>
+          <Text style={styles.primaryButtonIcon}>{isCollectedToday ? '🧾' : '💵'}</Text>
+          <Text style={styles.primaryButtonText}>
+            {isCollectedToday ? 'View Receipt' : 'Collect Deposit'}
+          </Text>
         </Pressable>
       </View>
+
+      <BottomSheet isOpen={isCollectOpen} onClose={handleCloseCollect}>
+        {customer && activeAccount ? (
+          <CollectDeposit
+            onClose={handleCloseCollect}
+            customer={customer}
+            account={activeAccount}
+            delegationId={delegationId}
+          />
+        ) : (
+          <View style={{ padding: 20 }}>
+            <Text style={{ color: theme.colors.text.primary }}>
+              Customer or account data not found
+            </Text>
+          </View>
+        )}
+      </BottomSheet>
+
+      <BottomSheet isOpen={isReceiptOpen} onClose={() => setIsReceiptOpen(false)}>
+        {todayCollection && (
+          <Receipt
+            collectionId={todayCollection.id}
+            onClose={() => setIsReceiptOpen(false)}
+          />
+        )}
+      </BottomSheet>
     </SafeAreaView>
   );
 }
-

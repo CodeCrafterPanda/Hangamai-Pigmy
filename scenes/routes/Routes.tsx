@@ -6,7 +6,7 @@ import type { State } from '@/utils/store';
 import { useTheme, typography, spacing, radius } from '@/theme';
 import RouteCard from '@/components/elements/RouteCard';
 import FloatingActionButton from '@/components/elements/FloatingActionButton';
-import { selectAllRoutes, selectSession } from '@/slices/settings.slice';
+import { selectRoutesByBranch, selectSession } from '@/slices/settings.slice';
 import { selectAllCustomers, selectCustomersByAgent } from '@/slices/customers.slice';
 import { selectTodayCollectionsByAgent } from '@/slices/collections.slice';
 import { selectDelegationsBySecondaryAgent } from '@/slices/delegations.slice';
@@ -21,9 +21,10 @@ export default function Routes() {
   const session = useSelector(selectSession);
   const timezone = useSelector((state: State) => state.settings.branchSettings.timezone);
   const agentId = session.agentId || 'demo-agent';
+  const branchId = session.branchId || '';
 
-  // Get data from Redux
-  const allRoutes = useSelector(selectAllRoutes);
+  // Get data from Redux — branch-scoped so newly created empty routes remain visible
+  const branchRoutes = useSelector((state: State) => selectRoutesByBranch(state, branchId));
   const allCustomers = useSelector(selectAllCustomers);
   const todayCollections = useSelector((state: State) =>
     selectTodayCollectionsByAgent(state, agentId, timezone)
@@ -31,27 +32,26 @@ export default function Routes() {
 
   // Get customers assigned to logged-in agent (primary + delegated)
   const primaryCustomers = useSelector((state: State) => selectCustomersByAgent(state, agentId));
-  const myDelegations = useSelector((state: State) => 
+  const myDelegations = useSelector((state: State) =>
     selectDelegationsBySecondaryAgent(state, agentId)
   );
   const delegatedCustomerIds = useMemo(() => {
     return myDelegations.map(d => d.customerId);
   }, [myDelegations]);
-  
+
   const myCustomerIds = useMemo(() => {
     const primary = primaryCustomers.map(c => c.id);
     return new Set([...primary, ...delegatedCustomerIds]);
   }, [primaryCustomers, delegatedCustomerIds]);
 
-  // Calculate route statistics
+  // Calculate route statistics (preserve real progress formula; do not hide zero-customer routes)
   const routes: Route[] = useMemo(() => {
-    return allRoutes
-      .map(route => {
-        // Get customers in this route that are assigned to logged-in agent
-        const routeCustomers = allCustomers.filter(
-          c => c.routeId === route.id && myCustomerIds.has(c.id)
-        );
-        const totalCustomers = routeCustomers.length;
+    return branchRoutes.map(route => {
+      // Get customers in this route that are assigned to logged-in agent
+      const routeCustomers = allCustomers.filter(
+        c => c.routeId === route.id && myCustomerIds.has(c.id)
+      );
+      const totalCustomers = routeCustomers.length;
 
       // Get collected customer IDs today
       const collectedCustomerIds = new Set(
@@ -86,9 +86,8 @@ export default function Routes() {
         totalCustomers,
         pendingCustomers,
       };
-    })
-    .filter(route => route.totalCustomers > 0); // Only show routes with customers assigned to this agent
-  }, [allRoutes, allCustomers, todayCollections, myCustomerIds]);
+    });
+  }, [branchRoutes, allCustomers, todayCollections, myCustomerIds]);
 
   const filteredRoutes = routes.filter(
     (route) =>
@@ -154,8 +153,7 @@ export default function Routes() {
   };
 
   const handleAddRoute = () => {
-    console.log('Add new route pressed');
-    // TODO: Navigate to add route screen
+    router.push('/(app)/(route)/add-route');
   };
 
   return (
@@ -170,12 +168,16 @@ export default function Routes() {
             <View style={styles.emptyState}>
               <Text style={styles.emptyIcon}>🔍</Text>
               <Text style={styles.emptyText}>
-                No routes found matching "{searchQuery}"
+                {searchQuery
+                  ? `No routes found matching "${searchQuery}"`
+                  : 'No routes available. Tap + to add a route.'}
               </Text>
             </View>
           )}
         </View>
       </ScrollView>
+
+      <FloatingActionButton onPress={handleAddRoute} />
     </View>
   );
 }

@@ -69,6 +69,9 @@ export const STORAGE_KEYS = {
 
 export const CURRENT_STORAGE_VERSION = 1;
 
+/** Seed payload version tracked on StorageMetadata to prevent duplicate seeding */
+export const CURRENT_SEED_VERSION = 1;
+
 // ===========================
 // STORAGE INTERFACES
 // ===========================
@@ -211,6 +214,44 @@ export async function initializeStorage(): Promise<StorageMetadata> {
   }
   
   return metadata;
+}
+
+/**
+ * Whether baseline seed data has already been applied for the current seed version.
+ * Reuses StorageMetadata — does not introduce a second init/versioning system.
+ */
+export async function hasCompletedSeed(
+  seedVersion: number = CURRENT_SEED_VERSION,
+): Promise<boolean> {
+  const metadata = await getItemSafe<StorageMetadata | null>(STORAGE_KEYS.METADATA, null);
+  return metadata?.seedVersion === seedVersion && Boolean(metadata.seededAt);
+}
+
+/**
+ * Mark seed as completed on StorageMetadata after a successful seedDummyData run.
+ */
+export async function markSeedCompleted(
+  seedVersion: number = CURRENT_SEED_VERSION,
+): Promise<boolean> {
+  const metadata = await getItemSafe<StorageMetadata | null>(STORAGE_KEYS.METADATA, null);
+  const now = new Date().toISOString();
+
+  const next: StorageMetadata = metadata
+    ? {
+        ...metadata,
+        seedVersion,
+        seededAt: now,
+        updatedAt: now,
+      }
+    : {
+        version: CURRENT_STORAGE_VERSION,
+        createdAt: now,
+        updatedAt: now,
+        seedVersion,
+        seededAt: now,
+      };
+
+  return setItemSafe(STORAGE_KEYS.METADATA, next);
 }
 
 /**
@@ -369,6 +410,8 @@ export default {
   getMultipleItemsSafe,
   setMultipleItemsSafe,
   initializeStorage,
+  hasCompletedSeed,
+  markSeedCompleted,
   createEmptyStore,
   addEntityToStore,
   updateEntityInStore,
@@ -379,5 +422,6 @@ export default {
   clearAllData,
   STORAGE_KEYS,
   CURRENT_STORAGE_VERSION,
+  CURRENT_SEED_VERSION,
 };
 

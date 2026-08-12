@@ -19,7 +19,7 @@ import {
 import { selectCustomersByAgent, selectAllCustomers } from '@/slices/customers.slice';
 import { selectDelegationsBySecondaryAgent } from '@/slices/delegations.slice';
 import { selectAllAccounts } from '@/slices/accounts.slice';
-import { selectSession } from '@/slices/settings.slice';
+import { selectSession, selectRouteById } from '@/slices/settings.slice';
 import type {
   CustomerCollection,
   RouteDetailsHeader as RouteDetailsHeaderType,
@@ -44,6 +44,9 @@ export default function RouteDetails({ routeId }: RouteDetailsProps) {
   const session = useSelector(selectSession);
   const timezone = useSelector((state: State) => state.settings.branchSettings.timezone);
   const agentId = session.agentId || 'demo-agent';
+  const route = useSelector((state: State) =>
+    routeId ? selectRouteById(state, routeId) : undefined
+  );
 
   // Get all customers (both primary and delegated) for this route
   const primaryCustomers = useSelector((state: State) => selectCustomersByAgent(state, agentId));
@@ -60,11 +63,12 @@ export default function RouteDetails({ routeId }: RouteDetailsProps) {
     return allCustomersData.filter(c => delegatedCustomerIds.includes(c.id));
   }, [myDelegations, allCustomersData]);
 
-  // Combine primary and delegated customers for this route
+  // Combine primary and delegated customers for this route (fail closed when routeId missing)
   const allRouteCustomers = useMemo(() => {
-    return [...primaryCustomers, ...delegatedCustomers].filter(
-      c => !routeId || c.routeId === routeId
-    );
+    if (!routeId) {
+      return [];
+    }
+    return [...primaryCustomers, ...delegatedCustomers].filter(c => c.routeId === routeId);
   }, [primaryCustomers, delegatedCustomers, routeId]);
 
   // Get all accounts
@@ -78,10 +82,9 @@ export default function RouteDetails({ routeId }: RouteDetailsProps) {
   // Use all route customers (no tab filtering)
   const activeCustomers = allRouteCustomers;
 
-  // Mock header data - TODO: Get from route params
   const headerData: RouteDetailsHeaderType = {
-    routeName: 'Market Road Route',
-    routeNumber: '04',
+    routeName: route?.name ?? (routeId ? 'Route not found' : 'No route selected'),
+    routeNumber: route?.routeCode ?? '—',
     totalStops: activeCustomers.length,
     isOnline: true,
   };
@@ -273,6 +276,10 @@ export default function RouteDetails({ routeId }: RouteDetailsProps) {
     router.push(`/(app)/(route)/edit-customer/${customerId}`);
   };
 
+  const handleCustomerPress = (customerId: string) => {
+    router.push(`/(app)/(route)/customer-detail/${customerId}`);
+  };
+
   const handleDelete = (customerId: string) => {
     console.log('Delete customer:', customerId);
     // TODO: Show confirmation and delete customer
@@ -319,6 +326,7 @@ export default function RouteDetails({ routeId }: RouteDetailsProps) {
               <CustomerCollectionCard
                 key={customer.id}
                 customer={customer}
+                onPress={handleCustomerPress}
                 onCollect={handleCollect}
                 onCollectAll={handleCollectAll}
                 onReceipt={handleReceipt}

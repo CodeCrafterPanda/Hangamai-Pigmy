@@ -66,6 +66,12 @@ export default function RouteStack() {
         }}
       />
       <Stack.Screen
+        name="add-route"
+        options={{
+          headerShown: false,
+        }}
+      />
+      <Stack.Screen
         name="edit-customer/[id]"
         options={{
           headerShown: false,

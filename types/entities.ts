@@ -373,5 +373,9 @@ export interface StorageMetadata {
   lastMigrationAt?: string;
   createdAt: string;
   updatedAt: string;
+  /** ISO timestamp set after a successful seedDummyData run */
+  seededAt?: string;
+  /** Seed content version; when set, startup skips re-seeding */
+  seedVersion?: number;
 }
 

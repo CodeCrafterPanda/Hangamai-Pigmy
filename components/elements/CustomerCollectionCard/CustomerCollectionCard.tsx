@@ -4,6 +4,7 @@ import type { CustomerCollection, CollectionStatus } from '@/types/CollectionDat
 
 interface CustomerCollectionCardProps {
   customer: CustomerCollection;
+  onPress?: (customerId: string) => void;
   onCollect?: (customerId: string) => void;
   onCollectAll?: (customerId: string) => void;
   onReceipt?: (customerId: string) => void;
@@ -13,6 +14,7 @@ interface CustomerCollectionCardProps {
 
 export default function CustomerCollectionCard({
   customer,
+  onPress,
   onCollect,
   onCollectAll,
   onReceipt,
@@ -287,7 +289,14 @@ export default function CustomerCollectionCard({
     <View style={styles.container}>
       <View style={styles.content}>
         <View style={styles.header}>
-          <View style={styles.leftSection}>
+          <Pressable
+            onPress={() => onPress?.(customer.id)}
+            disabled={!onPress}
+            style={({ pressed }) => [
+              styles.leftSection,
+              { opacity: onPress && pressed ? 0.7 : 1 },
+            ]}
+          >
             <View style={styles.customerInfo}>
               <Text
                 style={[
@@ -301,7 +310,7 @@ export default function CustomerCollectionCard({
                 {customer.accountType} • {customer.accountNumber}
               </Text>
             </View>
-          </View>
+          </Pressable>
 
           <View style={styles.statusBadge}>
             {renderActionButton()}
