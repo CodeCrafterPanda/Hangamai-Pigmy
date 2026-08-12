@@ -152,49 +152,47 @@ export default function CustomerDetail({ customerId }: CustomerDetailProps) {
       flex: 1,
       backgroundColor: theme.colors.background.app,
     },
+    // Match RouteDetailsHeader spacing/alignment (single custom header; Stack header hidden)
     header: {
-      backgroundColor: theme.colors.background.cardElevated,
-      paddingHorizontal: spacing(theme, 'screenPadding'),
-      paddingTop: spacing(theme, 'md'),
-      paddingBottom: spacing(theme, 'md'),
-      borderBottomWidth: 1,
-      borderBottomColor: theme.colors.background.divider,
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
+      paddingHorizontal: spacing(theme, 'screenPadding'),
+      paddingTop: spacing(theme, 'xs'),
+      paddingBottom: spacing(theme, 'xs'),
     },
     headerLeft: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: spacing(theme, 'md'),
+      gap: spacing(theme, 'sm'),
       flex: 1,
     },
     backButton: {
-      width: 40,
-      height: 40,
+      width: 32,
+      height: 32,
       justifyContent: 'center',
       alignItems: 'center',
     },
     backIcon: {
-      fontSize: 24,
+      fontSize: 20,
       color: theme.colors.text.primary,
     },
     title: {
-      ...typography(theme, 'pageTitle'),
-      fontSize: 20,
+      ...typography(theme, 'sectionTitle'),
       color: theme.colors.text.primary,
       fontWeight: '700',
+      flexShrink: 1,
     },
     syncButton: {
-      width: 40,
-      height: 40,
-      borderRadius: 20,
+      width: 36,
+      height: 36,
+      borderRadius: 18,
       backgroundColor: theme.colors.surfaceTint.successSoft,
       justifyContent: 'center',
       alignItems: 'center',
     },
     syncIcon: {
-      fontSize: 20,
+      fontSize: 16,
     },
     scrollContent: {
       paddingTop: spacing(theme, 'lg'),
@@ -349,7 +347,7 @@ export default function CustomerDetail({ customerId }: CustomerDetailProps) {
             <Pressable onPress={handleBack} style={styles.backButton}>
               <Text style={styles.backIcon}>←</Text>
             </Pressable>
-            <Text style={styles.title}>Customer Detail</Text>
+            <Text style={styles.title}>Customer Details</Text>
           </View>
         </View>
         <View style={styles.emptyState}>
@@ -403,7 +401,9 @@ export default function CustomerDetail({ customerId }: CustomerDetailProps) {
           <Pressable onPress={handleBack} style={styles.backButton}>
             <Text style={styles.backIcon}>←</Text>
           </Pressable>
-          <Text style={styles.title}>Customer Detail</Text>
+          <Text style={styles.title} numberOfLines={1}>
+            Customer Details
+          </Text>
         </View>
 
         <Pressable style={styles.syncButton}>

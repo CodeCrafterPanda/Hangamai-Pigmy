@@ -13,6 +13,7 @@ export interface DailyStats {
   collectedToday: number;
   pendingCount: number;
   inHandAmount: number;
+  onlineAmount: number;
 }
 
 export interface AttentionAlert {

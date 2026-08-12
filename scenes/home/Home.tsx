@@ -127,6 +127,10 @@ export default function Home() {
       .filter(c => c.status !== 'REVERSED' && c.mode === 'CASH')
       .reduce((sum, c) => sum + c.amount + c.penaltyAmount, 0);
 
+    const onlineAmount = tabCollections
+      .filter(c => c.status !== 'REVERSED' && c.mode === 'UPI')
+      .reduce((sum, c) => sum + c.amount + c.penaltyAmount, 0);
+
     const collectedCustomerIds = new Set(tabCollections.map(c => c.customerId));
     const pendingCount = activeCustomers.filter(c => !collectedCustomerIds.has(c.id)).length;
 
@@ -134,6 +138,7 @@ export default function Home() {
       collectedToday,
       pendingCount,
       inHandAmount,
+      onlineAmount,
     };
   }, [activeCustomers, todayCollections]);
 
@@ -328,6 +333,7 @@ export default function Home() {
         <View style={styles.statsRow}>
           <StatCard type="pending" value={dailyStats.pendingCount} />
           <StatCard type="inHand" value={dailyStats.inHandAmount} />
+          <StatCard type="online" value={dailyStats.onlineAmount} />
         </View>
 
         <View style={styles.tabsContainer}>

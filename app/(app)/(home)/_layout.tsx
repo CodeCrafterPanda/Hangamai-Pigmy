@@ -36,8 +36,7 @@ export default function HomeStack() {
       <Stack.Screen
         name="customer-detail/[id]"
         options={{
-          title: 'Customer Details',
-          headerShown: true,
+          headerShown: false,
         }}
       />
       <Stack.Screen

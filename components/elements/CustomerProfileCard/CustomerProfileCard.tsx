@@ -13,45 +13,42 @@ export default function CustomerProfileCard({ customer }: CustomerProfileCardPro
     container: {
       backgroundColor: theme.colors.background.card,
       borderRadius: radius(theme, 'card'),
-      padding: spacing(theme, 'xl'),
+      padding: spacing(theme, 'md'),
       marginHorizontal: spacing(theme, 'screenPadding'),
       marginBottom: spacing(theme, 'lg'),
       alignItems: 'center',
-      gap: spacing(theme, 'md'),
+      gap: spacing(theme, 'sm'),
       borderWidth: 1,
       borderColor: theme.colors.background.divider,
     },
-    avatarContainer: {
-      position: 'relative',
-    },
-    avatar: {
-      width: 120,
-      height: 120,
-      borderRadius: 60,
-      backgroundColor: theme.colors.background.cardElevated,
-    },
     avatarImage: {
-      width: 120,
-      height: 120,
-      borderRadius: 60,
+      width: 56,
+      height: 56,
+      borderRadius: 28,
+      marginBottom: spacing(theme, 'xxs'),
     },
-    onlineIndicator: {
-      position: 'absolute',
-      bottom: 8,
-      right: 8,
-      width: 20,
-      height: 20,
-      borderRadius: 10,
-      backgroundColor: theme.colors.status.success,
-      borderWidth: 3,
-      borderColor: theme.colors.background.card,
+    nameRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      maxWidth: '100%',
+      paddingHorizontal: spacing(theme, 'xs'),
+      gap: 9,
     },
     customerName: {
       ...typography(theme, 'displayXL'),
-      fontSize: 28,
+      fontSize: 24,
       color: theme.colors.text.primary,
       fontWeight: '700',
       textAlign: 'center',
+      flexShrink: 1,
+    },
+    statusDot: {
+      width: 10,
+      height: 10,
+      borderRadius: 5,
+      backgroundColor: theme.colors.status.success,
+      flexShrink: 0,
     },
     phoneContainer: {
       flexDirection: 'row',
@@ -89,16 +86,16 @@ export default function CustomerProfileCard({ customer }: CustomerProfileCardPro
 
   return (
     <View style={styles.container}>
-      <View style={styles.avatarContainer}>
-        {customer.avatarUrl ? (
-          <Image source={{ uri: customer.avatarUrl }} style={styles.avatarImage} />
-        ) : (
-          <View style={styles.avatar} />
-        )}
-        {customer.isOnline && <View style={styles.onlineIndicator} />}
-      </View>
+      {customer.avatarUrl ? (
+        <Image source={{ uri: customer.avatarUrl }} style={styles.avatarImage} />
+      ) : null}
 
-      <Text style={styles.customerName}>{customer.name}</Text>
+      <View style={styles.nameRow}>
+        <Text style={styles.customerName} numberOfLines={2}>
+          {customer.name}
+        </Text>
+        {customer.isOnline ? <View style={styles.statusDot} /> : null}
+      </View>
 
       <View style={styles.phoneContainer}>
         <Text style={styles.phoneIcon}>📞</Text>
@@ -112,4 +109,3 @@ export default function CustomerProfileCard({ customer }: CustomerProfileCardPro
     </View>
   );
 }
-
