@@ -2,9 +2,10 @@ import { View, Text, StyleSheet, ScrollView, Pressable, Linking } from 'react-na
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useMemo, useState } from 'react';
 import { useRouter } from 'expo-router';
-import { useSelector } from 'react-redux';
+import { shallowEqual, useSelector } from 'react-redux';
 import type { State } from '@/utils/store';
 import { useTheme, typography, spacing, radius } from '@/theme';
+import { useTranslation } from '@/i18n';
 import CustomerProfileCard from '@/components/elements/CustomerProfileCard';
 import AccountCard from '@/components/elements/AccountCard';
 import BottomSheet from '@/components/elements/BottomSheet';
@@ -17,43 +18,19 @@ import {
 import { selectAccountsByCustomer } from '@/slices/accounts.slice';
 import { selectAllRoutes, selectAllAgents, selectSession, selectBranchTimezone } from '@/slices/settings.slice';
 import { selectTodayCollectionsByAgent } from '@/slices/collections.slice';
+import { selectAccountBalance } from '@/slices/ledger.slice';
 import { selectDelegationsBySecondaryAgent } from '@/slices/delegations.slice';
-import { SchemeFrequency, KYCType } from '@/types';
+import type { Collection } from '@/types';
 import type { CustomerAccount, CustomerDetailData } from '@/types/CustomerDetailData';
 
 interface CustomerDetailProps {
   customerId?: string;
 }
 
-function frequencyLabel(frequency?: SchemeFrequency): string {
-  switch (frequency) {
-    case SchemeFrequency.WEEKLY:
-      return 'Weekly Collection';
-    case SchemeFrequency.MONTHLY:
-      return 'Monthly Collection';
-    case SchemeFrequency.DAILY:
-    default:
-      return 'Daily Collection';
-  }
-}
-
-function kycTypeLabel(kycType: KYCType): string {
-  switch (kycType) {
-    case KYCType.AADHAR:
-      return 'Aadhaar';
-    case KYCType.PAN:
-      return 'PAN';
-    case KYCType.VOTER_ID:
-      return 'Voter ID';
-    case KYCType.OTHER:
-    default:
-      return 'Other';
-  }
-}
-
 export default function CustomerDetail({ customerId }: CustomerDetailProps) {
   const router = useRouter();
   const { theme } = useTheme();
+  const { t } = useTranslation();
   const [isCollectOpen, setIsCollectOpen] = useState(false);
   const [isReceiptOpen, setIsReceiptOpen] = useState(false);
 
@@ -72,7 +49,13 @@ export default function CustomerDetail({ customerId }: CustomerDetailProps) {
   );
   const allRoutes = useSelector(selectAllRoutes);
   const allAgents = useSelector(selectAllAgents);
-  const schemesById = useSelector((state: State) => state.accounts.schemes.byId);
+  // Ledger-derived balance per listed account. selectAccountBalance is the authoritative
+  // source; Account.currentBalance is only a cache and is deliberately not read here.
+  // shallowEqual keeps the array identity stable while the amounts themselves are unchanged.
+  const accountBalances = useSelector(
+    (state: State) => accounts.map(account => selectAccountBalance(state, account.id)),
+    shallowEqual,
+  );
   const todayCollections = useSelector((state: State) =>
     selectTodayCollectionsByAgent(state, agentId, timezone),
   );
@@ -94,15 +77,28 @@ export default function CustomerDetail({ customerId }: CustomerDetailProps) {
     () => accounts.find(a => a.status === 'ACTIVE'),
     [accounts],
   );
-  const todayCollection = useMemo(() => {
-    if (!customer || !activeAccount) return undefined;
-    return todayCollections.find(
-      c =>
-        c.customerId === customer.id &&
-        c.accountId === activeAccount.id &&
-        c.status !== 'REVERSED',
-    );
-  }, [customer, activeAccount, todayCollections]);
+  // Today's non-reversed collection per account, so the account list and the primary action
+  // read the same state. Presence alone completes today's collection for this screen: the
+  // collected amount is never compared against the configured installment amount.
+  const todayCollectionsByAccount = useMemo(() => {
+    const byAccount = new Map<string, Collection>();
+    if (!customer) return byAccount;
+
+    todayCollections.forEach(collection => {
+      if (
+        collection.customerId === customer.id &&
+        collection.status !== 'REVERSED' &&
+        !byAccount.has(collection.accountId)
+      ) {
+        byAccount.set(collection.accountId, collection);
+      }
+    });
+
+    return byAccount;
+  }, [customer, todayCollections]);
+  const todayCollection = activeAccount
+    ? todayCollectionsByAccount.get(activeAccount.id)
+    : undefined;
   const isCollectedToday = Boolean(todayCollection);
   const delegationId = useMemo(
     () => (customerId ? myDelegations.find(d => d.customerId === customerId)?.id : undefined),
@@ -112,16 +108,18 @@ export default function CustomerDetail({ customerId }: CustomerDetailProps) {
   const customerData: CustomerDetailData | undefined = useMemo(() => {
     if (!customer) return undefined;
 
-    const mappedAccounts: CustomerAccount[] = accounts.map(account => {
-      const scheme = schemesById[account.schemeId];
+    const mappedAccounts: CustomerAccount[] = accounts.map((account, index) => {
+      // Anything collected today for this account closes it out for the day, whether the
+      // amount was short, exact or over the installment.
+      const isDue = account.status === 'ACTIVE' && !todayCollectionsByAccount.has(account.id);
       return {
         id: account.id,
         accountType: 'pigmy' as const,
         accountNumber: account.accountNumber,
-        label: frequencyLabel(scheme?.frequency),
-        amount: account.installmentAmount,
-        dueToday: account.status === 'ACTIVE' ? account.installmentAmount : 0,
-        status: account.status === 'ACTIVE' ? ('pending' as const) : ('paid' as const),
+        label: t('customerDetail.accountBalance'),
+        amount: accountBalances[index] ?? 0,
+        dueToday: isDue ? account.installmentAmount : 0,
+        status: isDue ? ('pending' as const) : ('paid' as const),
         progress: undefined,
       };
     });
@@ -145,7 +143,7 @@ export default function CustomerDetail({ customerId }: CustomerDetailProps) {
       },
       accounts: mappedAccounts,
     };
-  }, [customer, accounts, schemesById]);
+  }, [customer, accounts, accountBalances, todayCollectionsByAccount, t]);
 
   const styles = StyleSheet.create({
     container: {
@@ -347,15 +345,13 @@ export default function CustomerDetail({ customerId }: CustomerDetailProps) {
             <Pressable onPress={handleBack} style={styles.backButton}>
               <Text style={styles.backIcon}>←</Text>
             </Pressable>
-            <Text style={styles.title}>Customer Details</Text>
+            <Text style={styles.title}>{t('customerDetail.title')}</Text>
           </View>
         </View>
         <View style={styles.emptyState}>
           <Text style={styles.emptyIcon}>👤</Text>
-          <Text style={styles.emptyText}>Customer not found</Text>
-          <Text style={styles.emptyHint}>
-            This customer may have been removed or the link is invalid.
-          </Text>
+          <Text style={styles.emptyText}>{t('customerDetail.notFoundTitle')}</Text>
+          <Text style={styles.emptyHint}>{t('customerDetail.notFoundHint')}</Text>
         </View>
       </SafeAreaView>
     );
@@ -370,7 +366,10 @@ export default function CustomerDetail({ customerId }: CustomerDetailProps) {
   };
 
   const handleViewPassbook = () => {
-    // Passbook / ledger owned by later MVP stories
+    if (!activeAccount) {
+      return;
+    }
+    router.push(`/(app)/(route)/passbook/${activeAccount.id}`);
   };
 
   const handlePrimaryCollectionAction = () => {
@@ -402,7 +401,7 @@ export default function CustomerDetail({ customerId }: CustomerDetailProps) {
             <Text style={styles.backIcon}>←</Text>
           </Pressable>
           <Text style={styles.title} numberOfLines={1}>
-            Customer Details
+            {t('customerDetail.title')}
           </Text>
         </View>
 
@@ -416,45 +415,49 @@ export default function CustomerDetail({ customerId }: CustomerDetailProps) {
 
         <View style={styles.metaSection}>
           <View style={styles.metaRow}>
-            <Text style={styles.metaLabel}>Customer Code</Text>
+            <Text style={styles.metaLabel}>{t('customerDetail.customerCode')}</Text>
             <Text style={styles.metaValue}>{customer.customerCode}</Text>
           </View>
           <View style={styles.metaRow}>
-            <Text style={styles.metaLabel}>Status</Text>
-            <Text style={styles.metaValue}>{customer.status}</Text>
+            <Text style={styles.metaLabel}>{t('customerDetail.status')}</Text>
+            <Text style={styles.metaValue}>{t(`customerStatus.${customer.status}`)}</Text>
           </View>
           <View style={styles.metaRow}>
-            <Text style={styles.metaLabel}>Route</Text>
+            <Text style={styles.metaLabel}>{t('customerDetail.route')}</Text>
             <Text style={styles.metaValue}>
               {route ? `${route.routeCode} — ${route.name}` : '—'}
             </Text>
           </View>
           <View style={styles.metaRow}>
-            <Text style={styles.metaLabel}>Agent</Text>
+            <Text style={styles.metaLabel}>{t('customerDetail.agent')}</Text>
             <Text style={styles.metaValue}>{agent?.name || '—'}</Text>
           </View>
           <View style={styles.metaRow}>
-            <Text style={styles.metaLabel}>KYC</Text>
+            <Text style={styles.metaLabel}>{t('customerDetail.kyc')}</Text>
             <Text style={styles.metaValue}>
               {primaryKyc
-                ? `${kycTypeLabel(primaryKyc.kycType)} · ${primaryKyc.kycNumberMasked}`
-                : 'Not captured'}
+                ? `${t(`kycType.${primaryKyc.kycType}`)} · ${primaryKyc.kycNumberMasked}`
+                : t('customerDetail.kycNotCaptured')}
             </Text>
           </View>
         </View>
 
         <View style={styles.accountsSection}>
           <View style={styles.accountsHeader}>
-            <Text style={styles.accountsTitle}>ACTIVE ACCOUNTS</Text>
+            <Text style={styles.accountsTitle}>{t('customerDetail.accountsTitle')}</Text>
             <Text style={styles.accountsCount}>
-              {customerData.accounts.length} Account
-              {customerData.accounts.length === 1 ? '' : 's'}
+              {t(
+                customerData.accounts.length === 1
+                  ? 'customerDetail.accountCountOne'
+                  : 'customerDetail.accountCountOther',
+                { count: customerData.accounts.length },
+              )}
             </Text>
           </View>
 
           <View style={styles.accountsList}>
             {customerData.accounts.length === 0 ? (
-              <Text style={styles.emptyAccounts}>No accounts linked to this customer.</Text>
+              <Text style={styles.emptyAccounts}>{t('customerDetail.noAccounts')}</Text>
             ) : (
               customerData.accounts.map(account => (
                 <AccountCard
@@ -478,18 +481,19 @@ export default function CustomerDetail({ customerId }: CustomerDetailProps) {
             ]}
           >
             <Text style={styles.secondaryButtonIcon}>📞</Text>
-            <Text style={styles.secondaryButtonText}>Call Customer</Text>
+            <Text style={styles.secondaryButtonText}>{t('customerDetail.callCustomer')}</Text>
           </Pressable>
 
           <Pressable
             onPress={handleViewPassbook}
+            disabled={!activeAccount}
             style={({ pressed }) => [
               styles.secondaryButton,
-              { opacity: pressed ? 0.7 : 1 },
+              { opacity: !activeAccount ? 0.5 : pressed ? 0.7 : 1 },
             ]}
           >
             <Text style={styles.secondaryButtonIcon}>📖</Text>
-            <Text style={styles.secondaryButtonText}>View Passbook</Text>
+            <Text style={styles.secondaryButtonText}>{t('customerDetail.viewPassbook')}</Text>
           </Pressable>
         </View>
 
@@ -504,7 +508,9 @@ export default function CustomerDetail({ customerId }: CustomerDetailProps) {
         >
           <Text style={styles.primaryButtonIcon}>{isCollectedToday ? '🧾' : '💵'}</Text>
           <Text style={styles.primaryButtonText}>
-            {isCollectedToday ? 'View Receipt' : 'Collect Deposit'}
+            {isCollectedToday
+              ? t('customerDetail.viewReceipt')
+              : t('customerDetail.collectDeposit')}
           </Text>
         </Pressable>
       </View>
@@ -520,7 +526,7 @@ export default function CustomerDetail({ customerId }: CustomerDetailProps) {
         ) : (
           <View style={{ padding: 20 }}>
             <Text style={{ color: theme.colors.text.primary }}>
-              Customer or account data not found
+              {t('customerDetail.missingCollectContext')}
             </Text>
           </View>
         )}

@@ -1,5 +1,6 @@
 import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { useTheme, typography, spacing, radius, withAlpha } from '@/theme';
+import { useTranslation } from '@/i18n';
 import ProgressBar from '@/components/elements/ProgressBar';
 import type { CustomerAccount, AccountType, AccountStatus } from '@/types/CustomerDetailData';
 
@@ -10,19 +11,20 @@ interface AccountCardProps {
 
 export default function AccountCard({ account, onPress }: AccountCardProps) {
   const { theme } = useTheme();
+  const { t } = useTranslation();
 
   const getAccountTypeConfig = (type: AccountType) => {
     switch (type) {
       case 'pigmy':
         return {
-          label: 'PIGMY',
+          label: t('accountCard.type.pigmy'),
           backgroundColor: theme.colors.surfaceTint.primarySoft,
           textColor: theme.colors.brand.primary,
           borderColor: withAlpha(theme.colors.brand.primary, 0.3),
         };
       case 'loan':
         return {
-          label: 'LOAN',
+          label: t('accountCard.type.loan'),
           backgroundColor: theme.colors.surfaceTint.infoSoft,
           textColor: theme.colors.status.info,
           borderColor: withAlpha(theme.colors.status.info, 0.3),
@@ -34,19 +36,19 @@ export default function AccountCard({ account, onPress }: AccountCardProps) {
     switch (status) {
       case 'pending':
         return {
-          label: 'Pending',
+          label: t('accountCard.status.pending'),
           icon: '⏱',
           color: theme.colors.status.warning,
         };
       case 'paid':
         return {
-          label: 'Paid',
+          label: t('accountCard.status.paid'),
           icon: '✓',
           color: theme.colors.status.success,
         };
       case 'overdue':
         return {
-          label: 'Overdue',
+          label: t('accountCard.status.overdue'),
           icon: '⚠️',
           color: theme.colors.status.error,
         };
@@ -55,6 +57,8 @@ export default function AccountCard({ account, onPress }: AccountCardProps) {
 
   const typeConfig = getAccountTypeConfig(account.accountType);
   const statusConfig = getStatusConfig(account.status);
+  // Nothing due means no Due Today prompt at all — not a "Due Today ₹0" row.
+  const hasDueToday = account.dueToday > 0;
 
   const styles = StyleSheet.create({
     container: {
@@ -159,7 +163,9 @@ export default function AccountCard({ account, onPress }: AccountCardProps) {
             <Text style={styles.accountNumber}>{account.accountNumber}</Text>
           </View>
 
-          <Text style={styles.dueTodayLabel}>Due Today</Text>
+          {hasDueToday && (
+            <Text style={styles.dueTodayLabel}>{t('accountCard.dueToday')}</Text>
+          )}
         </View>
 
         <View style={styles.amountSection}>
@@ -169,7 +175,9 @@ export default function AccountCard({ account, onPress }: AccountCardProps) {
           </View>
 
           <View style={styles.rightAmount}>
-            <Text style={styles.dueAmount}>₹{account.dueToday.toLocaleString('en-IN')}</Text>
+            {hasDueToday && (
+              <Text style={styles.dueAmount}>₹{account.dueToday.toLocaleString('en-IN')}</Text>
+            )}
             <View
               style={[
                 styles.statusBadge,

@@ -2,6 +2,7 @@ import { DarkTheme, DefaultTheme, ThemeProvider as NavigationThemeProvider } fro
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Provider as ReduxProvider } from 'react-redux';
 import { ThemeProvider, useTheme } from '@/theme';
+import { LanguageProvider } from '@/i18n';
 import store from '@/utils/store';
 import 'react-native-reanimated';
 
@@ -29,7 +30,9 @@ export default function Provider({ children }: Readonly<{ children: React.ReactN
     <GestureHandlerRootView style={{ flex: 1 }}>
       <ReduxProvider store={store}>
         <ThemeProvider>
-          <NavigationWrapper>{children}</NavigationWrapper>
+          <LanguageProvider>
+            <NavigationWrapper>{children}</NavigationWrapper>
+          </LanguageProvider>
         </ThemeProvider>
       </ReduxProvider>
     </GestureHandlerRootView>

@@ -2,6 +2,7 @@ import { View, Text, StyleSheet, ScrollView, Pressable, Image } from 'react-nati
 import { useState } from 'react';
 import { useRouter } from 'expo-router';
 import { useTheme, typography, spacing, radius } from '@/theme';
+import { useTranslation } from '@/i18n';
 import { useSettingsSlice } from '@/slices';
 import { useDispatch } from 'react-redux';
 import { setLoggedIn } from '@/slices/app.slice';
@@ -13,8 +14,10 @@ export default function Profile() {
   const router = useRouter();
   const dispatch = useDispatch<Dispatch>();
   const { theme, isDark, toggleTheme } = useTheme();
+  const { language, languages, setLanguage, t } = useTranslation();
   const { clearSession, persistSettings } = useSettingsSlice();
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [showLanguagePicker, setShowLanguagePicker] = useState(false);
 
   // Mock data - replace with actual data from Redux/API
   const agentProfile: AgentProfile = {
@@ -263,6 +266,10 @@ export default function Profile() {
     // TODO: Navigate to help screen or open support
   };
 
+  const handleSelectLanguage = () => {
+    setShowLanguagePicker(true);
+  };
+
   const handleLogout = () => {
     setShowLogoutConfirm(true);
   };
@@ -280,6 +287,9 @@ export default function Profile() {
     // Navigate to MPIN screen (not login, since MPIN is already set)
     router.replace('/(auth)/mpin');
   };
+
+  const activeLanguageName =
+    languages.find(option => option.code === language)?.nativeName || language;
 
   // Get initials from name
   const getInitials = (name: string) => {
@@ -340,7 +350,7 @@ export default function Profile() {
               <Text style={styles.iconBank}>🏛</Text>
             </View>
             <View style={styles.infoContent}>
-              <Text style={styles.infoLabel}>BRANCH</Text>
+              <Text style={styles.infoLabel}>{t('profile.branch')}</Text>
               <Text style={styles.infoValue}>
                 {agentProfile.branch}{' '}
                 <Text style={styles.infoValueSecondary}>({agentProfile.branchCode})</Text>
@@ -353,7 +363,7 @@ export default function Profile() {
               <Text style={styles.iconSync}>🔄</Text>
             </View>
             <View style={styles.infoContent}>
-              <Text style={styles.infoLabel}>LAST SYNCED</Text>
+              <Text style={styles.infoLabel}>{t('profile.lastSynced')}</Text>
               <Text style={styles.infoValue}>{agentProfile.lastSyncTime}</Text>
             </View>
             <View style={styles.syncCheckmark}>
@@ -366,10 +376,12 @@ export default function Profile() {
               <Text style={styles.iconApp}>📱</Text>
             </View>
             <View style={styles.infoContent}>
-              <Text style={styles.infoLabel}>APP VERSION</Text>
+              <Text style={styles.infoLabel}>{t('profile.appVersion')}</Text>
               <Text style={styles.infoValue}>
                 {agentProfile.appVersion}{' '}
-                <Text style={styles.infoValueSecondary}>Build {agentProfile.buildNumber}</Text>
+                <Text style={styles.infoValueSecondary}>
+                  {t('profile.build', { buildNumber: agentProfile.buildNumber })}
+                </Text>
               </Text>
             </View>
           </View>
@@ -381,9 +393,22 @@ export default function Profile() {
         >
           <View style={styles.themeButtonLeft}>
             <Text style={styles.themeIcon}>{isDark ? '🌙' : '☀️'}</Text>
-            <Text style={styles.themeText}>Appearance</Text>
+            <Text style={styles.themeText}>{t('profile.appearance')}</Text>
           </View>
-          <Text style={styles.themeModeLabel}>{isDark ? 'Dark' : 'Light'}</Text>
+          <Text style={styles.themeModeLabel}>
+            {isDark ? t('profile.themeDark') : t('profile.themeLight')}
+          </Text>
+        </Pressable>
+
+        <Pressable
+          onPress={handleSelectLanguage}
+          style={({ pressed }) => [styles.themeButton, { opacity: pressed ? 0.7 : 1 }]}
+        >
+          <View style={styles.themeButtonLeft}>
+            <Text style={styles.themeIcon}>🌐</Text>
+            <Text style={styles.themeText}>{t('language.label')}</Text>
+          </View>
+          <Text style={styles.themeModeLabel}>{activeLanguageName}</Text>
         </Pressable>
 
         <Pressable
@@ -391,7 +416,7 @@ export default function Profile() {
           style={({ pressed }) => [styles.helpButton, { opacity: pressed ? 0.7 : 1 }]}
         >
           <Text style={styles.helpIcon}>🎧</Text>
-          <Text style={styles.helpText}>Help & Support</Text>
+          <Text style={styles.helpText}>{t('profile.helpSupport')}</Text>
         </Pressable>
 
         <Pressable
@@ -399,18 +424,34 @@ export default function Profile() {
           style={({ pressed }) => [styles.logoutButton, { opacity: pressed ? 0.7 : 1 }]}
         >
           <Text style={styles.logoutIcon}>🚪</Text>
-          <Text style={styles.logoutText}>Log Out</Text>
+          <Text style={styles.logoutText}>{t('profile.logOut')}</Text>
         </Pressable>
       </ScrollView>
 
       <AlertBottomSheet
+        isOpen={showLanguagePicker}
+        onClose={() => setShowLanguagePicker(false)}
+        title={t('language.selectTitle')}
+        message={t('language.selectMessage')}
+        buttons={[
+          // Language names stay in their own script, so they are never run through t().
+          ...languages.map(option => ({
+            text: option.code === language ? `${option.nativeName} ✓` : option.nativeName,
+            style: 'default' as const,
+            onPress: () => setLanguage(option.code),
+          })),
+          { text: t('profile.cancel'), style: 'cancel' as const },
+        ]}
+      />
+
+      <AlertBottomSheet
         isOpen={showLogoutConfirm}
         onClose={() => setShowLogoutConfirm(false)}
-        title="Log Out"
-        message="Are you sure you want to log out? You can log back in using your MPIN."
+        title={t('profile.logOut')}
+        message={t('profile.logOutMessage')}
         buttons={[
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Log Out', style: 'destructive', onPress: confirmLogout },
+          { text: t('profile.cancel'), style: 'cancel' },
+          { text: t('profile.logOut'), style: 'destructive', onPress: confirmLogout },
         ]}
       />
     </View>

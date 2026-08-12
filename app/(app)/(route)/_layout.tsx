@@ -86,6 +86,12 @@ export default function RouteStack() {
           headerShown: false,
         }}
       />
+      <Stack.Screen
+        name="passbook/[id]"
+        options={{
+          headerShown: false,
+        }}
+      />
     </Stack>
   );
 }

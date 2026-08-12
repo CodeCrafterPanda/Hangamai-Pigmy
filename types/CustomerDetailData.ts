@@ -18,9 +18,9 @@ export interface CustomerAccount {
   id: string;
   accountType: AccountType;
   accountNumber: string;
-  label: string; // "Daily Collection" or "Monthly EMI"
-  amount: number;
-  dueToday: number;
+  label: string; // Display label for `amount`, e.g. "Account Balance"
+  amount: number; // Ledger-derived account balance
+  dueToday: number; // 0 when nothing is due today (already collected, or account not active)
   status: AccountStatus;
   progress?: number; // 0-100 for progress bar
 }

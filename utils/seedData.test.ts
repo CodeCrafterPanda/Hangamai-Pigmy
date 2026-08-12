@@ -6,7 +6,13 @@ import customers, { addCustomer, selectAllCustomers } from '@/slices/customers.s
 import accounts, { addAccount, selectAllAccounts } from '@/slices/accounts.slice';
 import settings, { selectAllRoutes, selectSession } from '@/slices/settings.slice';
 import delegations, { selectAllDelegations } from '@/slices/delegations.slice';
-import { seedDummyData, DEMO_BRANCH_ID } from './seedData';
+import {
+  DEMO_AGENT_ID,
+  DEMO_BRANCH_ID,
+  DEMO_ROUTE_SUPA,
+  DEMO_SCHEME_DAILY_ID,
+} from '@/data/seed';
+import { seedDummyData } from './seedData';
 
 jest.mock('@react-native-async-storage/async-storage', () =>
   require('@react-native-async-storage/async-storage/jest/async-storage-mock'),
@@ -70,8 +76,8 @@ describe('seedDummyData', () => {
     store.dispatch(
       addCustomer({
         branchId: DEMO_BRANCH_ID,
-        routeId: 'route-supa',
-        primaryAgentId: 'agent-demo-001',
+        routeId: DEMO_ROUTE_SUPA,
+        primaryAgentId: DEMO_AGENT_ID,
         fullName: 'Field Added Customer',
         phone: '9000000001',
         addressLine1: 'Added on the round',
@@ -90,7 +96,7 @@ describe('seedDummyData', () => {
     store.dispatch(
       addAccount({
         customerId: addedCustomer.id,
-        schemeId: 'scheme-pigmy-daily-1yr',
+        schemeId: DEMO_SCHEME_DAILY_ID,
         installmentAmount: 250,
         status: AccountStatus.ACTIVE,
       }),
