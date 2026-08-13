@@ -11,7 +11,8 @@
     "dev:doctor": "cross-env EXPO_NO_DOTENV=1 dotenvx run -f .env.dev -- npx expo-doctor",
     "dev:secret:push": "dotenvx run -f .env.dev -- eas secret:push --scope project --env-file .env.dev --force",
     "dev:secret:list": "dotenvx run -f .env.dev -- eas env:list",
-    "dev:build:mobile": "npm run dev:secret:push && cross-env EXPO_NO_DOTENV=1 dotenv -e .env.dev -- npx eas build --profile development",
+    "dev:build:mobile": "npm run dev:secret:push && cross-env EXPO_NO_DOTENV=1 dotenv -e .env.dev -- npx eas-cli build --profile development",
+    "build:apk": "cross-env EXPO_NO_DOTENV=1 dotenvx run -f .env.dev -- npx eas-cli build -p android --profile preview",
     "dev:build:web": "dotenvx run -f .env.dev -- npx expo export --platform web",
     "dev:serve:web": "dotenvx run -f .env.dev -- npx expo serve",
     "dev:deploy:web": "npm run dev:build:web && dotenvx run -f .env.dev -- eas deploy --environment development",
@@ -62,7 +63,10 @@
     "react-native-webview": "13.15.0",
     "react-native-worklets": "0.5.1",
     "react-redux": "^9.2.0",
-    "redux-logger": "^3.0.6"
+    "redux-logger": "^3.0.6",
+    "expo-print": "~15.0.8",
+    "expo-sharing": "~14.0.8",
+    "expo-file-system": "~19.0.23"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",

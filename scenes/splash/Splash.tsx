@@ -1,37 +1,39 @@
 import { View, Text, StyleSheet } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'expo-router';
-import { useTheme, typography, spacing, radius, screenGradient, withAlpha } from '@/theme';
+import { useTheme, images, typography, spacing, radius, screenGradient, withAlpha } from '@/theme';
 import { useTranslation } from '@/i18n';
+import Image from '@/components/elements/Image';
 import ProgressBar from '@/components/elements/ProgressBar';
+import { windowWidth } from '@/utils/deviceInfo';
 
 export default function Splash() {
   const router = useRouter();
   const { theme } = useTheme();
   const { t } = useTranslation();
   const [progress, setProgress] = useState(0);
+  const hasNavigated = useRef(false);
 
   useEffect(() => {
-    // Simulate loading progress
-    const interval = setInterval(() => {
-      setProgress(prev => {
-        if (prev >= 100) {
-          clearInterval(interval);
-          // Navigate directly to home (auth temporarily disabled)
-          setTimeout(() => {
-            router.replace('/(app)/(home)');
-          }, 500);
-          return 100;
-        }
+    if (hasNavigated.current) {
+      return;
+    }
 
-        return prev + 2;
-      });
-    }, 50);
+    if (progress < 100) {
+      const timeoutId = setTimeout(() => {
+        setProgress(current => Math.min(current + 4, 100));
+      }, 40);
+      return () => clearTimeout(timeoutId);
+    }
 
-    return () => clearInterval(interval);
-  }, [router]);
+    hasNavigated.current = true;
+    const timeoutId = setTimeout(() => {
+      router.replace('/(app)/(home)');
+    }, 300);
+    return () => clearTimeout(timeoutId);
+  }, [progress, router]);
 
   const loadingText =
     progress < 30
@@ -57,6 +59,12 @@ export default function Splash() {
       justifyContent: 'center',
       alignItems: 'center',
       paddingHorizontal: spacing(theme, 'screenPadding'),
+      gap: spacing(theme, 'lg'),
+    },
+    logo: {
+      width: Math.min(220, windowWidth * 0.56),
+      height: Math.min(220, windowWidth * 0.56),
+      backgroundColor: 'transparent',
     },
     logoCard: {
       backgroundColor: withAlpha(theme.colors.background.card, 0.85),
@@ -64,22 +72,10 @@ export default function Splash() {
       padding: spacing(theme, 'xl'),
       alignItems: 'center',
       gap: spacing(theme, 'lg'),
-      minWidth: 280,
+      width: '100%',
+      maxWidth: 360,
       borderWidth: 1,
       borderColor: withAlpha(theme.colors.brand.primary, 0.25),
-    },
-    iconContainer: {
-      width: 80,
-      height: 80,
-      borderRadius: 16,
-      backgroundColor: theme.colors.surfaceTint.primarySoft,
-      justifyContent: 'center',
-      alignItems: 'center',
-      marginBottom: spacing(theme, 'sm'),
-    },
-    icon: {
-      fontSize: 40,
-      color: theme.colors.brand.primary,
     },
     appName: {
       ...typography(theme, 'displayXL'),
@@ -153,14 +149,16 @@ export default function Splash() {
         colors={screenGradient(theme)}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
-        style={styles.gradient}
-      >
+        style={styles.gradient}>
         <View style={styles.centerContent}>
-          <View style={styles.logoCard}>
-            <View style={styles.iconContainer}>
-              <Text style={styles.icon}>🏛</Text>
-            </View>
+          <Image
+            source={images.logo}
+            contentFit="contain"
+            style={styles.logo}
+            accessibilityLabel={t('auth.appName')}
+          />
 
+          <View style={styles.logoCard}>
             <Text style={styles.appName}>{t('auth.appName')}</Text>
             <Text style={styles.tagline}>{t('auth.tagline')}</Text>
 

@@ -3,7 +3,7 @@
  */
 
 import React, { createContext, useCallback, useEffect, useMemo, useState, ReactNode } from 'react';
-import { DEFAULT_LANGUAGE, LANGUAGE_OPTIONS, translations } from './translations';
+import { DEFAULT_LANGUAGE, FALLBACK_LANGUAGE, LANGUAGE_OPTIONS, translations } from './translations';
 import { loadLanguage, saveLanguage } from './storage';
 import type {
   Language,
@@ -49,17 +49,17 @@ export function LanguageProvider({ children, initialLanguage }: LanguageProvider
   const [language, setLanguageState] = useState<Language>(initialLanguage ?? DEFAULT_LANGUAGE);
   const [isReady, setIsReady] = useState(false);
 
-  // Load persisted language on mount
+  // Restore a saved choice, otherwise keep the provider default (Marathi).
   useEffect(() => {
     loadLanguage().then(saved => {
       if (isRegisteredLanguage(saved)) {
         setLanguageState(saved);
-      } else if (initialLanguage) {
+      } else if (initialLanguage && isRegisteredLanguage(initialLanguage)) {
         setLanguageState(initialLanguage);
       }
       setIsReady(true);
     });
-  }, []);
+  }, [initialLanguage]);
 
   const setLanguage = useCallback((next: Language) => {
     setLanguageState(next);
@@ -71,7 +71,7 @@ export function LanguageProvider({ children, initialLanguage }: LanguageProvider
   const t = useCallback(
     (key: TranslationKey, params?: TranslationParams) => {
       const translated =
-        lookup(translations[language], key) ?? lookup(translations[DEFAULT_LANGUAGE], key) ?? key;
+        lookup(translations[language], key) ?? lookup(translations[FALLBACK_LANGUAGE], key) ?? key;
 
       return interpolate(translated, params);
     },

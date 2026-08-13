@@ -1,35 +1,38 @@
 import { ExpoConfig, ConfigContext } from 'expo/config';
 
 export default ({ config }: ConfigContext): ExpoConfig => {
-  const expoProjectId = process.env.EXPO_PROJECT_ID ?? '18adc0d0-eb1d-11e9-8009-d524ed5cc4a7';
+  const expoProjectId = process.env.EXPO_PROJECT_ID;
   const expoConfig: ExpoConfig = {
     ...config,
-    slug: process.env.EXPO_SLUG ?? 'react-native-boilerplate',
-    name: process.env.EXPO_NAME ?? 'Hangamai Pigmy',
+    slug: process.env.EXPO_SLUG ?? 'hangamai',
+    name: process.env.EXPO_NAME ?? 'Hangamai',
+    owner: process.env.EXPO_OWNER ?? 'siyushs-team',
     ios: {
       ...config.ios,
-      bundleIdentifier:
-        process.env.EXPO_IOS_BUNDLE_IDENTIFIER ?? 'com.watarumaeda.react-native-boilerplate',
+      bundleIdentifier: process.env.EXPO_IOS_BUNDLE_IDENTIFIER ?? config.ios?.bundleIdentifier,
     },
     android: {
       ...config.android,
-      package: process.env.EXPO_ANDROID_PACKAGE ?? 'com.watarumaeda.react_native_boilerplate',
+      package: process.env.EXPO_ANDROID_PACKAGE ?? config.android?.package,
     },
     web: {
       ...config.web,
       bundler: 'metro',
       output: 'static',
-      favicon: './assets/images/logo-sm.png',
+      favicon: './assets/images/playstore.png',
     },
-    updates: {
-      url: `https://u.expo.dev/${expoProjectId}`,
-    },
+    ...(expoProjectId
+      ? {
+          updates: {
+            url: `https://u.expo.dev/${expoProjectId}`,
+          },
+        }
+      : {}),
     extra: {
       ...config.extra,
-      eas: { projectId: expoProjectId },
+      ...(expoProjectId ? { eas: { projectId: expoProjectId } } : {}),
       env: process.env.ENV ?? 'development',
       apiUrl: process.env.API_URL ?? 'https://example.com',
-      // add more env variables here...
     },
     plugins: [
       'expo-router',
@@ -37,13 +40,12 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       [
         'expo-splash-screen',
         {
-          // Match emerald theme tokens (light / dark backgrounds)
-          backgroundColor: '#F5FAF7',
+          backgroundColor: '#FFFFFF',
           dark: {
-            backgroundColor: '#07120D',
+            backgroundColor: '#FFFFFF',
           },
-          image: './assets/images/logo-lg.png',
-          imageWidth: 200,
+          image: './assets/images/icon.png',
+          imageWidth: 180,
           resizeMode: 'contain',
         },
       ],

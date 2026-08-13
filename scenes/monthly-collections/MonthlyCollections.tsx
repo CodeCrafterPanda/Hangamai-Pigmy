@@ -4,8 +4,8 @@ import {
   StyleSheet,
   ScrollView,
   Pressable,
-  Share,
   Alert,
+  ActivityIndicator,
   type NativeSyntheticEvent,
   type NativeScrollEvent,
 } from 'react-native';
@@ -17,6 +17,7 @@ import type { State } from '@/utils/store';
 import { useTheme, typography, spacing, radius } from '@/theme';
 import { useTranslation, formatDate, formatNumber } from '@/i18n';
 import type { TranslationKey } from '@/i18n';
+import { Ionicons } from '@expo/vector-icons';
 import NestedScreenHeader from '@/components/elements/NestedScreenHeader';
 import BottomSheet from '@/components/elements/BottomSheet';
 import { selectCustomersByAgent } from '@/slices/customers.slice';
@@ -30,8 +31,14 @@ import {
 import { selectSettlementsByAgentAndMonth } from '@/slices/settlements.slice';
 import { selectMonthlyCollectionReport } from '@/slices/reports.slice';
 import { getCurrentBusinessDate } from '@/utils/businessLogic';
-import { buildMonthlyReportCsv, buildMonthlyReportFileName } from '@/utils/reportExport';
 import { navigateToSettlementDetail } from '@/utils/navigation';
+import {
+  generateMonthlyCollectionPdf,
+  previewPdf,
+  savePdf,
+  sharePdf,
+  type GeneratedPdf,
+} from '@/services/pdf';
 import { SettlementScope } from '@/types';
 
 /** Shared geometry so frozen + scrollable halves paint as one table */
@@ -71,10 +78,12 @@ export default function MonthlyCollections() {
   const { theme } = useTheme();
   const { t, language } = useTranslation();
   const { month } = useLocalSearchParams<{ month?: string }>();
-  const [activePicker, setActivePicker] = useState<'month' | 'route' | null>(null);
+  const [activePicker, setActivePicker] = useState<'month' | 'route' | 'pdfActions' | null>(null);
   const [selectedMonth, setSelectedMonth] = useState<Date | null>(null);
   const [routeFilter, setRouteFilter] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'collections' | 'settlements'>('collections');
+  const [isExportingPdf, setIsExportingPdf] = useState(false);
+  const [generatedPdf, setGeneratedPdf] = useState<GeneratedPdf | null>(null);
 
   // Get session
   const session = useSelector(selectSession);
@@ -707,6 +716,54 @@ export default function MonthlyCollections() {
       color: theme.colors.brand.primary,
       fontWeight: '700',
     },
+    pdfActions: {
+      paddingHorizontal: spacing(theme, 'lg'),
+      paddingBottom: spacing(theme, 'lg'),
+      gap: spacing(theme, 'md'),
+    },
+    pdfActionsTitle: {
+      ...typography(theme, 'sectionTitle'),
+      color: theme.colors.text.primary,
+      fontWeight: '700',
+      textAlign: 'center',
+    },
+    pdfActionsMessage: {
+      ...typography(theme, 'body'),
+      color: theme.colors.text.secondary,
+      textAlign: 'center',
+    },
+    pdfActionsRow: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      justifyContent: 'space-between',
+      gap: spacing(theme, 'xs'),
+    },
+    pdfActionButton: {
+      flex: 1,
+      alignItems: 'center',
+      gap: spacing(theme, 'xs'),
+      minHeight: theme.ux.touchTargetMin,
+    },
+    pdfActionIconWrap: {
+      width: 52,
+      height: 52,
+      borderRadius: 26,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: theme.colors.background.cardElevated,
+      borderWidth: 1,
+      borderColor: theme.colors.background.divider,
+    },
+    pdfActionIconWrapPrimary: {
+      backgroundColor: theme.colors.brand.primary,
+      borderColor: theme.colors.brand.primary,
+    },
+    pdfActionLabel: {
+      ...typography(theme, 'caption'),
+      color: theme.colors.text.secondary,
+      fontWeight: '600',
+      textAlign: 'center',
+    },
   });
 
   const handleMonthChange = (newMonth: Date) => {
@@ -720,20 +777,63 @@ export default function MonthlyCollections() {
   };
 
   /**
-   * Exports the report model that is on screen — the CSV recalculates nothing, so its
-   * totals cannot drift from the displayed ones. Works entirely from local state.
+   * Builds a PDF from the report model already on screen — no second projection.
    */
-  const handleExport = async () => {
+  const handleExportPdf = async () => {
+    if (isExportingPdf) {
+      return;
+    }
+
+    setIsExportingPdf(true);
     try {
-      await Share.share({
-        title: buildMonthlyReportFileName(report),
-        message: buildMonthlyReportCsv(report, t, {
+      const pdf = await generateMonthlyCollectionPdf({
+        report,
+        t,
+        language,
+        names: {
           agentName: agent?.name,
           routeName: selectedRouteName,
-        }),
+          branchName: branch?.name,
+        },
       });
+      setGeneratedPdf(pdf);
+      setActivePicker('pdfActions');
     } catch {
-      Alert.alert(t('monthlyCollections.exportFailedTitle'), t('monthlyCollections.exportFailed'));
+      Alert.alert(t('pdf.generateFailedTitle'), t('pdf.generateFailed'));
+    } finally {
+      setIsExportingPdf(false);
+    }
+  };
+
+  const handlePreviewPdf = async () => {
+    if (!generatedPdf) {
+      return;
+    }
+    await previewPdf(generatedPdf);
+  };
+
+  const handleSharePdf = async () => {
+    if (!generatedPdf) {
+      return;
+    }
+    try {
+      await sharePdf(generatedPdf, t('pdf.share'));
+    } catch {
+      Alert.alert(t('pdf.generateFailedTitle'), t('pdf.shareUnavailable'));
+    }
+  };
+
+  const handleSavePdf = async () => {
+    if (!generatedPdf) {
+      return;
+    }
+    try {
+      const result = await savePdf(generatedPdf);
+      if (result === 'saved') {
+        Alert.alert(t('pdf.saveSuccessTitle'), t('pdf.saveSuccess'));
+      }
+    } catch {
+      Alert.alert(t('pdf.generateFailedTitle'), t('pdf.saveFailed'));
     }
   };
 
@@ -812,13 +912,20 @@ export default function MonthlyCollections() {
 
           <View style={styles.actionButtons}>
             <Pressable
-              onPress={handleExport}
+              onPress={handleExportPdf}
+              disabled={isExportingPdf}
+              accessibilityRole="button"
+              accessibilityLabel={isExportingPdf ? t('pdf.generating') : t('pdf.exportPdf')}
               style={({ pressed }) => [
                 styles.iconButton,
                 styles.iconButtonPrimary,
-                { opacity: pressed ? 0.8 : 1 },
+                { opacity: isExportingPdf || pressed ? 0.8 : 1 },
               ]}>
-              <Text style={[styles.iconButtonIcon, styles.iconButtonIconPrimary]}>📤</Text>
+              {isExportingPdf ? (
+                <ActivityIndicator color="#FFFFFF" size="small" />
+              ) : (
+                <Text style={[styles.iconButtonIcon, styles.iconButtonIconPrimary]}>📄</Text>
+              )}
             </Pressable>
           </View>
         </View>
@@ -881,9 +988,7 @@ export default function MonthlyCollections() {
           {/* Real reconciliation outcome — never a fixed success state */}
           {report.isAuditSuccessful ? (
             <View style={styles.auditOkRow}>
-              <Text style={styles.auditOkText}>
-                {t('monthlyCollections.reconciled')}
-              </Text>
+              <Text style={styles.auditOkText}>{t('monthlyCollections.reconciled')}</Text>
             </View>
           ) : (
             <View style={styles.auditBanner}>
@@ -972,7 +1077,9 @@ export default function MonthlyCollections() {
                   <View>
                     <View style={styles.headerRowDates}>
                       <View style={styles.missedHeaderCell}>
-                        <Text style={styles.columnHeaderText}>{t('monthlyCollections.missed')}</Text>
+                        <Text style={styles.columnHeaderText}>
+                          {t('monthlyCollections.missed')}
+                        </Text>
                       </View>
                       {dayNumbers.map(day => (
                         <View key={day} style={styles.dayHeaderCell}>
@@ -1132,28 +1239,36 @@ export default function MonthlyCollections() {
             </Text>
 
             <View style={styles.settlementAmountRow}>
-              <Text style={styles.settlementAmountLabel}>{t('monthlyCollections.cashCollected')}</Text>
+              <Text style={styles.settlementAmountLabel}>
+                {t('monthlyCollections.cashCollected')}
+              </Text>
               <Text style={styles.settlementAmountValue}>
                 ₹{formatNumber(report.settlement.cashCollected)}
               </Text>
             </View>
 
             <View style={styles.settlementAmountRow}>
-              <Text style={styles.settlementAmountLabel}>{t('monthlyCollections.upiCollected')}</Text>
+              <Text style={styles.settlementAmountLabel}>
+                {t('monthlyCollections.upiCollected')}
+              </Text>
               <Text style={styles.settlementAmountValue}>
                 ₹{formatNumber(report.settlement.upiCollected)}
               </Text>
             </View>
 
             <View style={styles.settlementAmountRow}>
-              <Text style={styles.settlementAmountLabel}>{t('monthlyCollections.settledCash')}</Text>
+              <Text style={styles.settlementAmountLabel}>
+                {t('monthlyCollections.settledCash')}
+              </Text>
               <Text style={styles.settlementAmountValue}>
                 ₹{formatNumber(report.settlement.settledCash)}
               </Text>
             </View>
 
             <View style={styles.settlementAmountRow}>
-              <Text style={styles.settlementAmountLabel}>{t('monthlyCollections.unsettledCashInHand')}</Text>
+              <Text style={styles.settlementAmountLabel}>
+                {t('monthlyCollections.unsettledCashInHand')}
+              </Text>
               <Text style={styles.settlementAmountValueStrong}>
                 ₹{formatNumber(report.settlement.cashInHand)}
               </Text>
@@ -1226,7 +1341,68 @@ export default function MonthlyCollections() {
       )}
 
       <BottomSheet isOpen={activePicker !== null} onClose={() => setActivePicker(null)}>
-        {activePicker === 'route' ? (
+        {activePicker === 'pdfActions' ? (
+          <View style={styles.pdfActions}>
+            <Text style={styles.pdfActionsTitle}>{t('pdf.readyTitle')}</Text>
+            <Text style={styles.pdfActionsMessage}>{t('pdf.readyMessage')}</Text>
+            <View style={styles.pdfActionsRow}>
+              {(
+                [
+                  {
+                    key: 'preview',
+                    label: t('pdf.preview'),
+                    icon: 'eye-outline' as const,
+                    onPress: handlePreviewPdf,
+                    primary: true,
+                  },
+                  {
+                    key: 'share',
+                    label: t('pdf.share'),
+                    icon: 'share-outline' as const,
+                    onPress: handleSharePdf,
+                    primary: true,
+                  },
+                  {
+                    key: 'save',
+                    label: t('pdf.save'),
+                    icon: 'download-outline' as const,
+                    onPress: handleSavePdf,
+                    primary: false,
+                  },
+                  {
+                    key: 'cancel',
+                    label: t('common.cancel'),
+                    icon: 'close-outline' as const,
+                    onPress: () => setActivePicker(null),
+                    primary: false,
+                  },
+                ] as const
+              ).map(action => (
+                <Pressable
+                  key={action.key}
+                  onPress={action.onPress}
+                  accessibilityRole="button"
+                  accessibilityLabel={action.label}
+                  style={({ pressed }) => [styles.pdfActionButton, { opacity: pressed ? 0.7 : 1 }]}>
+                  <View
+                    style={[
+                      styles.pdfActionIconWrap,
+                      action.primary && styles.pdfActionIconWrapPrimary,
+                    ]}>
+                    <Ionicons
+                      name={action.icon}
+                      size={22}
+                      color={action.primary ? '#FFFFFF' : theme.colors.brand.primary}
+                    />
+                  </View>
+                  <Text style={styles.pdfActionLabel} numberOfLines={1}>
+                    {action.label}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          </View>
+        ) : activePicker === 'route' ? (
           <View style={styles.pickerContent}>
             <Text style={styles.pickerTitle}>{t('monthlyCollections.selectRoute')}</Text>
             <View style={styles.pickerOptionsList}>

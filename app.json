@@ -1,34 +1,40 @@
 {
   "expo": {
-    "name": "Hangamai Pigmy",
-    "slug": "react-native-boilerplate",
-    "scheme": "react-native-boilerplate",
+    "name": "Hangamai",
+    "slug": "hangamai",
+    "scheme": "hangamai",
     "version": "3.0.0",
-    "owner": "wataru",
+    "owner": "siyushs-team",
     "newArchEnabled": true,
-    "platforms": ["ios", "android", "web"],
+    "platforms": [
+      "ios",
+      "android",
+      "web"
+    ],
     "orientation": "portrait",
-    "icon": "./assets/images/logo-lg.png",
+    "icon": "./assets/images/icon.png",
     "userInterfaceStyle": "automatic",
     "splash": {
-      "backgroundColor": "#ffffff",
+      "backgroundColor": "#FFFFFF",
       "dark": {
-        "backgroundColor": "#101212"
+        "backgroundColor": "#FFFFFF"
       },
-      "image": "./assets/images/logo-lg.png",
+      "image": "./assets/images/icon.png",
       "resizeMode": "contain"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.siyushs.hangamai"
     },
     "android": {
+      "package": "com.siyushs.hangamai",
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/logo-sm.png",
+        "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       }
     },
     "web": {
-      "favicon": "./assets/images/logo-sm.png"
+      "favicon": "./assets/images/playstore.png"
     },
     "runtimeVersion": {
       "policy": "sdkVersion"

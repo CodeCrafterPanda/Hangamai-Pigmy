@@ -132,6 +132,7 @@ const en = {
     label: 'Language',
     selectTitle: 'Select Language',
     selectMessage: 'Static app text will be shown in the language you choose.',
+    switcherA11y: 'Change language',
   },
 
   kycType: {
@@ -196,6 +197,15 @@ const en = {
     upNext: 'Up Next',
     viewAll: 'View All',
     missingCollectContext: 'Customer or account data not found',
+    quickCollection: 'Quick Collection',
+    accountNumber: 'Account Number',
+    accountNumberPlaceholder: 'Account number',
+    collect: 'Collect',
+    enterAccountNumber: 'Enter an account number.',
+    accountNotFound: 'Account not found.',
+    alreadyCollectedTitle: 'Already collected',
+    alreadyCollectedMessage: 'Collection for this account is already completed for today.',
+    seeReceipt: 'See Receipt',
   },
 
   collectedTodayCard: {
@@ -289,7 +299,8 @@ const en = {
     selectDelegatedAgent: 'Select Delegated Agent',
     delegatedHint:
       'The customer stays owned by the primary agent and is delegated to the selected agent for collections.',
-    primaryHint: 'The selected agent will be responsible for daily pigmy collections from this customer.',
+    primaryHint:
+      'The selected agent will be responsible for daily pigmy collections from this customer.',
     kycCompliance: 'KYC Compliance',
     documentType: 'Document Type',
     selectDocumentType: 'Select Document Type',
@@ -475,7 +486,8 @@ const en = {
     dayClosed: 'Day Closed',
     closing: 'Closing...',
     submitDayClose: 'Submit Day Close',
-    alreadySettledWarning: '{{scope}} collections for this business date have already been settled.',
+    alreadySettledWarning:
+      '{{scope}} collections for this business date have already been settled.',
     verifyWarning: 'Verify all amounts before submitting. This action cannot be undone.',
     cashRequiredTitle: 'Cash in Hand Required',
     cashRequired: 'Enter the actual cash amount you are carrying.',
@@ -490,8 +502,7 @@ const en = {
     notSaved:
       'The day closure could not be written to this device, so it was not applied. Cash in hand is unchanged — please try again.',
     dayClosedTitle: 'Day Closed',
-    dayClosedMessage:
-      '{{scope}} settlement for {{date}} submitted. Cash handed over: ₹{{amount}}.',
+    dayClosedMessage: '{{scope}} settlement for {{date}} submitted. Cash handed over: ₹{{amount}}.',
     submitFailed: 'Failed to submit settlement',
     primaryBook: 'Primary',
     delegatedBook: 'Delegated',
@@ -541,8 +552,7 @@ const en = {
     routeFilter: 'Route: {{name}}',
     statusActive: 'Status: Active',
     unknownRoute: 'Unknown',
-    reconciled:
-      '✓ Reconciled — customer, day, Cash/UPI, ledger and settlement totals agree',
+    reconciled: '✓ Reconciled — customer, day, Cash/UPI, ledger and settlement totals agree',
     auditIssueOne: '{{count}} reconciliation issue',
     auditIssueOther: '{{count}} reconciliation issues',
     moreIssueOne: '{{count}} more issue in the exported report',
@@ -601,6 +611,25 @@ const en = {
     settlement: 'Settlement',
     notSettled: 'NOT SETTLED',
     monthTotal: 'MONTH',
+  },
+
+  pdf: {
+    exportPdf: 'Export PDF',
+    generating: 'Generating PDF…',
+    readyTitle: 'PDF ready',
+    readyMessage: 'The report has been generated. Preview, share, or save it.',
+    preview: 'Preview',
+    share: 'Share',
+    save: 'Save',
+    saveSuccessTitle: 'Saved',
+    saveSuccess: 'The PDF was saved to the folder you selected.',
+    shareUnavailable: 'Sharing is not available on this device.',
+    generateFailedTitle: 'Export Failed',
+    generateFailed: 'The PDF could not be generated.',
+    saveFailed: 'The PDF could not be saved.',
+    generatedOn: 'Generated on {{datetime}}',
+    totalRecords: 'Total records: {{count}}',
+    page: 'Page',
   },
 
   collectionsHistory: {
@@ -676,7 +705,7 @@ const en = {
     sendOtp: 'Send OTP',
     needHelp: 'Need help? Contact branch',
     securityFooter: 'SECURED • ENCRYPTED • OFFLINE',
-    appName: 'Pigmy Collection',
+    appName: 'Hangamai',
     tagline: 'Daily Deposit System',
     verifyingDevice: 'Verifying Device...',
     loadingData: 'Loading Data...',

@@ -123,6 +123,7 @@ const mr = {
     label: 'भाषा',
     selectTitle: 'भाषा निवडा',
     selectMessage: 'अॅपमधील स्थिर मजकूर तुम्ही निवडलेल्या भाषेत दिसेल.',
+    switcherA11y: 'भाषा बदला',
   },
 
   kycType: {
@@ -187,6 +188,15 @@ const mr = {
     upNext: 'पुढचे',
     viewAll: 'सर्व पहा',
     missingCollectContext: 'खातेदार किंवा खाते सापडले नाही',
+    quickCollection: 'जलद जमा',
+    accountNumber: 'खाते क्रमांक',
+    accountNumberPlaceholder: 'खाते क्रमांक',
+    collect: 'जमा करा',
+    enterAccountNumber: 'खाते क्रमांक लिहा.',
+    accountNotFound: 'खाते सापडले नाही.',
+    alreadyCollectedTitle: 'आधीच जमा झाले',
+    alreadyCollectedMessage: 'या खात्यासाठी आजची जमा आधीच पूर्ण झाली आहे.',
+    seeReceipt: 'पावती पहा',
   },
 
   collectedTodayCard: {
@@ -357,8 +367,7 @@ const mr = {
     updatedSuccess: 'खातेदार यशस्वीरित्या अपडेट झाला!',
     updateFailed: 'खातेदार अपडेट करता आला नाही',
     partialSave: 'अर्धवट सेव्ह',
-    partialAccount:
-      'खातेदार तपशील सेव्ह झाले, पण नवा खाते क्रमांक साठवता आला नाही. पुन्हा लिहा.',
+    partialAccount: 'खातेदार तपशील सेव्ह झाले, पण नवा खाते क्रमांक साठवता आला नाही. पुन्हा लिहा.',
     partialDelegation:
       'खातेदार तपशील सेव्ह झाले, पण नियुक्ती बदल साठवता आला नाही. प्रतिनिधी पुन्हा सेट करा.',
     validationTitle: 'तपासणी त्रुटी',
@@ -388,8 +397,7 @@ const mr = {
     enterName: 'कृपया मार्ग नाव लिहा',
     noBranch: 'सध्याच्या सेशनशी कोणतीही शाखा जोडलेली नाही',
     duplicateCode: 'मार्ग आधीच आहे',
-    duplicateCodeMessage:
-      '"{{name}}" आधीच वापरला आहे.\n\nवेगळा मार्ग असेल तर पुढे जाऊ शकता.',
+    duplicateCodeMessage: '"{{name}}" आधीच वापरला आहे.\n\nवेगळा मार्ग असेल तर पुढे जाऊ शकता.',
     cancelTitle: 'रद्द',
     cancelMessage: 'नक्की रद्द करायचे आहे का? सगळी माहिती पुसली जाईल.',
   },
@@ -591,6 +599,25 @@ const mr = {
     monthTotal: 'महिना',
   },
 
+  pdf: {
+    exportPdf: 'PDF एक्सपोर्ट',
+    generating: 'PDF तयार होत आहे…',
+    readyTitle: 'PDF तयार आहे',
+    readyMessage: 'रिपोर्ट तयार झाला. पूर्वावलोकन, शेअर किंवा सेव्ह करा.',
+    preview: 'पूर्वावलोकन',
+    share: 'शेअर',
+    save: 'सेव्ह',
+    saveSuccessTitle: 'सेव्ह झाले',
+    saveSuccess: 'तुम्ही निवडलेल्या फोल्डरमध्ये PDF सेव्ह झाला.',
+    shareUnavailable: 'या डिव्हाइसवर शेअर उपलब्ध नाही.',
+    generateFailedTitle: 'एक्सपोर्ट अयशस्वी',
+    generateFailed: 'PDF तयार करता आला नाही.',
+    saveFailed: 'PDF सेव्ह करता आला नाही.',
+    generatedOn: '{{datetime}} रोजी तयार',
+    totalRecords: 'एकूण नोंदी: {{count}}',
+    page: 'पृष्ठ',
+  },
+
   collectionsHistory: {
     title: 'व्यवहार',
     subtitle: 'दैनिक बचत जमा प्रणाली',
@@ -664,7 +691,7 @@ const mr = {
     sendOtp: 'OTP पाठवा',
     needHelp: 'मदत हवी आहे? शाखेशी संपर्क करा',
     securityFooter: 'सुरक्षित • एन्क्रिप्टेड • ऑफलाइन',
-    appName: 'दैनिक बचत जमा',
+    appName: 'हंगामाई',
     tagline: 'दैनिक जमा प्रणाली',
     verifyingDevice: 'डिव्हाइस तपासत आहे...',
     loadingData: 'डेटा लोड होत आहे...',

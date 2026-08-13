@@ -24,7 +24,7 @@ export async function saveLanguage(language: Language): Promise<void> {
  */
 export async function loadLanguage(): Promise<string | null> {
   try {
-    return 'mr';
+    return await AsyncStorage.getItem(LANGUAGE_STORAGE_KEY);
   } catch (error) {
     console.warn('Failed to load language:', error);
     return null;

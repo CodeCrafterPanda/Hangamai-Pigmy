@@ -16,6 +16,7 @@ export { default as EditCustomerHeader } from './EditCustomerHeader';
 export { default as HistoryHeader } from './HistoryHeader';
 export { default as SyncHeader } from './SyncHeader';
 export { default as NestedScreenHeader } from './NestedScreenHeader';
+export { default as LanguageSwitcher } from './LanguageSwitcher';
 export { default as CollectedTodayCard } from './CollectedTodayCard';
 export { default as StatCard } from './StatCard';
 export { default as AttentionBanner } from './AttentionBanner';

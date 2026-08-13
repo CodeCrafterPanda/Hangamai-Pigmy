@@ -37,6 +37,8 @@ const EMPTY_COLLECTIONS: Collection[] = [];
 
 interface CollectDepositProps {
   onClose?: () => void;
+  /** Called after a collection is committed, before the sheet closes. */
+  onCollected?: () => void;
   customer?: Customer;
   account?: Account;
   delegationId?: string;
@@ -50,6 +52,7 @@ interface CollectDepositProps {
 
 export default function CollectDeposit({
   onClose,
+  onCollected,
   customer: customerProp,
   account: accountProp,
   delegationId: delegationIdProp,
@@ -375,6 +378,7 @@ export default function CollectDeposit({
             // Clear state and close
             setAmount(0);
             setPaymentMode('cash');
+            onCollected?.();
             if (onClose) {
               onClose();
             }

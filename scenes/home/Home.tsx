@@ -1,5 +1,5 @@
-import { View, Text, StyleSheet, ScrollView, Pressable } from 'react-native';
-import { useState, useMemo } from 'react';
+import { View, Text, StyleSheet, ScrollView, Pressable, Alert, Keyboard } from 'react-native';
+import { useState, useMemo, useRef } from 'react';
 import { useRouter } from 'expo-router';
 import { useSelector } from 'react-redux';
 import type { State } from '@/utils/store';
@@ -11,6 +11,8 @@ import StatCard from '@/components/elements/StatCard';
 // import AttentionBanner from '@/components/elements/AttentionBanner';
 import CustomerCollectionCard from '@/components/elements/CustomerCollectionCard';
 import BottomSheet from '@/components/elements/BottomSheet';
+import Input from '@/components/elements/Input';
+import Button from '@/components/elements/Button';
 import CollectDeposit from '@/scenes/collect-deposit';
 import Receipt from '@/scenes/receipt';
 import {
@@ -36,9 +38,14 @@ export default function Home() {
   const { t } = useTranslation();
   const [isBottomSheetOpen, setIsBottomSheetOpen] = useState(false);
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
+  const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'primary' | 'delegated'>('primary');
   const [isReceiptOpen, setIsReceiptOpen] = useState(false);
   const [selectedCollectionId, setSelectedCollectionId] = useState<string | null>(null);
+  const [accountQuery, setAccountQuery] = useState('');
+  const isQuickCollectingRef = useRef(false);
+  const clearQueryOnReceiptCloseRef = useRef(false);
+  const clearQueryOnCollectCloseRef = useRef(false);
 
   // Get session and settings
   const session = useSelector(selectSession);
@@ -266,6 +273,27 @@ export default function Home() {
     tabTextActive: {
       color: '#FFFFFF',
     },
+    quickCollectSection: {
+      paddingHorizontal: spacing(theme, 'screenPadding'),
+      marginBottom: spacing(theme, 'md'),
+      gap: spacing(theme, 'xs'),
+    },
+    quickCollectTitle: {
+      ...typography(theme, 'body'),
+      color: theme.colors.text.secondary,
+      fontWeight: '700',
+    },
+    quickCollectRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing(theme, 'sm'),
+    },
+    quickCollectInput: {
+      flex: 1,
+    },
+    quickCollectButton: {
+      paddingHorizontal: spacing(theme, 'lg'),
+    },
     // attentionSection: {
     //   marginBottom: spacing(theme, 'md'),
     // },
@@ -310,31 +338,39 @@ export default function Home() {
   };
 
   const handleCollect = (customerId: string) => {
-    console.log('Collect pressed for customer:', customerId);
+    clearQueryOnCollectCloseRef.current = false;
     setSelectedCustomerId(customerId);
+    setSelectedAccountId(null);
     setIsBottomSheetOpen(true);
   };
 
   const handleCloseBottomSheet = () => {
     setIsBottomSheetOpen(false);
     setSelectedCustomerId(null);
+    setSelectedAccountId(null);
+    if (clearQueryOnCollectCloseRef.current) {
+      setAccountQuery('');
+      clearQueryOnCollectCloseRef.current = false;
+    }
+  };
+
+  const handleCollectionCompleted = () => {
+    setAccountQuery('');
   };
 
   const handleCollectAll = (customerId: string) => {
-    console.log('Collect All pressed for customer:', customerId);
+    clearQueryOnCollectCloseRef.current = false;
     setSelectedCustomerId(customerId);
+    setSelectedAccountId(null);
     setIsBottomSheetOpen(true);
   };
 
   const handleReceipt = (customerId: string) => {
-    console.log('Receipt pressed for customer:', customerId);
-
-    // Find the collection for this customer today
     const customer = activeCustomers.find(c => c.id === customerId);
     if (!customer) return;
 
     const customerAccounts = allAccounts.filter(
-      a => a.customerId === customerId && a.status === 'ACTIVE'
+      a => a.customerId === customerId && a.status === 'ACTIVE',
     );
     const firstAccount = customerAccounts[0];
 
@@ -343,13 +379,88 @@ export default function Home() {
         c =>
           c.customerId === customerId &&
           c.accountId === firstAccount.id &&
-          c.status !== 'REVERSED'
+          c.status !== 'REVERSED',
       );
 
       if (collection) {
         setSelectedCollectionId(collection.id);
         setIsReceiptOpen(true);
       }
+    }
+  };
+
+  const openExistingReceipt = (collectionId: string) => {
+    clearQueryOnReceiptCloseRef.current = true;
+    setSelectedCollectionId(collectionId);
+    setIsReceiptOpen(true);
+  };
+
+  const handleCloseReceipt = () => {
+    setIsReceiptOpen(false);
+    setSelectedCollectionId(null);
+    if (clearQueryOnReceiptCloseRef.current) {
+      setAccountQuery('');
+      clearQueryOnReceiptCloseRef.current = false;
+    }
+  };
+
+  const handleQuickCollect = () => {
+    if (isQuickCollectingRef.current || isBottomSheetOpen || isReceiptOpen) {
+      return;
+    }
+
+    isQuickCollectingRef.current = true;
+    Keyboard.dismiss();
+
+    try {
+      const query = accountQuery.trim();
+      if (!query) {
+        Alert.alert(t('common.error'), t('home.enterAccountNumber'));
+        return;
+      }
+
+      const account = allAccounts.find(
+        a =>
+          a.status === 'ACTIVE' &&
+          a.accountNumber.trim().toLowerCase() === query.toLowerCase(),
+      );
+      const customer = account
+        ? activeCustomers.find(c => c.id === account.customerId)
+        : undefined;
+
+      if (!account || !customer) {
+        Alert.alert(t('common.error'), t('home.accountNotFound'));
+        return;
+      }
+
+      const todayCollection = todayCollections.find(
+        c =>
+          c.customerId === customer.id &&
+          c.accountId === account.id &&
+          c.status !== 'REVERSED',
+      );
+
+      if (todayCollection) {
+        Alert.alert(t('home.alreadyCollectedTitle'), t('home.alreadyCollectedMessage'), [
+          {
+            text: t('common.cancel'),
+            style: 'cancel',
+            onPress: () => setAccountQuery(''),
+          },
+          {
+            text: t('home.seeReceipt'),
+            onPress: () => openExistingReceipt(todayCollection.id),
+          },
+        ]);
+        return;
+      }
+
+      clearQueryOnCollectCloseRef.current = true;
+      setSelectedCustomerId(customer.id);
+      setSelectedAccountId(account.id);
+      setIsBottomSheetOpen(true);
+    } finally {
+      isQuickCollectingRef.current = false;
     }
   };
 
@@ -370,17 +481,13 @@ export default function Home() {
         <CollectedTodayCard amount={dailyStats.collectedToday} />
 
         <View style={styles.statsRow}>
-          {/* Pending is narrower, In Hand and Online equal. It cannot go much below 0.9:
-              "PENDING" plus the icon, gap and card padding needs ~105dp, which is close to an
-              even third of the row on a normal phone. */}
-          <StatCard type="pending" value={dailyStats.pendingCount} flex={0.9} />
+          <StatCard type="pending" value={dailyStats.pendingCount} />
           <StatCard
             type="inHand"
             value={dailyStats.inHandAmount}
-            flex={1}
             onPress={() => navigateToSettlement(activeScope)}
           />
-          <StatCard type="online" value={dailyStats.onlineAmount} flex={1} />
+          <StatCard type="online" value={dailyStats.onlineAmount} />
         </View>
 
         <View style={styles.tabsContainer}>
@@ -411,6 +518,32 @@ export default function Home() {
           </Pressable>
         </View>
 
+        <View style={styles.quickCollectSection}>
+          <Text style={styles.quickCollectTitle}>{t('home.quickCollection')}</Text>
+          <View style={styles.quickCollectRow}>
+            <View style={styles.quickCollectInput}>
+              <Input
+                placeholder={t('home.accountNumberPlaceholder')}
+                value={accountQuery}
+                onChangeText={setAccountQuery}
+                keyboardType="number-pad"
+                returnKeyType="done"
+                blurOnSubmit
+                autoCapitalize="none"
+                autoCorrect={false}
+                onSubmitEditing={handleQuickCollect}
+                accessibilityLabel={t('home.accountNumber')}
+              />
+            </View>
+            <Button
+              title={t('home.collect')}
+              onPress={handleQuickCollect}
+              disabled={isBottomSheetOpen || isReceiptOpen}
+              style={styles.quickCollectButton}
+            />
+          </View>
+        </View>
+
         {/* Restored later: Attention banner (overdue customers + pending sync).
         <View style={styles.attentionSection}>
           <AttentionBanner alert={attentionAlert} onPress={handleAttentionPress} />
@@ -419,12 +552,13 @@ export default function Home() {
       </View>
 
       <View style={styles.upNextSection}>
+        {/* Restored later: Up Next header (view all).
         <View style={styles.upNextHeader}>
           <Text style={styles.upNextTitle}>{t('home.upNext')}</Text>
           <Pressable onPress={handleViewAll}>
             <Text style={styles.viewAllButton}>{t('home.viewAll')}</Text>
           </Pressable>
-        </View>
+        </View> */}
 
         <ScrollView style={styles.upNextViewport} contentContainerStyle={styles.customerList}>
           {upNextCustomers.map((customer) => (
@@ -445,22 +579,17 @@ export default function Home() {
           const customerAccounts = allAccounts.filter(
             a => a.customerId === selectedCustomerId && a.status === 'ACTIVE'
           );
-          const account = customerAccounts[0];
+          const account = selectedAccountId
+            ? customerAccounts.find(a => a.id === selectedAccountId) ?? customerAccounts[0]
+            : customerAccounts[0];
 
           // Find delegation if this is a delegated customer
           const delegation = myDelegations.find(d => d.customerId === selectedCustomerId);
 
-          console.log('[Home] Rendering CollectDeposit for:', {
-            customerId: selectedCustomerId,
-            customerFound: !!customer,
-            accountFound: !!account,
-            customerName: customer?.fullName,
-            accountNumber: account?.accountNumber,
-          });
-
           return customer && account ? (
             <CollectDeposit
               onClose={handleCloseBottomSheet}
+              onCollected={handleCollectionCompleted}
               customer={customer}
               account={account}
               delegationId={delegation?.id}
@@ -475,12 +604,9 @@ export default function Home() {
         })()}
       </BottomSheet>
 
-      <BottomSheet isOpen={isReceiptOpen} onClose={() => setIsReceiptOpen(false)}>
+      <BottomSheet isOpen={isReceiptOpen} onClose={handleCloseReceipt}>
         {selectedCollectionId && (
-          <Receipt
-            collectionId={selectedCollectionId}
-            onClose={() => setIsReceiptOpen(false)}
-          />
+          <Receipt collectionId={selectedCollectionId} onClose={handleCloseReceipt} />
         )}
       </BottomSheet>
     </View>

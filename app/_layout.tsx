@@ -6,7 +6,7 @@ import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { hasCompletedSeed, initializeStorage, markSeedCompleted } from '@/utils/storage';
 import { seedDummyData } from '@/utils/seedData';
-import { useDispatch, useSelector, useStore } from 'react-redux';
+import { useDispatch, useStore } from 'react-redux';
 import type { State, Dispatch } from '@/utils/store';
 import { setInitStatus, setLoggedIn } from '@/slices/app.slice';
 import {
@@ -20,7 +20,6 @@ import {
   hydrateSyncQueue,
   hydrateAuditLogs,
 } from '@/slices';
-import { selectSession } from '@/slices/settings.slice';
 import Provider from '@/providers';
 import { useTheme } from '@/theme';
 
@@ -31,7 +30,6 @@ function Router() {
   const { isDark } = useTheme();
   const dispatch = useDispatch<Dispatch>();
   const store = useStore<State>();
-  const session = useSelector(selectSession);
 
   /**
    * Initialize app: Load assets and hydrate data stores

@@ -1,6 +1,5 @@
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { StackActions } from '@react-navigation/native';
 import type { NavigationProp, ParamListBase, RouteProp } from '@react-navigation/native';
 import { useTheme } from '@/theme';
 import { useTranslation } from '@/i18n';
@@ -16,20 +15,23 @@ interface TabListenerProps {
  *
  * Each tab owns a Stack, and a tab switch alone does not unwind it, so a section would
  * otherwise reopen on whatever nested screen was last visited (Settlement under History,
- * Customer Detail under Route). Popping the target section's stack on tab press is scoped
- * to root-navigator selection only: pushes and back gestures inside a section are
- * untouched, because no tab press is involved in them.
+ * Customer Detail under Route). Jump to that stack's `index` from the tab navigator
+ * itself — do not dispatch POP_TO_TOP at a nested stack key. Tab state can still list
+ * nested routes after the native stack has already remounted at the root, which makes
+ * POP_TO_TOP unhandled ("Is there any screen to go back to?").
  */
 function resetSectionOnTabPress({ navigation, route }: TabListenerProps) {
   return {
     tabPress: () => {
       const section = navigation.getState().routes.find(r => r.key === route.key);
       const stack = section?.state;
+      const currentName = stack?.routes?.[stack.index ?? 0]?.name;
 
-      if (stack?.type !== 'stack' || !stack.key) return;
-      if ((stack.index ?? 0) === 0) return;
+      if (stack?.type !== 'stack' || !currentName || currentName === 'index') {
+        return;
+      }
 
-      navigation.dispatch({ ...StackActions.popToTop(), target: stack.key });
+      navigation.navigate(route.name, { screen: 'index' });
     },
   };
 }

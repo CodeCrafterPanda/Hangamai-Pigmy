@@ -15,8 +15,7 @@ export default function ProfileHeader({ profile }: ProfileHeaderProps) {
     container: {
       flexDirection: 'row',
       alignItems: 'center',
-      justifyContent: 'space-between',
-      paddingHorizontal: spacing(theme, 'screenPadding'),
+      justifyContent: 'flex-start',
       paddingTop: spacing(theme, 'xs'),
       paddingBottom: spacing(theme, 'xs'),
     },
@@ -53,6 +52,7 @@ export default function ProfileHeader({ profile }: ProfileHeaderProps) {
     },
     userInfo: {
       gap: spacing(theme, 'xxs'),
+      flexShrink: 1,
     },
     userName: {
       ...typography(theme, 'sectionTitle'),
@@ -91,8 +91,12 @@ export default function ProfileHeader({ profile }: ProfileHeaderProps) {
     <View style={styles.container}>
       <View style={styles.leftSection}>
         <View style={styles.userInfo}>
-          <Text style={styles.userName}>{profile.name}</Text>
-          <Text style={styles.branch}>{profile.branch}</Text>
+          <Text style={styles.userName} numberOfLines={1}>
+            {profile.name}
+          </Text>
+          <Text style={styles.branch} numberOfLines={1}>
+            {profile.branch}
+          </Text>
         </View>
       </View>
 

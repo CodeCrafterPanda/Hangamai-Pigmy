@@ -29,6 +29,8 @@ export interface LanguageOption {
   code: Language;
   /** Language name written in its own script — display data, never translated. */
   nativeName: string;
+  /** Compact header label, e.g. EN / मरा. */
+  shortLabel: string;
 }
 
 export interface LanguageContextValue {

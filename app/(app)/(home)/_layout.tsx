@@ -1,6 +1,7 @@
 import { Stack } from 'expo-router';
 import { useSelector } from 'react-redux';
 import ProfileHeader from '@/components/elements/ProfileHeader';
+import LanguageSwitcher from '@/components/elements/LanguageSwitcher';
 import type { UserProfile } from '@/types/HomeData';
 import { useTheme } from '@/theme';
 import { useTranslation } from '@/i18n';
@@ -36,7 +37,9 @@ export default function HomeStack() {
         name="index"
         options={{
           headerShown: true,
+          headerTitleAlign: 'left',
           headerTitle: () => <ProfileHeader profile={userProfile} />,
+          headerRight: () => <LanguageSwitcher />,
         }}
       />
       <Stack.Screen

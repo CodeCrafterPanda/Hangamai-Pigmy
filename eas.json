@@ -28,6 +28,22 @@
         "gradleCommand": ":app:assembleDebug"
       }
     },
+    "preview": {
+      "extends": "base",
+      "channel": "preview",
+      "environment": "development",
+      "distribution": "internal",
+      "env": {
+        "EXPO_NAME": "Hangamai",
+        "EXPO_SLUG": "hangamai",
+        "EXPO_OWNER": "siyushs-team",
+        "EXPO_IOS_BUNDLE_IDENTIFIER": "com.siyushs.hangamai",
+        "EXPO_ANDROID_PACKAGE": "com.siyushs.hangamai"
+      },
+      "android": {
+        "buildType": "apk"
+      }
+    },
     "production": {
       "extends": "base",
       "channel": "production",

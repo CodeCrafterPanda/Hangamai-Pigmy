@@ -30,7 +30,7 @@ export default function Provider({ children }: Readonly<{ children: React.ReactN
     <GestureHandlerRootView style={{ flex: 1 }}>
       <ReduxProvider store={store}>
         <ThemeProvider>
-          <LanguageProvider>
+          <LanguageProvider initialLanguage="mr">
             <NavigationWrapper>{children}</NavigationWrapper>
           </LanguageProvider>
         </ThemeProvider>

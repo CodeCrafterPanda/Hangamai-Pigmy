@@ -54,7 +54,8 @@ export default function StatCard({ type, value, onPress, flex = 1 }: StatCardPro
       minWidth: 0,
       backgroundColor: theme.colors.background.card,
       borderRadius: radius(theme, 'card'),
-      padding: spacing(theme, 'sm'),
+      paddingVertical: spacing(theme, 'sm'),
+      paddingHorizontal: spacing(theme, 'xs'),
       gap: spacing(theme, 'xs'),
       borderWidth: 1,
       borderColor: theme.colors.background.divider,
@@ -66,10 +67,11 @@ export default function StatCard({ type, value, onPress, flex = 1 }: StatCardPro
       flexDirection: 'row',
       alignItems: 'center',
       gap: spacing(theme, 'xxs'),
+      minWidth: 0,
     },
     iconContainer: {
-      width: 28,
-      height: 28,
+      width: 24,
+      height: 24,
       flexShrink: 0,
       borderRadius: 8,
       backgroundColor: currentConfig.iconBg,
@@ -77,7 +79,7 @@ export default function StatCard({ type, value, onPress, flex = 1 }: StatCardPro
       alignItems: 'center',
     },
     iconText: {
-      fontSize: 14,
+      fontSize: 12,
     },
     label: {
       ...typography(theme, 'body'),
@@ -86,6 +88,7 @@ export default function StatCard({ type, value, onPress, flex = 1 }: StatCardPro
       fontSize: 16,
       lineHeight: 20,
       flexShrink: 1,
+      minWidth: 0,
     },
     value: {
       ...typography(theme, 'displayXL'),
@@ -106,7 +109,11 @@ export default function StatCard({ type, value, onPress, flex = 1 }: StatCardPro
         <View style={styles.iconContainer}>
           <Text style={styles.iconText}>{currentConfig.icon}</Text>
         </View>
-        <Text style={styles.label} numberOfLines={1}>
+        <Text
+          style={styles.label}
+          numberOfLines={1}
+          adjustsFontSizeToFit
+          minimumFontScale={0.75}>
           {currentConfig.label}
         </Text>
       </View>
