@@ -5,6 +5,7 @@ import { useRouter } from 'expo-router';
 import { useSelector } from 'react-redux';
 import type { State } from '@/utils/store';
 import { useTheme, typography, spacing } from '@/theme';
+import { useTranslation, formatDate } from '@/i18n';
 import InfoBanner from '@/components/elements/InfoBanner';
 import DelegatedCustomerCard from '@/components/elements/DelegatedCustomerCard';
 import { selectSession, selectAllAgents } from '@/slices/settings.slice';
@@ -16,6 +17,7 @@ import type { DelegatedCustomer, DelegationInfo } from '@/types/DelegatedData';
 export default function DelegatedCustomers() {
   const router = useRouter();
   const { theme } = useTheme();
+  const { t, language } = useTranslation();
   const [showBanner, setShowBanner] = useState(true);
 
   const session = useSelector(selectSession);
@@ -48,7 +50,7 @@ export default function DelegatedCustomers() {
 
       const primaryAgent = allAgents.find(a => a.id === delegation.primaryAgentId);
       const endDate = new Date(delegation.endAt);
-      const validTill = endDate.toLocaleDateString('en-US', {
+      const validTill = formatDate(endDate, language, {
         month: 'short',
         day: 'numeric',
       });
@@ -70,12 +72,12 @@ export default function DelegatedCustomers() {
     }
 
     return results;
-  }, [myDelegations, allCustomersData, allAccounts, allAgents]);
+  }, [myDelegations, allCustomersData, allAccounts, allAgents, language]);
 
   const delegationInfo: DelegationInfo = {
     showBanner: true,
-    title: 'Temporary Assignment',
-    message: 'These customers are temporarily assigned to you for collection today.',
+    title: t('delegatedCustomers.temporaryAssignment'),
+    message: t('delegatedCustomers.bannerBody'),
   };
 
   const styles = StyleSheet.create({
@@ -177,7 +179,7 @@ export default function DelegatedCustomers() {
         <Pressable onPress={handleBack} style={styles.backButton}>
           <Text style={styles.backIcon}>←</Text>
         </Pressable>
-        <Text style={styles.title}>Delegated Customers</Text>
+        <Text style={styles.title}>{t('delegatedCustomers.title')}</Text>
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
@@ -201,7 +203,7 @@ export default function DelegatedCustomers() {
           ) : (
             <View style={styles.emptyState}>
               <Text style={styles.emptyIcon}>📋</Text>
-              <Text style={styles.emptyText}>No delegated customers at the moment</Text>
+              <Text style={styles.emptyText}>{t('delegatedCustomers.empty')}</Text>
             </View>
           )}
         </View>

@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router';
 import { useSelector } from 'react-redux';
 import type { State } from '@/utils/store';
 import { useTheme, typography, spacing, radius } from '@/theme';
+import { useTranslation } from '@/i18n';
 import RouteCard from '@/components/elements/RouteCard';
 import FloatingActionButton from '@/components/elements/FloatingActionButton';
 import { selectRoutesByBranch, selectSession, selectBranchTimezone } from '@/slices/settings.slice';
@@ -15,6 +16,7 @@ import type { Route } from '@/types/RouteData';
 export default function Routes() {
   const router = useRouter();
   const { theme } = useTheme();
+  const { t } = useTranslation();
   const [searchQuery, setSearchQuery] = useState('');
 
   // Get session and settings
@@ -170,8 +172,8 @@ export default function Routes() {
               <Text style={styles.emptyIcon}>🔍</Text>
               <Text style={styles.emptyText}>
                 {searchQuery
-                  ? `No routes found matching "${searchQuery}"`
-                  : 'No routes available. Tap + to add a route.'}
+                  ? t('routes.emptySearch', { query: searchQuery })
+                  : t('routes.empty')}
               </Text>
             </View>
           )}

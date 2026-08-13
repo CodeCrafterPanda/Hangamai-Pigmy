@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react';
 import { shallowEqual, useSelector } from 'react-redux';
 import type { State } from '@/utils/store';
 import { useTheme, typography, spacing, radius } from '@/theme';
-import { useTranslation } from '@/i18n';
+import { useTranslation, formatNumber } from '@/i18n';
 import NestedScreenHeader from '@/components/elements/NestedScreenHeader';
 import BottomSheet from '@/components/elements/BottomSheet';
 import Receipt from '@/scenes/receipt';
@@ -132,7 +132,6 @@ export default function Passbook({ accountId }: PassbookProps) {
     balanceHint: {
       ...typography(theme, 'caption'),
       color: theme.colors.text.muted,
-      fontSize: 11,
     },
     customerName: {
       ...typography(theme, 'sectionTitle'),
@@ -190,8 +189,10 @@ export default function Passbook({ accountId }: PassbookProps) {
       borderRadius: radius(theme, 'card'),
       borderWidth: 1,
       borderColor: theme.colors.background.divider,
+      borderLeftWidth: 4,
       padding: spacing(theme, 'md'),
       gap: spacing(theme, 'xs'),
+      overflow: 'hidden',
     },
     entryTopRow: {
       flexDirection: 'row',
@@ -227,7 +228,6 @@ export default function Passbook({ accountId }: PassbookProps) {
     entryMeta: {
       ...typography(theme, 'caption'),
       color: theme.colors.text.muted,
-      fontSize: 11,
       flexShrink: 1,
     },
     entryBalance: {
@@ -263,7 +263,7 @@ export default function Passbook({ accountId }: PassbookProps) {
   });
 
   const formatAmount = (amount: number) =>
-    `₹ ${amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
+    `₹ ${formatNumber(amount, { minimumFractionDigits: 2 })}`;
 
   if (!account) {
     return (
@@ -358,7 +358,7 @@ export default function Passbook({ accountId }: PassbookProps) {
                 const hasReceipt = Boolean(row.entry.collectionId);
 
                 const content = (
-                  <View style={styles.entryCard}>
+                  <View style={[styles.entryCard, { borderLeftColor: typeColor }]}>
                     <View style={styles.entryTopRow}>
                       <View style={[styles.typeBadge, { borderColor: typeColor }]}>
                         <Text style={[styles.typeBadgeText, { color: typeColor }]}>

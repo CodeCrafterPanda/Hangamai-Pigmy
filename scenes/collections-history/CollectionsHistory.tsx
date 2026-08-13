@@ -3,6 +3,8 @@ import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useSelector } from 'react-redux';
 import { useTheme, typography, spacing, radius } from '@/theme';
+import { useTranslation, formatDate, formatTime } from '@/i18n';
+import type { TranslationKey } from '@/i18n';
 import BottomSheet from '@/components/elements/BottomSheet';
 import Receipt from '@/scenes/receipt';
 import { selectAllCollections } from '@/slices/collections.slice';
@@ -11,7 +13,7 @@ import { selectSession, selectBranchTimezone } from '@/slices/settings.slice';
 import { getCurrentBusinessDate } from '@/utils/businessLogic';
 
 /** Day cell width, shared by the strip styles and its opening scroll offset. */
-const DAY_BUTTON_WIDTH = 56;
+const DAY_BUTTON_WIDTH = 72;
 
 /**
  * History root — today's summary and navigation into Monthly Collections.
@@ -20,6 +22,7 @@ const DAY_BUTTON_WIDTH = 56;
 export default function CollectionsHistory() {
   const router = useRouter();
   const { theme } = useTheme();
+  const { t, language } = useTranslation();
   // Day-of-month within the current business month; null follows the current business day.
   const [pickedDay, setPickedDay] = useState<number | null>(null);
   const [activeFilter, setActiveFilter] = useState<'all' | 'synced' | 'pending'>('all');
@@ -148,19 +151,24 @@ export default function CollectionsHistory() {
       padding: spacing(theme, 'md'),
       borderWidth: 1,
       borderColor: theme.colors.background.divider,
+      borderLeftWidth: 4,
+      borderLeftColor: theme.colors.brand.primary,
+      overflow: 'hidden',
     },
     todayCard: {
       backgroundColor: theme.colors.brand.primary,
       borderColor: theme.colors.brand.primary,
+      borderLeftColor: '#FFFFFF',
     },
     cardIcon: {
       fontSize: 16,
       marginBottom: spacing(theme, 'xxs'),
     },
     cardLabel: {
-      ...typography(theme, 'caption'),
-      fontWeight: '600',
-      fontSize: 11,
+      ...typography(theme, 'body'),
+      fontWeight: '700',
+      fontSize: 16,
+      lineHeight: 20,
       marginBottom: spacing(theme, 'xs'),
     },
     todayCardLabel: {
@@ -182,9 +190,10 @@ export default function CollectionsHistory() {
       color: theme.colors.text.primary,
     },
     cardPercentage: {
-      ...typography(theme, 'caption'),
-      fontWeight: '600',
-      fontSize: 11,
+      ...typography(theme, 'body'),
+      fontWeight: '700',
+      fontSize: 16,
+      lineHeight: 20,
     },
     todayCardPercentage: {
       color: 'rgba(255, 255, 255, 0.7)',
@@ -226,9 +235,10 @@ export default function CollectionsHistory() {
       borderColor: theme.colors.brand.primary,
     },
     dayName: {
-      ...typography(theme, 'caption'),
-      fontSize: 10,
-      fontWeight: '600',
+      ...typography(theme, 'body'),
+      fontSize: 16,
+      lineHeight: 20,
+      fontWeight: '700',
       textTransform: 'uppercase',
     },
     dayNameActive: {
@@ -263,8 +273,11 @@ export default function CollectionsHistory() {
       fontWeight: '700',
     },
     transactionsCount: {
-      ...typography(theme, 'caption'),
+      ...typography(theme, 'body'),
       color: theme.colors.text.muted,
+      fontWeight: '700',
+      fontSize: 16,
+      lineHeight: 20,
     },
     filtersContainer: {
       flexDirection: 'row',
@@ -273,7 +286,7 @@ export default function CollectionsHistory() {
     },
     filterButton: {
       paddingHorizontal: spacing(theme, 'md'),
-      paddingVertical: spacing(theme, 'xs'),
+      paddingVertical: spacing(theme, 'sm'),
       borderRadius: radius(theme, 'button'),
       backgroundColor: theme.colors.background.cardElevated,
       borderWidth: 1,
@@ -284,9 +297,10 @@ export default function CollectionsHistory() {
       borderColor: theme.colors.brand.primary,
     },
     filterText: {
-      ...typography(theme, 'caption'),
-      fontSize: 12,
-      fontWeight: '600',
+      ...typography(theme, 'body'),
+      fontSize: 16,
+      lineHeight: 20,
+      fontWeight: '700',
     },
     filterTextActive: {
       color: theme.colors.brand.primary,
@@ -323,7 +337,6 @@ export default function CollectionsHistory() {
     transactionMeta: {
       ...typography(theme, 'caption'),
       color: theme.colors.text.muted,
-      fontSize: 11,
     },
     transactionRight: {
       alignItems: 'flex-end',
@@ -339,7 +352,6 @@ export default function CollectionsHistory() {
     },
     modeText: {
       ...typography(theme, 'caption'),
-      fontSize: 9,
       fontWeight: '700',
       letterSpacing: 0.5,
     },
@@ -360,7 +372,6 @@ export default function CollectionsHistory() {
     },
     statusText: {
       ...typography(theme, 'caption'),
-      fontSize: 10,
       fontWeight: '600',
     },
     emptyState: {
@@ -381,7 +392,7 @@ export default function CollectionsHistory() {
 
   const getDayName = (day: number) => {
     const date = new Date(currentYear, currentMonth, day);
-    return date.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase().substring(0, 3);
+    return formatDate(date, language, { weekday: 'short' }).toUpperCase();
   };
 
   const formatAmount = (amount: number) => {
@@ -412,7 +423,9 @@ export default function CollectionsHistory() {
     router.push(`/(app)/(history)/monthly-collections?month=${encodeURIComponent(month)}`);
   };
 
-  const currentMonthLabel = businessMonthDate.toLocaleDateString('en-US', { month: 'long' });
+  const currentMonthLabel = formatDate(businessMonthDate, language, {
+    month: 'long',
+  });
 
   return (
     <View style={styles.container}>
@@ -420,7 +433,9 @@ export default function CollectionsHistory() {
         <View style={styles.cardsRow}>
           <View style={[styles.card, styles.todayCard]}>
             <Text style={[styles.cardIcon]}>📅</Text>
-            <Text style={[styles.cardLabel, styles.todayCardLabel]}>Today's History</Text>
+            <Text style={[styles.cardLabel, styles.todayCardLabel]}>
+              {t('collectionsHistory.todaysHistory')}
+            </Text>
             <Text style={[styles.cardAmount, styles.todayCardAmount]}>
               {formatAmount(todayAmount)}
             </Text>
@@ -444,7 +459,10 @@ export default function CollectionsHistory() {
         <View style={styles.calendarSection}>
           <View style={styles.calendarHeader}>
             <Text style={styles.monthText}>
-              {businessMonthDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+              {formatDate(businessMonthDate, language, {
+                month: 'long',
+                year: 'numeric',
+              })}
             </Text>
           </View>
 
@@ -497,10 +515,10 @@ export default function CollectionsHistory() {
         <View style={styles.transactionsSection}>
           <View style={styles.transactionsHeader}>
             <View>
-              <Text style={styles.transactionsTitle}>Transactions</Text>
+              <Text style={styles.transactionsTitle}>{t('collectionsHistory.transactions')}</Text>
               <Text style={styles.transactionsCount}>
                 ({filteredCollections.length}{' '}
-                {new Date(`${selectedBusinessDate}T00:00:00`).toLocaleDateString('en-US', {
+                {formatDate(new Date(`${selectedBusinessDate}T00:00:00`), language, {
                   month: 'short',
                   day: 'numeric',
                 })}
@@ -520,7 +538,7 @@ export default function CollectionsHistory() {
                   activeFilter === 'all' ? styles.filterTextActive : styles.filterTextInactive,
                 ]}
               >
-                All
+                {t('collectionsHistory.all')}
               </Text>
             </Pressable>
 
@@ -534,7 +552,7 @@ export default function CollectionsHistory() {
                   activeFilter === 'synced' ? styles.filterTextActive : styles.filterTextInactive,
                 ]}
               >
-                Synced
+                {t('collectionsHistory.synced')}
               </Text>
             </Pressable>
 
@@ -548,7 +566,7 @@ export default function CollectionsHistory() {
                   activeFilter === 'pending' ? styles.filterTextActive : styles.filterTextInactive,
                 ]}
               >
-                Pending
+                {t('collectionsHistory.pending')}
               </Text>
             </Pressable>
           </View>
@@ -557,21 +575,18 @@ export default function CollectionsHistory() {
             {filteredCollections.length > 0 ? (
               filteredCollections.map(collection => {
                 const customer = allCustomers.find(c => c.id === collection.customerId);
-                const collectionTime = new Date(collection.collectedAt).toLocaleTimeString(
-                  'en-US',
-                  {
-                    hour: '2-digit',
-                    minute: '2-digit',
-                    hour12: true,
-                  }
-                );
+                const collectionTime = formatTime(new Date(collection.collectedAt), language, {
+                  hour: '2-digit',
+                  minute: '2-digit',
+                  hour12: true,
+                });
 
                 const statusConfig =
                   collection.status === 'SYNCED'
-                    ? { color: theme.colors.status.success, label: 'Success' }
+                    ? { color: theme.colors.status.success, label: t('collectionStatus.SYNCED') }
                     : collection.status === 'FAILED'
-                      ? { color: theme.colors.status.error, label: 'Failed' }
-                      : { color: '#D4834D', label: 'Syncing' };
+                      ? { color: theme.colors.status.error, label: t('collectionStatus.FAILED') }
+                      : { color: '#D4834D', label: t('collectionStatus.CREATED') };
 
                 const isCash = collection.mode === 'CASH';
                 const modeColor = isCash
@@ -589,14 +604,17 @@ export default function CollectionsHistory() {
                   >
                     <View style={styles.transactionInfo}>
                       <Text style={styles.customerName}>
-                        {customer?.fullName || 'Unknown Customer'}
+                        {customer?.fullName || t('common.unknownCustomer')}
                       </Text>
                       <Text style={styles.transactionMeta}>
-                        Ac: {collection.accountId.slice(-4)} • {collectionTime}
+                        {t('collectionsHistory.accountShort', {
+                          number: collection.accountId.slice(-4),
+                          time: collectionTime,
+                        })}
                       </Text>
                       <View style={[styles.modeBadge, { borderColor: modeColor }]}>
                         <Text style={[styles.modeText, { color: modeColor }]}>
-                          {isCash ? 'CASH' : 'UPI'}
+                          {t(`collectionMode.${collection.mode}` as TranslationKey)}
                         </Text>
                       </View>
                     </View>
@@ -610,7 +628,7 @@ export default function CollectionsHistory() {
                         </Text>
                       </View>
                       <Text style={[styles.statusText, { color: theme.colors.brand.primary }]}>
-                        RECEIPT ›
+                        {t('collectionsHistory.receipt')}
                       </Text>
                     </View>
                   </Pressable>
@@ -619,7 +637,7 @@ export default function CollectionsHistory() {
             ) : (
               <View style={styles.emptyState}>
                 <Text style={styles.emptyIcon}>📭</Text>
-                <Text style={styles.emptyText}>No transactions on this date</Text>
+                <Text style={styles.emptyText}>{t('collectionsHistory.empty')}</Text>
               </View>
             )}
           </View>

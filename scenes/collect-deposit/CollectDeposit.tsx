@@ -4,6 +4,8 @@ import { useRouter } from 'expo-router';
 import { useDispatch, useSelector } from 'react-redux';
 import type { State, Dispatch } from '@/utils/store';
 import { useTheme, typography, spacing, radius } from '@/theme';
+import { useTranslation } from '@/i18n';
+import type { TranslationKey } from '@/i18n';
 import AmountSelector from '@/components/elements/AmountSelector';
 import PaymentModeSelector from '@/components/elements/PaymentModeSelector';
 import {
@@ -56,6 +58,7 @@ export default function CollectDeposit({
   const router = useRouter();
   const dispatch = useDispatch<Dispatch>();
   const { theme } = useTheme();
+  const { t } = useTranslation();
   const [amount, setAmount] = useState(0);
   const [paymentMode, setPaymentMode] = useState<PaymentMode>('cash');
 
@@ -310,12 +313,12 @@ export default function CollectDeposit({
 
     try {
       if (amount <= 0) {
-        Alert.alert('Invalid Amount', 'Please enter an amount greater than 0');
+        Alert.alert(t('collection.invalidAmountTitle'), t('collection.invalidAmount'));
         return;
       }
 
       if (!customer || !account || !depositData) {
-        Alert.alert('Error', 'Customer or account data missing');
+        Alert.alert(t('common.error'), t('collection.missingData'));
         return;
       }
 
@@ -333,8 +336,10 @@ export default function CollectDeposit({
 
         if (!eligibility.isEligible) {
           Alert.alert(
-            'Not Eligible',
-            eligibility.reason || 'This delegation is not eligible for collection',
+            t('collection.notEligible'),
+            eligibility.reasonCode
+              ? t(`collection.eligibility.${eligibility.reasonCode}` as TranslationKey, eligibility.reasonParams)
+              : eligibility.reason || t('collection.notEligibleFallback'),
           );
           return;
         }
@@ -359,13 +364,13 @@ export default function CollectDeposit({
       );
 
       if (commitCollection.rejected.match(result)) {
-        Alert.alert('Error', 'Collection could not be saved. Please try again.');
+        Alert.alert(t('common.error'), t('collection.saveFailed'));
         return;
       }
 
-      Alert.alert('Success', `₹${amount} collected successfully!`, [
+      Alert.alert(t('common.success'), t('collection.collectedSuccess', { amount }), [
         {
-          text: 'OK',
+          text: t('common.ok'),
           onPress: () => {
             // Clear state and close
             setAmount(0);
@@ -378,7 +383,7 @@ export default function CollectDeposit({
       ]);
     } catch (error) {
       console.error('Collection error:', error);
-      Alert.alert('Error', 'Failed to process collection');
+      Alert.alert(t('common.error'), t('collection.processFailed'));
     } finally {
       isSubmittingRef.current = false;
     }
@@ -413,10 +418,8 @@ export default function CollectDeposit({
       <View style={styles.container}>
         <View style={styles.emptyState}>
           <Text style={styles.emptyIcon}>💵</Text>
-          <Text style={styles.emptyText}>Account not found</Text>
-          <Text style={styles.emptyHint}>
-            This account may have been removed or the link is invalid.
-          </Text>
+          <Text style={styles.emptyText}>{t('collection.accountNotFound')}</Text>
+          <Text style={styles.emptyHint}>{t('collection.accountNotFoundHint')}</Text>
         </View>
       </View>
     );
@@ -460,7 +463,9 @@ export default function CollectDeposit({
 
           <View style={styles.customerInfo}>
             <Text style={styles.customerName}>{depositData.customer.name}</Text>
-            <Text style={styles.accountNumber}>A/C: {depositData.customer.accountNumber}</Text>
+            <Text style={styles.accountNumber}>
+              {t('collection.accountPrefix', { number: depositData.customer.accountNumber })}
+            </Text>
           </View>
         </View>
         <View style={styles.amountSection}>
@@ -486,7 +491,9 @@ export default function CollectDeposit({
               ]}
             >
               <Text style={[styles.buttonIcon, styles.collectButtonIcon]}>✓</Text>
-              <Text style={[styles.buttonText, styles.collectButtonText]}>Collect</Text>
+              <Text style={[styles.buttonText, styles.collectButtonText]}>
+                {t('collection.collect')}
+              </Text>
             </Pressable>
 
             <Pressable
@@ -498,7 +505,9 @@ export default function CollectDeposit({
               ]}
             >
               <Text style={[styles.buttonIcon, styles.cancelButtonIcon]}>✕</Text>
-              <Text style={[styles.buttonText, styles.cancelButtonText]}>Cancel</Text>
+              <Text style={[styles.buttonText, styles.cancelButtonText]}>
+                {t('collection.cancel')}
+              </Text>
             </Pressable>
           </View>
         </View>

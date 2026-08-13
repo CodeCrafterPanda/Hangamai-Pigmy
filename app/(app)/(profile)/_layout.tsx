@@ -1,9 +1,11 @@
 import { Stack } from 'expo-router';
 import { useTheme } from '@/theme';
+import { useTranslation } from '@/i18n';
 import SyncHeader from '@/components/elements/SyncHeader';
 
 export default function ProfileStack() {
   const { theme } = useTheme();
+  const { t } = useTranslation();
 
   return (
     <Stack
@@ -29,14 +31,14 @@ export default function ProfileStack() {
       <Stack.Screen
         name="help"
         options={{
-          title: 'Help & Support',
+          title: t('help.title'),
           headerShown: true,
         }}
       />
       <Stack.Screen
         name="about"
         options={{
-          title: 'About',
+          title: t('about.title'),
           headerShown: true,
         }}
       />

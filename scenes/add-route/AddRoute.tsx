@@ -13,6 +13,7 @@ import { useRouter } from 'expo-router';
 import { useDispatch, useSelector } from 'react-redux';
 import type { Dispatch, State } from '@/utils/store';
 import { useTheme, typography, spacing, radius } from '@/theme';
+import { useTranslation } from '@/i18n';
 import {
   addRoute,
   persistSettings,
@@ -27,6 +28,7 @@ export default function AddRoute() {
   const router = useRouter();
   const dispatch = useDispatch<Dispatch>();
   const { theme } = useTheme();
+  const { t } = useTranslation();
   const session = useSelector(selectSession);
   const branchRoutes = useSelector((state: State) =>
     selectRoutesByBranch(state, session.branchId || ''),
@@ -34,8 +36,6 @@ export default function AddRoute() {
 
   const [name, setName] = useState('');
   const [isSaving, setIsSaving] = useState(false);
-
-  const derivedRouteCode = generateRouteCode(name);
 
   const styles = StyleSheet.create({
     container: {
@@ -95,26 +95,6 @@ export default function AddRoute() {
       paddingHorizontal: spacing(theme, 'md'),
       paddingVertical: spacing(theme, 'md'),
     },
-    readOnlyField: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: spacing(theme, 'xs'),
-      backgroundColor: theme.colors.background.cardElevated,
-      borderRadius: radius(theme, 'input'),
-      borderWidth: 1,
-      borderColor: theme.colors.background.divider,
-      paddingHorizontal: spacing(theme, 'md'),
-      height: 48,
-    },
-    readOnlyIcon: {
-      fontSize: 14,
-      color: theme.colors.text.muted,
-    },
-    readOnlyText: {
-      ...typography(theme, 'body'),
-      color: theme.colors.text.muted,
-      flex: 1,
-    },
     actionButtons: {
       paddingHorizontal: spacing(theme, 'screenPadding'),
       flexDirection: 'row',
@@ -171,7 +151,7 @@ export default function AddRoute() {
       await dispatch(persistSettings()).unwrap();
       router.replace(`/(app)/(route)/route-customers/${newRoute.id}`);
     } catch {
-      Alert.alert('Error', 'Failed to add route');
+      Alert.alert(t('common.error'), t('addRoute.addFailed'));
     } finally {
       setIsSaving(false);
     }
@@ -181,11 +161,11 @@ export default function AddRoute() {
     const trimmedName = name.trim();
 
     if (!trimmedName) {
-      Alert.alert('Validation Error', 'Please enter a route name');
+      Alert.alert(t('addRoute.validationTitle'), t('addRoute.enterName'));
       return;
     }
     if (!session.branchId) {
-      Alert.alert('Validation Error', 'No branch is associated with the current session');
+      Alert.alert(t('addRoute.validationTitle'), t('addRoute.noBranch'));
       return;
     }
 
@@ -197,12 +177,14 @@ export default function AddRoute() {
 
     if (existingRoute) {
       Alert.alert(
-        'Duplicate Route Code',
-        `"${existingRoute.name}" already uses the code ${routeCode}.\n\nYou can continue anyway if this is a different route.`,
+        t('addRoute.duplicateCode'),
+        t('addRoute.duplicateCodeMessage', {
+          name: existingRoute.name,
+        }),
         [
-          { text: 'Cancel', style: 'cancel' },
+          { text: t('common.cancel'), style: 'cancel' },
           {
-            text: 'Continue Anyway',
+            text: t('common.continueAnyway'),
             onPress: () => {
               void saveRoute(branchId);
             },
@@ -216,10 +198,10 @@ export default function AddRoute() {
   };
 
   const handleCancel = () => {
-    Alert.alert('Cancel', 'Are you sure you want to cancel? All data will be lost.', [
-      { text: 'Continue Editing', style: 'cancel' },
+    Alert.alert(t('addRoute.cancelTitle'), t('addRoute.cancelMessage'), [
+      { text: t('common.continueEditing'), style: 'cancel' },
       {
-        text: 'Discard',
+        text: t('common.discard'),
         style: 'destructive',
         onPress: () => router.back(),
       },
@@ -232,33 +214,23 @@ export default function AddRoute() {
         <Pressable onPress={() => router.back()} style={styles.backButton}>
           <Text style={styles.backIcon}>←</Text>
         </Pressable>
-        <Text style={styles.title}>Add New Route</Text>
+        <Text style={styles.title}>{t('addRoute.title')}</Text>
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         <View style={styles.section}>
           <View style={styles.field}>
             <Text style={styles.label}>
-              Route Name <Text style={styles.required}>*</Text>
+              {t('addRoute.routeName')} <Text style={styles.required}>*</Text>
             </Text>
             <TextInput
               style={styles.input}
-              placeholder="e.g. Market Road Route"
+              placeholder={t('addRoute.routeNamePlaceholder')}
               placeholderTextColor={theme.colors.text.muted}
               value={name}
               onChangeText={setName}
               editable={!isSaving}
             />
-          </View>
-
-          <View style={styles.field}>
-            <Text style={styles.label}>Route Code</Text>
-            <View style={styles.readOnlyField}>
-              <Text style={styles.readOnlyIcon}>🔒</Text>
-              <Text style={styles.readOnlyText}>
-                {derivedRouteCode || 'Generated from the route name'}
-              </Text>
-            </View>
           </View>
         </View>
 
@@ -268,7 +240,7 @@ export default function AddRoute() {
             disabled={isSaving}
             style={({ pressed }) => [styles.cancelButton, { opacity: pressed || isSaving ? 0.7 : 1 }]}
           >
-            <Text style={styles.cancelButtonText}>Cancel</Text>
+            <Text style={styles.cancelButtonText}>{t('addRoute.cancel')}</Text>
           </Pressable>
 
           <Pressable
@@ -276,7 +248,9 @@ export default function AddRoute() {
             disabled={isSaving}
             style={({ pressed }) => [styles.saveButton, { opacity: pressed || isSaving ? 0.8 : 1 }]}
           >
-            <Text style={styles.saveButtonText}>{isSaving ? 'Saving...' : 'Save Route'}</Text>
+            <Text style={styles.saveButtonText}>
+              {isSaving ? t('addRoute.saving') : t('addRoute.saveRoute')}
+            </Text>
           </Pressable>
         </View>
       </ScrollView>

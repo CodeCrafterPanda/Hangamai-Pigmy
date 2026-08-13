@@ -56,13 +56,12 @@ export default function InfoCard({ variant, label, value, showIndicator = false 
       gap: spacing(theme, 'xxs'),
     },
     label: {
-      ...typography(theme, 'micro'),
+      ...typography(theme, 'caption'),
       color: theme.colors.text.muted,
       fontWeight: '700',
       textTransform: 'uppercase',
       letterSpacing: 0.5,
       textAlign: 'center',
-      fontSize: 10,
     },
     indicator: {
       position: 'absolute',

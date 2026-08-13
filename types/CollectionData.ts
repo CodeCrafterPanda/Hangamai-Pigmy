@@ -19,7 +19,6 @@ export interface CustomerCollection {
 
 export interface RouteDetailsHeader {
   routeName: string;
-  routeNumber: string;
   totalStops: number;
   isOnline: boolean;
 }

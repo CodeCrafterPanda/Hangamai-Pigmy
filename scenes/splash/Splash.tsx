@@ -4,13 +4,14 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'expo-router';
 import { useTheme, typography, spacing, radius, screenGradient, withAlpha } from '@/theme';
+import { useTranslation } from '@/i18n';
 import ProgressBar from '@/components/elements/ProgressBar';
 
 export default function Splash() {
   const router = useRouter();
   const { theme } = useTheme();
+  const { t } = useTranslation();
   const [progress, setProgress] = useState(0);
-  const [loadingText, setLoadingText] = useState('Verifying Device...');
 
   useEffect(() => {
     // Simulate loading progress
@@ -25,23 +26,21 @@ export default function Splash() {
           return 100;
         }
 
-        // Update loading text based on progress
-        if (prev < 30) {
-          setLoadingText('Verifying Device...');
-        } else if (prev < 60) {
-          setLoadingText('Loading Data...');
-        } else if (prev < 90) {
-          setLoadingText('Syncing...');
-        } else {
-          setLoadingText('Almost Ready...');
-        }
-
         return prev + 2;
       });
     }, 50);
 
     return () => clearInterval(interval);
   }, [router]);
+
+  const loadingText =
+    progress < 30
+      ? t('auth.verifyingDevice')
+      : progress < 60
+        ? t('auth.loadingData')
+        : progress < 90
+          ? t('auth.syncing')
+          : t('auth.almostReady');
 
   const styles = StyleSheet.create({
     container: {
@@ -162,8 +161,8 @@ export default function Splash() {
               <Text style={styles.icon}>🏛</Text>
             </View>
 
-            <Text style={styles.appName}>Pigmy Collection</Text>
-            <Text style={styles.tagline}>Daily Deposit System</Text>
+            <Text style={styles.appName}>{t('auth.appName')}</Text>
+            <Text style={styles.tagline}>{t('auth.tagline')}</Text>
 
             <View style={styles.loadingSection}>
               <View style={styles.loadingTextRow}>
@@ -178,9 +177,11 @@ export default function Splash() {
         <View style={styles.bottomSection}>
           <View style={styles.securityBadge}>
             <Text style={styles.securityIcon}>🔒</Text>
-            <Text style={styles.securityText}>SECURED CO-OPERATIVE APP</Text>
+            <Text style={styles.securityText}>{t('auth.securedApp')}</Text>
           </View>
-          <Text style={styles.versionText}>v2.8.1 [build 402]</Text>
+          <Text style={styles.versionText}>
+            {t('auth.version', { version: '2.8.1', build: '402' })}
+          </Text>
         </View>
       </LinearGradient>
     </SafeAreaView>

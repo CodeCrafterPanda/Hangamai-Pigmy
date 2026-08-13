@@ -43,6 +43,15 @@ const initialState: CustomersState = {
   lastCustomerNumber: 0,
 };
 
+/**
+ * Customer creation payload.
+ * `customerCode` is optional: when omitted the sequential CUST-NNNN code is generated, when
+ * supplied the caller's number is used as-is (seed data and any future manual override).
+ */
+export type AddCustomerPayload = Omit<Customer, 'id' | 'customerCode' | 'createdAt' | 'updatedAt'> & {
+  customerCode?: string;
+};
+
 // ===========================
 // ASYNC THUNKS
 // ===========================
@@ -119,19 +128,23 @@ const slice = createSlice({
     /**
      * Add a new customer
      */
-    addCustomer: (
-      state,
-      { payload }: PayloadAction<Omit<Customer, 'id' | 'customerCode' | 'createdAt' | 'updatedAt'>>,
-    ) => {
+    addCustomer: (state, { payload }: PayloadAction<AddCustomerPayload>) => {
+      const { customerCode: manualCustomerCode, ...customerData } = payload;
       const id = generateUUID();
       const now = new Date().toISOString();
 
-      // Generate customer code
-      state.lastCustomerNumber += 1;
-      const customerCode = generateCustomerCode(state.lastCustomerNumber);
+      const trimmedManualCode = manualCustomerCode?.trim();
+      let customerCode: string;
+
+      if (trimmedManualCode) {
+        customerCode = trimmedManualCode;
+      } else {
+        state.lastCustomerNumber += 1;
+        customerCode = generateCustomerCode(state.lastCustomerNumber);
+      }
 
       const customer: Customer = {
-        ...payload,
+        ...customerData,
         id,
         customerCode,
         createdAt: now,

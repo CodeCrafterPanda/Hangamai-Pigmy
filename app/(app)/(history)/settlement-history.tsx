@@ -6,6 +6,8 @@ import { View, Text, StyleSheet, ScrollView, Pressable } from 'react-native';
 import { useSelector } from 'react-redux';
 import type { State } from '@/utils/store';
 import { useTheme, typography, spacing, radius } from '@/theme';
+import { useTranslation, formatDateTime, formatNumber } from '@/i18n';
+import type { TranslationKey } from '@/i18n';
 import { selectSettlementsByAgent } from '@/slices/settlements.slice';
 import { selectSession } from '@/slices/settings.slice';
 import { navigateToSettlementDetail } from '@/utils/navigation';
@@ -13,6 +15,7 @@ import { SettlementScope } from '@/types';
 
 export default function SettlementHistory() {
   const { theme } = useTheme();
+  const { t, language } = useTranslation();
 
   const session = useSelector(selectSession);
   const agentId = session.agentId || 'demo-agent';
@@ -66,7 +69,6 @@ export default function SettlementHistory() {
     },
     statusText: {
       ...typography(theme, 'caption'),
-      fontSize: 10,
       fontWeight: '700',
       letterSpacing: 0.5,
     },
@@ -91,7 +93,6 @@ export default function SettlementHistory() {
     meta: {
       ...typography(theme, 'caption'),
       color: theme.colors.text.muted,
-      fontSize: 11,
     },
     notes: {
       ...typography(theme, 'caption'),
@@ -141,39 +142,41 @@ export default function SettlementHistory() {
                   <View style={styles.badgeRow}>
                     <View style={[styles.statusBadge, { backgroundColor: `${scopeColor}26` }]}>
                       <Text style={[styles.statusText, { color: scopeColor }]}>
-                        {settlement.scope}
+                        {t(`settlementScope.${settlement.scope}` as TranslationKey)}
                       </Text>
                     </View>
                     <View style={[styles.statusBadge, { backgroundColor: `${color}26` }]}>
-                      <Text style={[styles.statusText, { color }]}>{settlement.status}</Text>
+                      <Text style={[styles.statusText, { color }]}>
+                        {t(`settlementStatus.${settlement.status}` as TranslationKey)}
+                      </Text>
                     </View>
                   </View>
                 </View>
 
                 <View style={styles.row}>
-                  <Text style={styles.label}>Cash</Text>
-                  <Text style={styles.value}>₹{settlement.cashTotal.toLocaleString('en-IN')}</Text>
+                  <Text style={styles.label}>{t('settlementHistory.cash')}</Text>
+                  <Text style={styles.value}>₹{formatNumber(settlement.cashTotal)}</Text>
                 </View>
 
                 <View style={styles.row}>
-                  <Text style={styles.label}>UPI</Text>
-                  <Text style={styles.value}>₹{settlement.upiTotal.toLocaleString('en-IN')}</Text>
+                  <Text style={styles.label}>{t('settlementHistory.upi')}</Text>
+                  <Text style={styles.value}>₹{formatNumber(settlement.upiTotal)}</Text>
                 </View>
 
                 <View style={styles.row}>
-                  <Text style={styles.label}>Total Collection</Text>
+                  <Text style={styles.label}>{t('settlementHistory.totalCollection')}</Text>
                   <Text style={styles.value}>
-                    ₹{settlement.totalCollection.toLocaleString('en-IN')}
+                    ₹{formatNumber(settlement.totalCollection)}
                   </Text>
                 </View>
 
                 <View style={styles.row}>
-                  <Text style={styles.label}>Declared Cash in Hand</Text>
-                  <Text style={styles.value}>₹{settlement.cashInHand.toLocaleString('en-IN')}</Text>
+                  <Text style={styles.label}>{t('settlementHistory.declaredCashInHand')}</Text>
+                  <Text style={styles.value}>₹{formatNumber(settlement.cashInHand)}</Text>
                 </View>
 
                 <View style={styles.row}>
-                  <Text style={styles.label}>Variance</Text>
+                  <Text style={styles.label}>{t('settlementHistory.variance')}</Text>
                   <Text
                     style={[
                       styles.varianceValue,
@@ -185,14 +188,14 @@ export default function SettlementHistory() {
                       },
                     ]}
                   >
-                    ₹{settlement.variance.toLocaleString('en-IN')}
+                    ₹{formatNumber(settlement.variance)}
                   </Text>
                 </View>
 
                 {!!settlement.notes && <Text style={styles.notes}>{settlement.notes}</Text>}
 
                 <Text style={styles.meta}>
-                  {settlement.id.slice(0, 8)} • {new Date(submittedAt).toLocaleString('en-IN')}
+                  {settlement.id.slice(0, 8)} • {formatDateTime(new Date(submittedAt), language)}
                 </Text>
               </Pressable>
             );
@@ -200,7 +203,7 @@ export default function SettlementHistory() {
         ) : (
           <View style={styles.emptyState}>
             <Text style={styles.emptyIcon}>🔒</Text>
-            <Text style={styles.emptyText}>No day closures yet</Text>
+            <Text style={styles.emptyText}>{t('settlementHistory.empty')}</Text>
           </View>
         )}
       </ScrollView>

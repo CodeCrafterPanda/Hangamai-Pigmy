@@ -24,7 +24,7 @@ export default function Profile() {
     id: 'AGT-001',
     name: 'Rajesh Kumar',
     agentId: 'AGT-8821',
-    role: 'Senior Field Agent',
+    role: t('profile.roleSeniorFieldAgent'),
     avatarUrl: undefined,
     isOnline: true,
     branch: 'Main St. Branch',
@@ -87,24 +87,6 @@ export default function Profile() {
       color: theme.colors.text.primary,
       fontWeight: '700',
       textAlign: 'center',
-    },
-    agentIdBadge: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: spacing(theme, 'xs'),
-      paddingHorizontal: spacing(theme, 'md'),
-      paddingVertical: spacing(theme, 'xs'),
-      backgroundColor: theme.colors.brand.primary,
-      borderRadius: radius(theme, 'chip') + 8,
-    },
-    badgeIcon: {
-      fontSize: 16,
-      color: '#FFFFFF',
-    },
-    agentIdText: {
-      ...typography(theme, 'body'),
-      color: '#FFFFFF',
-      fontWeight: '700',
     },
     roleText: {
       ...typography(theme, 'body'),
@@ -336,11 +318,6 @@ export default function Profile() {
 
           <Text style={styles.agentName}>{agentProfile.name}</Text>
 
-          <View style={styles.agentIdBadge}>
-            <Text style={styles.badgeIcon}>🆔</Text>
-            <Text style={styles.agentIdText}>{agentProfile.agentId}</Text>
-          </View>
-
           <Text style={styles.roleText}>{agentProfile.role}</Text>
         </View>
 
@@ -352,8 +329,7 @@ export default function Profile() {
             <View style={styles.infoContent}>
               <Text style={styles.infoLabel}>{t('profile.branch')}</Text>
               <Text style={styles.infoValue}>
-                {agentProfile.branch}{' '}
-                <Text style={styles.infoValueSecondary}>({agentProfile.branchCode})</Text>
+                {agentProfile.branch}
               </Text>
             </View>
           </View>

@@ -14,7 +14,12 @@
  */
 
 import type { Dispatch, State } from '@/utils/store';
-import { addCustomer, persistCustomers, selectAllCustomers } from '@/slices/customers.slice';
+import {
+  addCustomer,
+  persistCustomers,
+  selectAllCustomers,
+  updateCustomer,
+} from '@/slices/customers.slice';
 import {
   addAccount,
   addScheme,
@@ -83,21 +88,45 @@ export async function seedDummyData(dispatch: Dispatch, getState: () => State) {
   routes.forEach(route => dispatch(addRoute({ ...route, createdAt: now })));
   schemes.forEach(scheme => dispatch(addScheme({ ...scheme, createdAt: now })));
 
-  // Add only the customers that are not already present
-  const existingSeedKeys = new Set(selectAllCustomers(getState()).map(seedKey));
+  // Insert dataset customers that are not already present. For ones that already exist
+  // (matched by name + phone), re-apply route/agent/branch assignment so a recovery
+  // re-seed cannot leave them pointing at route ids that were recreated under different
+  // ids. Agent-created customers never match a dataset key, so they are left alone.
+  const customersBySeedKey = new Map(selectAllCustomers(getState()).map(c => [seedKey(c), c]));
 
-  customers
-    .filter(customer => !existingSeedKeys.has(seedKey(customer)))
-    .forEach(({ ref, ...customer }) => {
+  customers.forEach(({ ref: _ref, ...customer }) => {
+    const stored = customersBySeedKey.get(seedKey(customer));
+    if (!stored) {
       dispatch(addCustomer(customer));
-    });
+      return;
+    }
+
+    if (
+      stored.routeId !== customer.routeId ||
+      stored.primaryAgentId !== customer.primaryAgentId ||
+      stored.branchId !== customer.branchId
+    ) {
+      dispatch(
+        updateCustomer({
+          id: stored.id,
+          updates: {
+            routeId: customer.routeId,
+            primaryAgentId: customer.primaryAgentId,
+            branchId: customer.branchId,
+          },
+        }),
+      );
+    }
+  });
 
   // Resolve every dataset handle to the customer record now in the store, so accounts and
   // delegations can be wired to real ids.
-  const customersBySeedKey = new Map(selectAllCustomers(getState()).map(c => [seedKey(c), c]));
+  const customersBySeedKeyAfter = new Map(
+    selectAllCustomers(getState()).map(c => [seedKey(c), c]),
+  );
   const customerIdByRef = new Map<SeedCustomerRef, string>();
   customers.forEach(customer => {
-    const stored = customersBySeedKey.get(seedKey(customer));
+    const stored = customersBySeedKeyAfter.get(seedKey(customer));
     if (stored) {
       customerIdByRef.set(customer.ref, stored.id);
     }

@@ -1,5 +1,6 @@
 import { View, Text, StyleSheet } from 'react-native';
 import { useTheme, typography, spacing, radius } from '@/theme';
+import { useTranslation } from '@/i18n';
 import type { UserProfile } from '@/types/HomeData';
 
 interface ProfileHeaderProps {
@@ -8,6 +9,7 @@ interface ProfileHeaderProps {
 
 export default function ProfileHeader({ profile }: ProfileHeaderProps) {
   const { theme } = useTheme();
+  const { t } = useTranslation();
 
   const styles = StyleSheet.create({
     container: {
@@ -97,7 +99,7 @@ export default function ProfileHeader({ profile }: ProfileHeaderProps) {
       {profile.isOnline && (
         <View style={styles.onlineStatus}>
           <View style={styles.onlineIcon} />
-          <Text style={styles.onlineText}>Online</Text>
+          <Text style={styles.onlineText}>{t('common.online')}</Text>
         </View>
       )}
     </View>

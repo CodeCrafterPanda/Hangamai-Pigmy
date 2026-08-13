@@ -1,5 +1,6 @@
 import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { useTheme, typography, spacing, radius } from '@/theme';
+import { useTranslation } from '@/i18n';
 import type { PaymentMode } from '@/types/CollectDepositData';
 
 interface PaymentModeSelectorProps {
@@ -12,6 +13,7 @@ export default function PaymentModeSelector({
   onModeChange,
 }: PaymentModeSelectorProps) {
   const { theme } = useTheme();
+  const { t } = useTranslation();
 
   const styles = StyleSheet.create({
     container: {
@@ -89,7 +91,7 @@ export default function PaymentModeSelector({
 
   return (
     <View style={styles.container}>
-      <Text style={styles.label}>PAYMENT MODE</Text>
+      <Text style={styles.label}>{t('collection.paymentMode')}</Text>
 
       <View style={styles.modesContainer}>
         <Pressable
@@ -114,7 +116,7 @@ export default function PaymentModeSelector({
               selectedMode === 'cash' ? styles.cashTextActive : styles.cashTextInactive,
             ]}
           >
-            Cash
+            {t('collection.cash')}
           </Text>
         </Pressable>
 
@@ -140,7 +142,7 @@ export default function PaymentModeSelector({
               selectedMode === 'upi' ? styles.upiTextActive : styles.upiTextInactive,
             ]}
           >
-            UPI
+            {t('collection.upi')}
           </Text>
         </Pressable>
       </View>

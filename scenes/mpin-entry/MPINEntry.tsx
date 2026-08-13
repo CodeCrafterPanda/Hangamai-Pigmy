@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useState } from 'react';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useTheme, typography, spacing, radius, screenGradient, withAlpha } from '@/theme';
+import { useTranslation } from '@/i18n';
 import { useSettingsSlice } from '@/slices';
 import { useDispatch } from 'react-redux';
 import { setLoggedIn } from '@/slices/app.slice';
@@ -20,6 +21,7 @@ export default function MPINEntry() {
   const router = useRouter();
   const dispatch = useDispatch<Dispatch>();
   const { theme } = useTheme();
+  const { t } = useTranslation();
   const params = useLocalSearchParams<{ phoneNumber?: string; isSetup?: string }>();
   const { session, updateSession, persistSettings } = useSettingsSlice();
 
@@ -70,11 +72,11 @@ export default function MPINEntry() {
             // MPINs don't match
             setAlertConfig({
               isOpen: true,
-              title: 'MPIN Mismatch',
-              message: 'The MPINs you entered do not match. Please try again.',
+              title: t('auth.mismatchTitle'),
+              message: t('auth.mismatchMessage'),
               buttons: [
                 {
-                  text: 'OK',
+                  text: t('common.ok'),
                   style: 'default',
                   onPress: () => {
                     setPin('');
@@ -114,11 +116,11 @@ export default function MPINEntry() {
     } else {
       setAlertConfig({
         isOpen: true,
-        title: 'Invalid MPIN',
-        message: 'The MPIN you entered is incorrect. Please try again.',
+        title: t('auth.invalidTitle'),
+        message: t('auth.invalidMessage'),
         buttons: [
           {
-            text: 'OK',
+            text: t('common.ok'),
             style: 'default',
             onPress: () => setPin(''),
           },
@@ -157,8 +159,8 @@ export default function MPINEntry() {
 
   const phoneNumber = params?.phoneNumber || session?.agentId?.replace('agent-', '') || '****';
   const displayDeviceInfo = isSetupMode
-    ? `Setting up for: +91 ${phoneNumber}`
-    : `Device linked to Agent`;
+    ? t('auth.settingUpFor', { phone: phoneNumber })
+    : t('auth.deviceLinked');
 
   const handleDelete = () => {
     if (step === 'enter') {
@@ -176,12 +178,12 @@ export default function MPINEntry() {
   const handleForgotPIN = () => {
     setAlertConfig({
       isOpen: true,
-      title: 'Reset MPIN',
-      message: 'You will need to login again with phone number and OTP to reset your MPIN.',
+      title: t('auth.resetTitle'),
+      message: t('auth.resetMessage'),
       buttons: [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Reset',
+          text: t('auth.reset'),
           style: 'destructive',
           onPress: async () => {
             // Clear MPIN from session
@@ -344,15 +346,15 @@ export default function MPINEntry() {
 
           <Text style={styles.title}>
             {isSetupMode
-              ? (step === 'enter' ? 'Set Your MPIN' : 'Confirm MPIN')
-              : 'Enter Your MPIN'}
+              ? (step === 'enter' ? t('auth.setYourMpin') : t('auth.confirmMpin'))
+              : t('auth.enterYourMpin')}
           </Text>
           <Text style={styles.subtitle}>
             {isSetupMode
               ? (step === 'enter'
-                ? 'Create a 4-digit MPIN for secure access'
-                : 'Re-enter your MPIN to confirm')
-              : 'Enter your 4-digit MPIN to access your account'}
+                ? t('auth.createMpinHint')
+                : t('auth.confirmMpinHint'))
+              : t('auth.enterMpinHint')}
           </Text>
 
           <View style={styles.pinDotsContainer}>
@@ -440,6 +442,7 @@ export default function MPINEntry() {
               {!isSetupMode ? (
                 <Pressable
                   onPress={handleBiometric}
+                  accessibilityLabel={t('auth.useBiometric')}
                   style={({ pressed }) => [styles.iconButton, { opacity: pressed ? 0.7 : 1 }]}
                 >
                   <Text style={styles.iconButtonIcon}>👆</Text>
@@ -464,7 +467,7 @@ export default function MPINEntry() {
 
           {!isSetupMode && (
             <Pressable onPress={handleForgotPIN} style={styles.forgotLink}>
-              <Text style={styles.forgotText}>Forgot MPIN?</Text>
+              <Text style={styles.forgotText}>{t('auth.forgotMpin')}</Text>
             </Pressable>
           )}
         </View>

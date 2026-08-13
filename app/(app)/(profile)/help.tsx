@@ -4,9 +4,11 @@
  */
 import { View, Text, StyleSheet } from 'react-native';
 import { useTheme } from '@/theme';
+import { useTranslation } from '@/i18n';
 
 export default function Help() {
   const { theme } = useTheme();
+  const { t } = useTranslation();
 
   // TODO: Implement help and support content
   // Will show FAQ, tutorials, contact support
@@ -14,10 +16,10 @@ export default function Help() {
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.background.app }]}>
       <Text style={[styles.text, { color: theme.colors.text.primary }]}>
-        Help & Support Screen
+        {t('help.pending')}
       </Text>
       <Text style={[styles.subtext, { color: theme.colors.text.secondary }]}>
-        Implementation pending - will show help content and support options
+        {t('help.pendingHint')}
       </Text>
     </View>
   );

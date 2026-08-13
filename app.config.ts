@@ -5,7 +5,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
   const expoConfig: ExpoConfig = {
     ...config,
     slug: process.env.EXPO_SLUG ?? 'react-native-boilerplate',
-    name: process.env.EXPO_NAME ?? 'React Native Boilerplate',
+    name: process.env.EXPO_NAME ?? 'Hangamai Pigmy',
     ios: {
       ...config.ios,
       bundleIdentifier:

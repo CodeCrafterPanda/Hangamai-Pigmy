@@ -1,5 +1,6 @@
 import { View, Text, StyleSheet } from 'react-native';
 import { useTheme, typography, spacing } from '@/theme';
+import { useTranslation } from '@/i18n';
 
 /**
  * Root Sync tab header — same shell language as HistoryHeader / ProfileHeader.
@@ -7,6 +8,7 @@ import { useTheme, typography, spacing } from '@/theme';
  */
 export default function SyncHeader() {
   const { theme } = useTheme();
+  const { t } = useTranslation();
 
   const styles = StyleSheet.create({
     container: {
@@ -38,8 +40,8 @@ export default function SyncHeader() {
   return (
     <View style={styles.container}>
       <View style={styles.leftSection}>
-        <Text style={styles.title}>Offline Queue</Text>
-        <Text style={styles.subtitle}>Pending transactions waiting to sync</Text>
+        <Text style={styles.title}>{t('offlineQueue.title')}</Text>
+        <Text style={styles.subtitle}>{t('offlineQueue.subtitle')}</Text>
       </View>
       <Text style={styles.offlineIcon}>📴</Text>
     </View>

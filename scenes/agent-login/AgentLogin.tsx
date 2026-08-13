@@ -4,10 +4,12 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useState } from 'react';
 import { useRouter } from 'expo-router';
 import { useTheme, typography, spacing, radius, screenGradient, withAlpha } from '@/theme';
+import { useTranslation } from '@/i18n';
 
 export default function AgentLogin() {
   const router = useRouter();
   const { theme } = useTheme();
+  const { t } = useTranslation();
   const [phoneNumber, setPhoneNumber] = useState('');
 
   const handleSendOTP = () => {
@@ -183,21 +185,19 @@ export default function AgentLogin() {
             <Text style={styles.icon}>🏛</Text>
           </View>
 
-          <Text style={styles.title}>Agent Login</Text>
-          <Text style={styles.subtitle}>Co-operative Bank Pigmy Collection</Text>
+          <Text style={styles.title}>{t('auth.agentLogin')}</Text>
+          <Text style={styles.subtitle}>{t('auth.subtitle')}</Text>
 
           <View style={styles.loginCard}>
-            <Text style={styles.instructionText}>
-              Enter your registered mobile number to access your collection dashboard.
-            </Text>
+            <Text style={styles.instructionText}>{t('auth.loginInstruction')}</Text>
 
             <View style={styles.inputSection}>
-              <Text style={styles.inputLabel}>MOBILE NUMBER</Text>
+              <Text style={styles.inputLabel}>{t('auth.mobileNumber')}</Text>
               <View style={styles.phoneInputContainer}>
                 <Text style={styles.countryCode}>+91</Text>
                 <TextInput
                   style={styles.phoneInput}
-                  placeholder="98765 00000"
+                  placeholder={t('auth.phonePlaceholder')}
                   placeholderTextColor={theme.colors.text.muted}
                   keyboardType="phone-pad"
                   maxLength={10}
@@ -217,19 +217,19 @@ export default function AgentLogin() {
                 { opacity: pressed ? 0.8 : 1 },
               ]}
             >
-              <Text style={styles.sendOTPButtonText}>Send OTP</Text>
+              <Text style={styles.sendOTPButtonText}>{t('auth.sendOtp')}</Text>
               <Text style={styles.sendOTPButtonIcon}>→</Text>
             </Pressable>
 
             <View style={styles.helpSection}>
               <Text style={styles.helpIcon}>ℹ️</Text>
-              <Text style={styles.helpText}>Need help? Contact branch</Text>
+              <Text style={styles.helpText}>{t('auth.needHelp')}</Text>
             </View>
           </View>
         </View>
 
         <View style={styles.bottomSection}>
-          <Text style={styles.securityText}>SECURED • ENCRYPTED • OFFLINE</Text>
+          <Text style={styles.securityText}>{t('auth.securityFooter')}</Text>
         </View>
       </LinearGradient>
     </SafeAreaView>

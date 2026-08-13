@@ -15,6 +15,8 @@ import { useLocalSearchParams } from 'expo-router';
 import { useSelector } from 'react-redux';
 import type { State } from '@/utils/store';
 import { useTheme, typography, spacing, radius } from '@/theme';
+import { useTranslation, formatDate, formatNumber } from '@/i18n';
+import type { TranslationKey } from '@/i18n';
 import NestedScreenHeader from '@/components/elements/NestedScreenHeader';
 import BottomSheet from '@/components/elements/BottomSheet';
 import { selectCustomersByAgent } from '@/slices/customers.slice';
@@ -48,7 +50,7 @@ const MAX_VISIBLE_AUDIT_ERRORS = 3;
 const EMPTY_CELL = '—';
 
 function formatCellValue(value: number): string {
-  return value === 0 ? EMPTY_CELL : value.toLocaleString('en-IN');
+  return value === 0 ? EMPTY_CELL : formatNumber(value);
 }
 
 /** Parses the "Month Year" route param (e.g. "December 2025") into that month's first day */
@@ -67,6 +69,7 @@ function parseMonthParam(value?: string): Date | null {
 
 export default function MonthlyCollections() {
   const { theme } = useTheme();
+  const { t, language } = useTranslation();
   const { month } = useLocalSearchParams<{ month?: string }>();
   const [activePicker, setActivePicker] = useState<'month' | 'route' | null>(null);
   const [selectedMonth, setSelectedMonth] = useState<Date | null>(null);
@@ -121,8 +124,8 @@ export default function MonthlyCollections() {
   }, [myPrimaryCustomers, allRoutes]);
 
   const selectedRouteName = routeFilter
-    ? (allRoutes.find(route => route.id === routeFilter)?.name ?? 'Unknown')
-    : 'All';
+    ? allRoutes.find(route => route.id === routeFilter)?.name
+    : undefined;
 
   const styles = StyleSheet.create({
     container: {
@@ -153,7 +156,9 @@ export default function MonthlyCollections() {
     dateText: {
       ...typography(theme, 'body'),
       color: theme.colors.text.primary,
-      fontWeight: '600',
+      fontWeight: '700',
+      fontSize: 16,
+      lineHeight: 20,
     },
     dateIcon: {
       fontSize: 16,
@@ -248,8 +253,9 @@ export default function MonthlyCollections() {
     modeTabText: {
       ...typography(theme, 'body'),
       color: theme.colors.text.secondary,
-      fontWeight: '600',
-      fontSize: 14,
+      fontWeight: '700',
+      fontSize: 16,
+      lineHeight: 20,
     },
     modeTabTextActive: {
       color: '#FFFFFF',
@@ -458,7 +464,6 @@ export default function MonthlyCollections() {
       color: theme.colors.text.muted,
       fontWeight: '700',
       textTransform: 'uppercase',
-      fontSize: 10,
       letterSpacing: 0.5,
     },
     settlementTopRow: {
@@ -473,13 +478,11 @@ export default function MonthlyCollections() {
     },
     settlementStatus: {
       ...typography(theme, 'caption'),
-      fontSize: 10,
       fontWeight: '700',
       letterSpacing: 0.5,
     },
     settlementScope: {
       ...typography(theme, 'caption'),
-      fontSize: 11,
       fontWeight: '700',
       letterSpacing: 0.4,
       color: theme.colors.text.secondary,
@@ -492,19 +495,16 @@ export default function MonthlyCollections() {
     settlementAmountLabel: {
       ...typography(theme, 'caption'),
       color: theme.colors.text.secondary,
-      fontSize: 12,
     },
     settlementAmountValue: {
       ...typography(theme, 'caption'),
       color: theme.colors.text.primary,
       fontWeight: '600',
-      fontSize: 12,
     },
     settlementAmountValueStrong: {
       ...typography(theme, 'caption'),
       color: theme.colors.brand.primary,
       fontWeight: '700',
-      fontSize: 12,
     },
     emptyState: {
       padding: spacing(theme, 'xxl'),
@@ -521,28 +521,34 @@ export default function MonthlyCollections() {
       textAlign: 'center',
     },
     columnHeaderText: {
-      ...typography(theme, 'caption'),
+      ...typography(theme, 'body'),
       color: theme.colors.text.muted,
       fontWeight: '700',
       textTransform: 'uppercase',
-      fontSize: 10,
+      fontSize: 16,
+      lineHeight: 20,
     },
     dayHeaderText: {
       ...typography(theme, 'pageTitle'),
       fontSize: 16,
+      lineHeight: 20,
       color: theme.colors.text.primary,
       fontWeight: '700',
     },
     daySubText: {
-      ...typography(theme, 'micro'),
+      ...typography(theme, 'body'),
       color: theme.colors.text.muted,
       textTransform: 'uppercase',
-      fontSize: 9,
+      fontWeight: '700',
+      fontSize: 16,
+      lineHeight: 20,
     },
     totalHeaderText: {
       ...typography(theme, 'body'),
       color: theme.colors.brand.primary,
       fontWeight: '700',
+      fontSize: 16,
+      lineHeight: 20,
     },
     customerCellContent: {
       gap: 2,
@@ -595,21 +601,24 @@ export default function MonthlyCollections() {
       color: theme.colors.text.primary,
       fontWeight: '700',
       textTransform: 'uppercase',
-      fontSize: 12,
+      fontSize: 16,
+      lineHeight: 20,
     },
     totalAmount: {
       ...typography(theme, 'body'),
       color: theme.colors.brand.primary,
       fontWeight: '700',
       textAlign: 'center',
-      fontSize: 13,
+      fontSize: 16,
+      lineHeight: 20,
     },
     totalAmountGrand: {
       ...typography(theme, 'body'),
       color: theme.colors.brand.primary,
       fontWeight: '700',
       textAlign: 'right',
-      fontSize: 13,
+      fontSize: 16,
+      lineHeight: 20,
     },
     auditBanner: {
       marginHorizontal: spacing(theme, 'screenPadding'),
@@ -718,10 +727,13 @@ export default function MonthlyCollections() {
     try {
       await Share.share({
         title: buildMonthlyReportFileName(report),
-        message: buildMonthlyReportCsv(report),
+        message: buildMonthlyReportCsv(report, t, {
+          agentName: agent?.name,
+          routeName: selectedRouteName,
+        }),
       });
     } catch {
-      Alert.alert('Export Failed', 'The report could not be shared from this device.');
+      Alert.alert(t('monthlyCollections.exportFailedTitle'), t('monthlyCollections.exportFailed'));
     }
   };
 
@@ -736,7 +748,7 @@ export default function MonthlyCollections() {
 
   const getDayOfWeek = (day: number) => {
     const date = new Date(report.year, report.month - 1, day);
-    return date.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase();
+    return formatDate(date, language, { weekday: 'short' }).toUpperCase();
   };
 
   // User-driven vertical scroll only: the other half mirrors and must not sync back.
@@ -782,14 +794,14 @@ export default function MonthlyCollections() {
 
   const hasMonthCollections = report.collectionCount > 0;
   const dayNumbers = Array.from({ length: report.daysInMonth }, (_, i) => i + 1);
-  const monthLabel = `${activeMonth.toLocaleDateString('en-US', { month: 'short' })} ${currentYear}`;
-  const headerSubtitle = `${branch?.name ?? 'Branch'} · Primary book`;
+  const monthLabel = `${formatDate(activeMonth, language, { month: 'short' })} ${currentYear}`;
+  const headerSubtitle = `${branch?.name ?? t('monthlyCollections.branchFallback')} · ${t('monthlyCollections.primaryBook')}`;
   const visibleAuditErrors = report.auditErrors.slice(0, MAX_VISIBLE_AUDIT_ERRORS);
   const hiddenAuditErrorCount = report.auditErrors.length - visibleAuditErrors.length;
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      <NestedScreenHeader title="Monthly Collections" subtitle={headerSubtitle} />
+      <NestedScreenHeader title={t('monthlyCollections.title')} subtitle={headerSubtitle} />
 
       <View style={styles.controlsContainer}>
         <View style={styles.controlsRow}>
@@ -823,7 +835,7 @@ export default function MonthlyCollections() {
           ]}>
           <Text
             style={[styles.modeTabText, viewMode === 'collections' && styles.modeTabTextActive]}>
-            Collections
+            {t('monthlyCollections.collections')}
           </Text>
         </Pressable>
 
@@ -836,37 +848,41 @@ export default function MonthlyCollections() {
           ]}>
           <Text
             style={[styles.modeTabText, viewMode === 'settlements' && styles.modeTabTextActive]}>
-            Settlements
+            {t('monthlyCollections.settlements')}
           </Text>
         </Pressable>
       </View>
 
       {viewMode === 'collections' && (
         <>
+          {/* Restored later: agent / route / status filter chips.
           <View style={styles.filtersRow}>
             <View style={styles.filterChip}>
-              <Text style={styles.filterChipText}>Agent: {agent?.name ?? agentId}</Text>
+              <Text style={styles.filterChipText}>
+                {t('monthlyCollections.agentFilter', { name: agent?.name ?? t('common.unnamedAgent') })}
+              </Text>
             </View>
 
             <Pressable
               onPress={() => setActivePicker('route')}
               style={[styles.filterChip, !!routeFilter && styles.filterChipActive]}>
               <Text style={routeFilter ? styles.filterChipTextActive : styles.filterChipText}>
-                Route: {selectedRouteName}
+                {t('monthlyCollections.routeFilter', { name: selectedRouteName })}
               </Text>
               <Text style={routeFilter ? styles.filterChipIcon : styles.filterDropdownIcon}>▼</Text>
             </Pressable>
 
             <View style={styles.filterChip}>
-              <Text style={styles.filterChipText}>Status: Active</Text>
+              <Text style={styles.filterChipText}>{t('monthlyCollections.statusActive')}</Text>
             </View>
           </View>
+          */}
 
           {/* Real reconciliation outcome — never a fixed success state */}
           {report.isAuditSuccessful ? (
             <View style={styles.auditOkRow}>
               <Text style={styles.auditOkText}>
-                ✓ Reconciled — customer, day, Cash/UPI, ledger and settlement totals agree
+                {t('monthlyCollections.reconciled')}
               </Text>
             </View>
           ) : (
@@ -876,8 +892,12 @@ export default function MonthlyCollections() {
               </View>
               <View style={styles.auditContent}>
                 <Text style={styles.auditTitle}>
-                  {report.auditErrors.length} reconciliation issue
-                  {report.auditErrors.length === 1 ? '' : 's'}
+                  {t(
+                    report.auditErrors.length === 1
+                      ? 'monthlyCollections.auditIssueOne'
+                      : 'monthlyCollections.auditIssueOther',
+                    { count: report.auditErrors.length },
+                  )}
                 </Text>
                 {visibleAuditErrors.map((error, index) => (
                   <Text key={`audit-error-${index}`} style={styles.auditMessage}>
@@ -886,8 +906,13 @@ export default function MonthlyCollections() {
                 ))}
                 {hiddenAuditErrorCount > 0 && (
                   <Text style={styles.auditMessage}>
-                    • {hiddenAuditErrorCount} more issue
-                    {hiddenAuditErrorCount === 1 ? '' : 's'} in the exported report
+                    •{' '}
+                    {t(
+                      hiddenAuditErrorCount === 1
+                        ? 'monthlyCollections.moreIssueOne'
+                        : 'monthlyCollections.moreIssueOther',
+                      { count: hiddenAuditErrorCount },
+                    )}
                   </Text>
                 )}
               </View>
@@ -898,14 +923,14 @@ export default function MonthlyCollections() {
             {!hasMonthCollections ? (
               <View style={styles.emptyState}>
                 <Text style={styles.emptyIcon}>📭</Text>
-                <Text style={styles.emptyText}>No collections for the selected month</Text>
+                <Text style={styles.emptyText}>{t('monthlyCollections.empty')}</Text>
               </View>
             ) : (
               <View style={styles.tableShell}>
                 {/* Frozen Customer column — stays put during horizontal scroll */}
                 <View style={styles.frozenColumn}>
                   <View style={[styles.headerRow, styles.customerHeaderCell]}>
-                    <Text style={styles.columnHeaderText}>Customer</Text>
+                    <Text style={styles.columnHeaderText}>{t('monthlyCollections.customer')}</Text>
                   </View>
 
                   <ScrollView
@@ -933,7 +958,7 @@ export default function MonthlyCollections() {
 
                     <View style={[styles.footerRow, styles.customerFooterCell]}>
                       <Text style={styles.totalLabel} numberOfLines={1}>
-                        DAILY TOTAL
+                        {t('monthlyCollections.dailyTotal')}
                       </Text>
                     </View>
                   </ScrollView>
@@ -947,7 +972,7 @@ export default function MonthlyCollections() {
                   <View>
                     <View style={styles.headerRowDates}>
                       <View style={styles.missedHeaderCell}>
-                        <Text style={styles.columnHeaderText}>Missed</Text>
+                        <Text style={styles.columnHeaderText}>{t('monthlyCollections.missed')}</Text>
                       </View>
                       {dayNumbers.map(day => (
                         <View key={day} style={styles.dayHeaderCell}>
@@ -958,13 +983,13 @@ export default function MonthlyCollections() {
                         </View>
                       ))}
                       <View style={styles.metricHeaderCell}>
-                        <Text style={styles.columnHeaderText}>Cash</Text>
+                        <Text style={styles.columnHeaderText}>{t('monthlyCollections.cash')}</Text>
                       </View>
                       <View style={styles.metricHeaderCell}>
-                        <Text style={styles.columnHeaderText}>UPI</Text>
+                        <Text style={styles.columnHeaderText}>{t('monthlyCollections.upi')}</Text>
                       </View>
                       <View style={styles.totalHeaderCell}>
-                        <Text style={styles.totalHeaderText}>Total</Text>
+                        <Text style={styles.totalHeaderText}>{t('monthlyCollections.total')}</Text>
                       </View>
                     </View>
 
@@ -1100,34 +1125,37 @@ export default function MonthlyCollections() {
               collection history, it only moves the unsettled balance. */}
           <View style={styles.settlementCard}>
             <Text style={styles.settlementSummaryTitle}>
-              Cash reconciliation · Primary book · all routes
+              {t('monthlyCollections.cashReconciliation', {
+                scope: t('monthlyCollections.primaryBook'),
+                routes: t('monthlyCollections.allRoutes'),
+              })}
             </Text>
 
             <View style={styles.settlementAmountRow}>
-              <Text style={styles.settlementAmountLabel}>Cash collected</Text>
+              <Text style={styles.settlementAmountLabel}>{t('monthlyCollections.cashCollected')}</Text>
               <Text style={styles.settlementAmountValue}>
-                ₹{report.settlement.cashCollected.toLocaleString('en-IN')}
+                ₹{formatNumber(report.settlement.cashCollected)}
               </Text>
             </View>
 
             <View style={styles.settlementAmountRow}>
-              <Text style={styles.settlementAmountLabel}>UPI collected</Text>
+              <Text style={styles.settlementAmountLabel}>{t('monthlyCollections.upiCollected')}</Text>
               <Text style={styles.settlementAmountValue}>
-                ₹{report.settlement.upiCollected.toLocaleString('en-IN')}
+                ₹{formatNumber(report.settlement.upiCollected)}
               </Text>
             </View>
 
             <View style={styles.settlementAmountRow}>
-              <Text style={styles.settlementAmountLabel}>Settled cash</Text>
+              <Text style={styles.settlementAmountLabel}>{t('monthlyCollections.settledCash')}</Text>
               <Text style={styles.settlementAmountValue}>
-                ₹{report.settlement.settledCash.toLocaleString('en-IN')}
+                ₹{formatNumber(report.settlement.settledCash)}
               </Text>
             </View>
 
             <View style={styles.settlementAmountRow}>
-              <Text style={styles.settlementAmountLabel}>Unsettled cash in hand</Text>
+              <Text style={styles.settlementAmountLabel}>{t('monthlyCollections.unsettledCashInHand')}</Text>
               <Text style={styles.settlementAmountValueStrong}>
-                ₹{report.settlement.cashInHand.toLocaleString('en-IN')}
+                ₹{formatNumber(report.settlement.cashInHand)}
               </Text>
             </View>
           </View>
@@ -1146,7 +1174,7 @@ export default function MonthlyCollections() {
               const dateLabel = (() => {
                 const [y, m, d] = settlement.businessDate.split('-').map(Number);
                 if (!y || !m || !d) return settlement.businessDate;
-                return new Date(y, m - 1, d).toLocaleDateString('en-GB', {
+                return formatDate(new Date(y, m - 1, d), language, {
                   day: 'numeric',
                   month: 'short',
                   year: 'numeric',
@@ -1164,25 +1192,25 @@ export default function MonthlyCollections() {
                   <View style={styles.settlementTopRow}>
                     <Text style={styles.settlementDate}>{dateLabel}</Text>
                     <Text style={[styles.settlementStatus, { color: statusColor }]}>
-                      {settlement.status}
+                      {t(`settlementStatus.${settlement.status}` as TranslationKey)}
                     </Text>
                   </View>
 
                   <Text style={styles.settlementScope}>
-                    {settlement.scope === SettlementScope.DELEGATED ? 'DELEGATED' : 'PRIMARY'}
+                    {t(`settlementScope.${settlement.scope}` as TranslationKey)}
                   </Text>
 
                   <View style={styles.settlementAmountRow}>
-                    <Text style={styles.settlementAmountLabel}>Cash</Text>
+                    <Text style={styles.settlementAmountLabel}>{t('monthlyCollections.cash')}</Text>
                     <Text style={styles.settlementAmountValue}>
-                      ₹{settlement.cashTotal.toLocaleString('en-IN')}
+                      ₹{formatNumber(settlement.cashTotal)}
                     </Text>
                   </View>
 
                   <View style={styles.settlementAmountRow}>
-                    <Text style={styles.settlementAmountLabel}>UPI</Text>
+                    <Text style={styles.settlementAmountLabel}>{t('monthlyCollections.upi')}</Text>
                     <Text style={styles.settlementAmountValue}>
-                      ₹{settlement.upiTotal.toLocaleString('en-IN')}
+                      ₹{formatNumber(settlement.upiTotal)}
                     </Text>
                   </View>
                 </Pressable>
@@ -1191,7 +1219,7 @@ export default function MonthlyCollections() {
           ) : (
             <View style={styles.emptyState}>
               <Text style={styles.emptyIcon}>🔒</Text>
-              <Text style={styles.emptyText}>No settlements in this month</Text>
+              <Text style={styles.emptyText}>{t('monthlyCollections.emptySettlements')}</Text>
             </View>
           )}
         </ScrollView>
@@ -1200,7 +1228,7 @@ export default function MonthlyCollections() {
       <BottomSheet isOpen={activePicker !== null} onClose={() => setActivePicker(null)}>
         {activePicker === 'route' ? (
           <View style={styles.pickerContent}>
-            <Text style={styles.pickerTitle}>Select Route</Text>
+            <Text style={styles.pickerTitle}>{t('monthlyCollections.selectRoute')}</Text>
             <View style={styles.pickerOptionsList}>
               <Pressable
                 onPress={() => handleRouteChange(null)}
@@ -1214,7 +1242,7 @@ export default function MonthlyCollections() {
                     styles.pickerOptionText,
                     !routeFilter && styles.pickerOptionTextSelected,
                   ]}>
-                  All routes
+                  {t('monthlyCollections.allRoutes')}
                 </Text>
               </Pressable>
 
@@ -1243,12 +1271,12 @@ export default function MonthlyCollections() {
           </View>
         ) : (
           <View style={styles.pickerContent}>
-            <Text style={styles.pickerTitle}>Select Month</Text>
+            <Text style={styles.pickerTitle}>{t('monthlyCollections.selectMonth')}</Text>
             <View style={styles.pickerOptionsList}>
               {monthOptions.map((date, index) => {
                 const isSelected =
                   date.getMonth() === currentMonthIndex && date.getFullYear() === currentYear;
-                const label = date.toLocaleDateString('en-US', {
+                const label = formatDate(date, language, {
                   month: 'long',
                   year: 'numeric',
                 });

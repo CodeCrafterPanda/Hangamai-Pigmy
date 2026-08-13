@@ -3,6 +3,7 @@ import { useMemo } from 'react';
 import { useRouter } from 'expo-router';
 import { useSelector } from 'react-redux';
 import { useTheme, typography, spacing, radius } from '@/theme';
+import { useTranslation } from '@/i18n';
 import { selectCollectionsNeedingSync, selectAllCollections } from '@/slices/collections.slice';
 import { selectSession, selectBranchTimezone } from '@/slices/settings.slice';
 import SyncStatusCard from '@/components/elements/SyncStatusCard';
@@ -11,6 +12,7 @@ import { getCurrentBusinessDate } from '@/utils/businessLogic';
 export default function SyncStatus() {
   const router = useRouter();
   const { theme } = useTheme();
+  const { t } = useTranslation();
 
   // Get session
   const session = useSelector(selectSession);
@@ -147,12 +149,12 @@ export default function SyncStatus() {
         <View style={styles.statsSection}>
           <View style={styles.statsGrid}>
             <View style={[styles.statCard, styles.pendingCard]}>
-              <Text style={styles.statLabel}>Pending Sync</Text>
+              <Text style={styles.statLabel}>{t('syncStatus.pendingSync')}</Text>
               <Text style={[styles.statValue, styles.pendingValue]}>{pendingCount}</Text>
             </View>
 
             <View style={[styles.statCard, styles.syncedCard]}>
-              <Text style={styles.statLabel}>Synced</Text>
+              <Text style={styles.statLabel}>{t('syncStatus.synced')}</Text>
               <Text style={[styles.statValue, styles.syncedValue]}>{syncedCount}</Text>
             </View>
           </View>
@@ -162,9 +164,9 @@ export default function SyncStatus() {
         {pendingCount > 0 ? (
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Pending Sync</Text>
+              <Text style={styles.sectionTitle}>{t('syncStatus.pendingSync')}</Text>
               <Pressable onPress={handleViewAllPending}>
-                <Text style={styles.viewAllButton}>View All</Text>
+                <Text style={styles.viewAllButton}>{t('syncStatus.viewAll')}</Text>
               </Pressable>
             </View>
 
@@ -177,10 +179,8 @@ export default function SyncStatus() {
         ) : (
           <View style={styles.emptyState}>
             <Text style={styles.emptyIcon}>✓</Text>
-            <Text style={styles.emptyTitle}>All Synced!</Text>
-            <Text style={styles.emptyText}>
-              All your collections have been synced to the server
-            </Text>
+            <Text style={styles.emptyTitle}>{t('syncStatus.allSynced')}</Text>
+            <Text style={styles.emptyText}>{t('syncStatus.allSyncedHint')}</Text>
           </View>
         )}
       </ScrollView>

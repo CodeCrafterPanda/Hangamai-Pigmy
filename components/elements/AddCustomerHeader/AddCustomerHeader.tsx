@@ -1,10 +1,12 @@
 import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { useTheme, typography, spacing } from '@/theme';
 import { useRouter } from 'expo-router';
+import { useTranslation } from '@/i18n';
 
 export default function AddCustomerHeader() {
   const { theme } = useTheme();
   const router = useRouter();
+  const { t } = useTranslation();
 
   const styles = StyleSheet.create({
     container: {
@@ -53,7 +55,7 @@ export default function AddCustomerHeader() {
         </Pressable>
 
         <View style={styles.titleSection}>
-          <Text style={styles.title}>Add New Customer</Text>
+          <Text style={styles.title}>{t('addCustomer.title')}</Text>
         </View>
       </View>
     </View>

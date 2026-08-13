@@ -1,5 +1,6 @@
 import { Stack } from 'expo-router';
 import { useTheme } from '@/theme';
+import { useTranslation } from '@/i18n';
 import HistoryHeader from '@/components/elements/HistoryHeader';
 
 /**
@@ -18,6 +19,7 @@ export const unstable_settings = {
 
 export default function HistoryStack() {
   const { theme } = useTheme();
+  const { t } = useTranslation();
 
   return (
     <Stack
@@ -42,42 +44,42 @@ export default function HistoryStack() {
       <Stack.Screen
         name="monthly-collections"
         options={{
-          title: 'Monthly Collections',
+          title: t('monthlyCollections.title'),
           headerShown: false,
         }}
       />
       <Stack.Screen
         name="receipt-detail/[id]"
         options={{
-          title: 'Receipt Details',
+          title: t('receipt.title'),
           headerShown: true,
         }}
       />
       <Stack.Screen
         name="offline-queue"
         options={{
-          title: 'Offline Queue',
+          title: t('offlineQueue.title'),
           headerShown: true,
         }}
       />
       <Stack.Screen
         name="settlement-history"
         options={{
-          title: 'Settlement History',
+          title: t('settlementHistory.title'),
           headerShown: true,
         }}
       />
       <Stack.Screen
         name="settlement"
         options={{
-          title: 'Settlement',
+          title: t('settlement.title'),
           headerShown: false,
         }}
       />
       <Stack.Screen
         name="settlement-detail/[id]"
         options={{
-          title: 'Settlement Details',
+          title: t('settlementDetail.title'),
           headerShown: false,
         }}
       />

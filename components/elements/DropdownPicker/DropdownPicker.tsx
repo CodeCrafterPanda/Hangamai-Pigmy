@@ -1,6 +1,7 @@
 import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { useState } from 'react';
 import { useTheme, typography, spacing, radius } from '@/theme';
+import { useTranslation } from '@/i18n';
 import BottomSheet from '@/components/elements/BottomSheet';
 
 interface DropdownPickerProps {
@@ -15,12 +16,14 @@ interface DropdownPickerProps {
 export default function DropdownPicker({
   label,
   value,
-  placeholder = 'Select an option',
+  placeholder,
   options,
   onSelect,
   required = false,
 }: DropdownPickerProps) {
   const { theme } = useTheme();
+  const { t } = useTranslation();
+  const resolvedPlaceholder = placeholder ?? t('common.selectAnOption');
   const [isOpen, setIsOpen] = useState(false);
 
   const styles = StyleSheet.create({
@@ -111,7 +114,7 @@ export default function DropdownPicker({
         </Text>
         <Pressable onPress={() => setIsOpen(true)} style={styles.dropdown}>
           <Text style={value ? styles.dropdownText : styles.dropdownPlaceholder}>
-            {value || placeholder}
+            {value || resolvedPlaceholder}
           </Text>
           <Text style={styles.dropdownIcon}>▼</Text>
         </Pressable>

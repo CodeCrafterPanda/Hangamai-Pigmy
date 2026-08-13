@@ -1,5 +1,6 @@
 import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { useTheme, typography, spacing, radius } from '@/theme';
+import { useTranslation } from '@/i18n';
 import type { CustomerCollection, CollectionStatus } from '@/types/CollectionData';
 
 interface CustomerCollectionCardProps {
@@ -22,25 +23,26 @@ export default function CustomerCollectionCard({
   onDelete,
 }: CustomerCollectionCardProps) {
   const { theme } = useTheme();
+  const { t } = useTranslation();
 
   const getStatusConfig = (status: CollectionStatus) => {
     switch (status) {
       case 'pending':
         return {
           statusColor: '#D4834D',
-          statusLabel: 'PENDING',
+          statusLabel: t('customerCollectionCard.pending'),
           leftBorderColor: '#D4834D',
         };
       case 'overdue':
         return {
           statusColor: theme.colors.status.error,
-          statusLabel: 'OVERDUE',
+          statusLabel: t('customerCollectionCard.overdue'),
           leftBorderColor: theme.colors.status.error,
         };
       case 'collected':
         return {
           statusColor: theme.colors.status.success,
-          statusLabel: 'COLLECTED',
+          statusLabel: t('customerCollectionCard.collected'),
           leftBorderColor: theme.colors.status.success,
         };
     }
@@ -125,7 +127,7 @@ export default function CustomerCollectionCard({
       backgroundColor: statusConfig.statusColor,
     },
     statusText: {
-      ...typography(theme, 'micro'),
+      ...typography(theme, 'caption'),
       color: theme.colors.text.muted,
       fontWeight: '600',
       letterSpacing: 0.5,
@@ -210,14 +212,13 @@ export default function CustomerCollectionCard({
       borderColor: theme.colors.brand.primary,
     },
     editButtonIcon: {
-      fontSize: 10,
+      fontSize: 12,
       color: theme.colors.brand.primary,
     },
     editButtonText: {
       ...typography(theme, 'caption'),
       color: theme.colors.brand.primary,
       fontWeight: '600',
-      fontSize: 10,
     },
     deleteButton: {
       flexDirection: 'row',
@@ -231,14 +232,13 @@ export default function CustomerCollectionCard({
       borderColor: theme.colors.status.error,
     },
     deleteButtonIcon: {
-      fontSize: 10,
+      fontSize: 12,
       color: theme.colors.status.error,
     },
     deleteButtonText: {
       ...typography(theme, 'caption'),
       color: theme.colors.status.error,
       fontWeight: '600',
-      fontSize: 10,
     },
   });
 
@@ -253,7 +253,7 @@ export default function CustomerCollectionCard({
             { opacity: pressed ? 0.7 : 1 },
           ]}
         >
-          <Text style={[styles.buttonText, styles.receiptButtonText]}>Receipt</Text>
+          <Text style={[styles.buttonText, styles.receiptButtonText]}>{t('customerCollectionCard.receipt')}</Text>
           <Text style={[styles.buttonIcon, styles.receiptButtonIcon]}>📄</Text>
         </Pressable>
       );
@@ -269,7 +269,7 @@ export default function CustomerCollectionCard({
             { opacity: pressed ? 0.8 : 1 },
           ]}
         >
-          <Text style={styles.buttonText}>Collect All</Text>
+          <Text style={styles.buttonText}>{t('customerCollectionCard.collectAll')}</Text>
           <Text style={styles.buttonIcon}>💵</Text>
         </Pressable>
       );
@@ -280,7 +280,7 @@ export default function CustomerCollectionCard({
         onPress={() => onCollect?.(customer.id)}
         style={({ pressed }) => [styles.collectButton, { opacity: pressed ? 0.8 : 1 }]}
       >
-        <Text style={styles.buttonText}>Collect</Text>
+        <Text style={styles.buttonText}>{t('customerCollectionCard.collect')}</Text>
         <Text style={styles.buttonIcon}>→</Text>
       </Pressable>
     );
@@ -308,7 +308,10 @@ export default function CustomerCollectionCard({
                 {customer.customerName}
               </Text>
               <Text style={styles.accountInfo}>
-                {customer.accountType} • {customer.accountNumber}
+                {customer.accountType.toLowerCase() === 'pigmy'
+                  ? t('common.pigmy')
+                  : customer.accountType}{' '}
+                • {customer.accountNumber}
               </Text>
             </View>
           </Pressable>
@@ -326,7 +329,7 @@ export default function CustomerCollectionCard({
                 style={({ pressed }) => [styles.editButton, { opacity: pressed ? 0.7 : 1 }]}
               >
                 <Text style={styles.editButtonIcon}>✏️</Text>
-                <Text style={styles.editButtonText}>Edit</Text>
+                <Text style={styles.editButtonText}>{t('customerCollectionCard.edit')}</Text>
               </Pressable>
             )}
             {onDelete && (
@@ -335,7 +338,7 @@ export default function CustomerCollectionCard({
                 style={({ pressed }) => [styles.deleteButton, { opacity: pressed ? 0.7 : 1 }]}
               >
                 <Text style={styles.deleteButtonIcon}>🗑️</Text>
-                <Text style={styles.deleteButtonText}>Delete</Text>
+                <Text style={styles.deleteButtonText}>{t('customerCollectionCard.delete')}</Text>
               </Pressable>
             )}
           </View>

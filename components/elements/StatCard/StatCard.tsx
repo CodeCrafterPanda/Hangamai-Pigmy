@@ -1,5 +1,6 @@
 import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { useTheme, typography, spacing, radius } from '@/theme';
+import { useTranslation } from '@/i18n';
 
 type StatType = 'pending' | 'inHand' | 'online';
 
@@ -17,22 +18,23 @@ function formatRupeeAmount(value: number): string {
 
 export default function StatCard({ type, value, onPress, flex = 1 }: StatCardProps) {
   const { theme } = useTheme();
+  const { t } = useTranslation();
 
   const config = {
     pending: {
-      label: 'PENDING',
+      label: t('statCard.pending'),
       iconColor: '#D4834D',
       iconBg: 'rgba(212, 131, 77, 0.15)',
       icon: '📋',
     },
     inHand: {
-      label: 'IN HAND',
+      label: t('statCard.inHand'),
       iconColor: '#38D39F',
       iconBg: 'rgba(56, 211, 159, 0.15)',
       icon: '💵',
     },
     online: {
-      label: 'ONLINE',
+      label: t('statCard.online'),
       iconColor: '#4C8DFF',
       iconBg: 'rgba(76, 141, 255, 0.15)',
       icon: '📱',
@@ -56,6 +58,9 @@ export default function StatCard({ type, value, onPress, flex = 1 }: StatCardPro
       gap: spacing(theme, 'xs'),
       borderWidth: 1,
       borderColor: theme.colors.background.divider,
+      borderLeftWidth: 4,
+      borderLeftColor: currentConfig.iconColor,
+      overflow: 'hidden',
     },
     header: {
       flexDirection: 'row',
@@ -75,11 +80,11 @@ export default function StatCard({ type, value, onPress, flex = 1 }: StatCardPro
       fontSize: 14,
     },
     label: {
-      ...typography(theme, 'caption'),
+      ...typography(theme, 'body'),
       color: theme.colors.text.secondary,
-      fontWeight: '600',
-      letterSpacing: 0.5,
-      fontSize: 10,
+      fontWeight: '700',
+      fontSize: 16,
+      lineHeight: 20,
       flexShrink: 1,
     },
     value: {

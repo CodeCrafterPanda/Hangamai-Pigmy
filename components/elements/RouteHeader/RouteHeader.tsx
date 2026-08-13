@@ -1,5 +1,6 @@
 import { View, Text, StyleSheet } from 'react-native';
 import { useTheme, typography, spacing, radius } from '@/theme';
+import { useTranslation } from '@/i18n';
 
 interface RouteHeaderProps {
   date: string;
@@ -8,6 +9,7 @@ interface RouteHeaderProps {
 
 export default function RouteHeader({ date, isOnline }: RouteHeaderProps) {
   const { theme } = useTheme();
+  const { t } = useTranslation();
 
   const styles = StyleSheet.create({
     container: {
@@ -65,7 +67,7 @@ export default function RouteHeader({ date, isOnline }: RouteHeaderProps) {
   return (
     <View style={styles.container}>
       <View style={styles.leftSection}>
-        <Text style={styles.title}>My Routes</Text>
+        <Text style={styles.title}>{t('routes.myRoutes')}</Text>
         <Text style={styles.date}>{date}</Text>
       </View>
 
@@ -73,7 +75,7 @@ export default function RouteHeader({ date, isOnline }: RouteHeaderProps) {
         {isOnline && (
           <View style={styles.onlineStatus}>
             <View style={styles.onlineIcon} />
-            <Text style={styles.onlineText}>Online</Text>
+            <Text style={styles.onlineText}>{t('common.online')}</Text>
           </View>
         )}
       </View>

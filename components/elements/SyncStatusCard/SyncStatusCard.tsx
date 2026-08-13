@@ -1,5 +1,6 @@
 import { View, Text, StyleSheet } from 'react-native';
 import { useTheme, typography, spacing, radius } from '@/theme';
+import { useTranslation } from '@/i18n';
 
 interface SyncStatusCardProps {
   pendingCount: number;
@@ -8,6 +9,7 @@ interface SyncStatusCardProps {
 
 export default function SyncStatusCard({ pendingCount, lastSyncTime }: SyncStatusCardProps) {
   const { theme } = useTheme();
+  const { t } = useTranslation();
 
   const styles = StyleSheet.create({
     container: {
@@ -69,11 +71,13 @@ export default function SyncStatusCard({ pendingCount, lastSyncTime }: SyncStatu
   return (
     <View style={styles.container}>
       <View style={styles.leftSection}>
-        <Text style={styles.label}>Sync Status</Text>
-        <Text style={styles.count}>{pendingCount} Pending</Text>
+        <Text style={styles.label}>{t('syncStatus.label')}</Text>
+        <Text style={styles.count}>{t('syncStatus.pendingCount', { count: pendingCount })}</Text>
         <View style={styles.lastSyncContainer}>
           <Text style={styles.clockIcon}>🕐</Text>
-          <Text style={styles.lastSyncText}>Last successful sync: {lastSyncTime}</Text>
+          <Text style={styles.lastSyncText}>
+            {t('syncStatus.lastSuccessfulSync', { time: lastSyncTime })}
+          </Text>
         </View>
       </View>
 

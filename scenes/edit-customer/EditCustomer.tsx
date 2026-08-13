@@ -14,6 +14,7 @@ import { useRouter } from 'expo-router';
 import { useSelector, useDispatch } from 'react-redux';
 import type { State, Dispatch } from '@/utils/store';
 import { useTheme, typography, spacing, radius } from '@/theme';
+import { useTranslation, formatNumber } from '@/i18n';
 import EditCustomerHeader from '@/components/elements/EditCustomerHeader';
 import BottomSheet from '@/components/elements/BottomSheet';
 import {
@@ -80,6 +81,7 @@ export default function EditCustomer({ customerId }: EditCustomerProps) {
   const router = useRouter();
   const dispatch = useDispatch<Dispatch>();
   const { theme } = useTheme();
+  const { t } = useTranslation();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
 
@@ -117,13 +119,15 @@ export default function EditCustomer({ customerId }: EditCustomerProps) {
   const primaryAccount = customerAccounts[0];
 
   // Format options for dropdowns
+  const unnamedAgent = t('common.unnamedAgent');
+
   const routeOptions = useMemo(() => {
-    return allRoutes.map(r => `${r.routeCode} - ${r.name}`);
+    return allRoutes.map(r => r.name);
   }, [allRoutes]);
 
   const agentOptions = useMemo(() => {
-    return allAgents.map(a => `${a.name || 'Agent'} (${a.id})`);
-  }, [allAgents]);
+    return allAgents.map(a => a.name || unnamedAgent);
+  }, [allAgents, unnamedAgent]);
 
   const getInitials = (name: string) => {
     const parts = name.split(' ');
@@ -141,7 +145,7 @@ export default function EditCustomer({ customerId }: EditCustomerProps) {
       idNumber: actualCustomer.customerCode.replace('CUST-', ''),
       avatarUrl: undefined,
       isVerified: true,
-      assignedAgent: allAgents.find(a => a.id === actualCustomer.primaryAgentId)?.name || 'Agent',
+      assignedAgent: allAgents.find(a => a.id === actualCustomer.primaryAgentId)?.name || unnamedAgent,
       activeAccountsCount: customerAccounts.length,
     },
     personalInfo: {
@@ -154,17 +158,17 @@ export default function EditCustomer({ customerId }: EditCustomerProps) {
       homeBranch: branch?.name || '—',
     },
     collectionMapping: {
-      assignedRoute: allRoutes.find(r => r.id === actualCustomer.routeId)?.name || 'Unknown',
-      routeId: allRoutes.find(r => r.id === actualCustomer.routeId)?.routeCode || '',
-      primaryAgent: allAgents.find(a => a.id === actualCustomer.primaryAgentId)?.name || 'Agent',
+      assignedRoute: allRoutes.find(r => r.id === actualCustomer.routeId)?.name || t('common.unknown'),
+      routeId: actualCustomer.routeId,
+      primaryAgent: allAgents.find(a => a.id === actualCustomer.primaryAgentId)?.name || unnamedAgent,
       agentId: actualCustomer.primaryAgentId,
     },
     kycDocuments: [],
     associatedAccounts: customerAccounts.map((acc, idx) => ({
       id: acc.id,
-      type: 'Pigmy Daily Deposit',
+      type: t('editCustomer.pigmyDailyDeposit'),
       accountNumber: acc.accountNumber,
-      status: acc.status === 'ACTIVE' ? 'Active' : 'Inactive',
+      status: acc.status === 'ACTIVE' ? t('editCustomer.active') : t('editCustomer.inactive'),
       icon: '💰',
       iconColor: '#2ED47A',
     })),
@@ -184,8 +188,8 @@ export default function EditCustomer({ customerId }: EditCustomerProps) {
   const delegatedAgentOptions = useMemo(() => {
     return allAgents
       .filter(a => a.id !== customerData.collectionMapping.agentId)
-      .map(a => `${a.name || 'Agent'} (${a.id})`);
-  }, [allAgents, customerData.collectionMapping.agentId]);
+      .map(a => a.name || unnamedAgent);
+  }, [allAgents, customerData.collectionMapping.agentId, unnamedAgent]);
 
   const styles = StyleSheet.create({
     container: {
@@ -633,15 +637,15 @@ export default function EditCustomer({ customerId }: EditCustomerProps) {
   const handleUpdate = async () => {
     // Validate required fields
     if (!customerData.personalInfo.fullName.trim()) {
-      Alert.alert('Validation Error', 'Please enter customer name');
+      Alert.alert(t('editCustomer.validationTitle'), t('editCustomer.enterName'));
       return;
     }
     if (!customerData.personalInfo.address.trim()) {
-      Alert.alert('Validation Error', 'Please enter address');
+      Alert.alert(t('editCustomer.validationTitle'), t('editCustomer.enterAddress'));
       return;
     }
     if (!customerData.personalInfo.mobileNumber.trim()) {
-      Alert.alert('Validation Error', 'Please enter mobile number');
+      Alert.alert(t('editCustomer.validationTitle'), t('editCustomer.enterMobile'));
       return;
     }
 
@@ -650,7 +654,7 @@ export default function EditCustomer({ customerId }: EditCustomerProps) {
     const nextAccountNumber = customerData.personalInfo.accountNumber.trim();
     if (primaryAccount) {
       if (!nextAccountNumber) {
-        Alert.alert('Validation Error', 'Please enter the account number');
+        Alert.alert(t('editCustomer.validationTitle'), t('editCustomer.enterAccountNumber'));
         return;
       }
 
@@ -661,8 +665,8 @@ export default function EditCustomer({ customerId }: EditCustomerProps) {
       );
       if (collision) {
         Alert.alert(
-          'Validation Error',
-          `Account number ${collision.accountNumber} is already in use. Enter a different number.`,
+          t('editCustomer.validationTitle'),
+          t('editCustomer.accountInUse', { accountNumber: collision.accountNumber }),
         );
         return;
       }
@@ -670,8 +674,8 @@ export default function EditCustomer({ customerId }: EditCustomerProps) {
 
     if (requiresDelegation && !delegatedAgentId) {
       Alert.alert(
-        'Validation Error',
-        'Please select the agent this customer is delegated to, or set yourself as primary agent',
+        t('editCustomer.validationTitle'),
+        t('editCustomer.selectDelegatedAgentError'),
       );
       return;
     }
@@ -681,7 +685,7 @@ export default function EditCustomer({ customerId }: EditCustomerProps) {
 
       // Find route ID from route code
       const route = allRoutes.find(
-        r => r.routeCode === customerData.collectionMapping.routeId ||
+        r => r.id === customerData.collectionMapping.routeId ||
         r.name === customerData.collectionMapping.assignedRoute
       );
 
@@ -714,8 +718,8 @@ export default function EditCustomer({ customerId }: EditCustomerProps) {
         } catch (accountError) {
           console.error('Error updating account number:', accountError);
           Alert.alert(
-            'Partial Save',
-            'Customer details were saved, but the new account number could not be stored. Please enter it again.',
+            t('editCustomer.partialSave'),
+            t('editCustomer.partialAccount'),
           );
           return;
         }
@@ -758,21 +762,21 @@ export default function EditCustomer({ customerId }: EditCustomerProps) {
       } catch (delegationError) {
         console.error('Error updating delegation:', delegationError);
         Alert.alert(
-          'Partial Save',
-          'Customer details were saved, but the delegation change could not be stored. Please set the agents again.',
+          t('editCustomer.partialSave'),
+          t('editCustomer.partialDelegation'),
         );
         return;
       }
 
-      Alert.alert('Success', 'Customer updated successfully!', [
+      Alert.alert(t('common.success'), t('editCustomer.updatedSuccess'), [
         {
-          text: 'OK',
+          text: t('common.ok'),
           onPress: () => router.back(),
         },
       ]);
     } catch (error) {
       console.error('Error updating customer:', error);
-      Alert.alert('Error', 'Failed to update customer');
+      Alert.alert(t('common.error'), t('editCustomer.updateFailed'));
     }
   };
 
@@ -797,26 +801,24 @@ export default function EditCustomer({ customerId }: EditCustomerProps) {
 
   const handleDropdownSelect = (value: string) => {
     if (activeDropdown === 'route') {
-      const routeCode = value.split(' - ')[0];
-      const route = allRoutes.find(r => r.routeCode === routeCode);
-      const routeName = value.split(' - ')[1] || value;
+      const route = allRoutes.find(r => r.name === value);
       setCustomerData({
         ...customerData,
         collectionMapping: {
           ...customerData.collectionMapping,
-          routeId: route?.routeCode || routeCode,
-          assignedRoute: routeName,
+          routeId: route?.id || customerData.collectionMapping.routeId,
+          assignedRoute: route?.name || value,
         },
       });
     } else if (activeDropdown === 'agent') {
-      const agentName = value.split(' (')[0];
-      const agentId = value.match(/\(([^)]+)\)/)?.[1] || '';
+      const agent = allAgents.find(a => (a.name || unnamedAgent) === value);
+      const agentId = agent?.id || '';
       setCustomerData({
         ...customerData,
         collectionMapping: {
           ...customerData.collectionMapping,
-          primaryAgent: agentName,
-          agentId: agentId,
+          primaryAgent: agent?.name || value,
+          agentId,
         },
       });
       // a delegate is only meaningful for another primary agent, and can never be that
@@ -825,8 +827,8 @@ export default function EditCustomer({ customerId }: EditCustomerProps) {
         setDelegatedAgentId('');
       }
     } else if (activeDropdown === 'delegatedAgent') {
-      const agentId = value.match(/\(([^)]+)\)/)?.[1] || '';
-      setDelegatedAgentId(agentId);
+      const agent = allAgents.find(a => (a.name || unnamedAgent) === value);
+      setDelegatedAgentId(agent?.id || '');
     }
     closeDropdown();
   };
@@ -846,7 +848,7 @@ export default function EditCustomer({ customerId }: EditCustomerProps) {
       case 'agent': return customerData.collectionMapping.primaryAgent;
       case 'delegatedAgent': {
         const agent = allAgents.find(a => a.id === delegatedAgentId);
-        return agent ? `${agent.name} (${agent.id})` : '';
+        return agent ? agent.name || unnamedAgent : '';
       }
       default: return '';
     }
@@ -854,9 +856,9 @@ export default function EditCustomer({ customerId }: EditCustomerProps) {
 
   const getDropdownTitle = () => {
     switch (activeDropdown) {
-      case 'route': return 'Select Route';
-      case 'agent': return 'Select Primary Agent';
-      case 'delegatedAgent': return 'Select Delegated Agent';
+      case 'route': return t('editCustomer.selectRoute');
+      case 'agent': return t('editCustomer.selectPrimaryAgent');
+      case 'delegatedAgent': return t('editCustomer.selectDelegatedAgent');
       default: return '';
     }
   };
@@ -868,9 +870,9 @@ export default function EditCustomer({ customerId }: EditCustomerProps) {
       <SafeAreaView style={styles.container} edges={['top']}>
         <View style={styles.emptyState}>
           <Text style={styles.emptyIcon}>👤</Text>
-          <Text style={styles.emptyText}>Customer not found</Text>
+          <Text style={styles.emptyText}>{t('editCustomer.notFoundTitle')}</Text>
           <Text style={styles.emptyHint}>
-            This customer may have been removed or the link is invalid.
+            {t('editCustomer.notFoundHint')}
           </Text>
         </View>
       </SafeAreaView>
@@ -887,7 +889,9 @@ export default function EditCustomer({ customerId }: EditCustomerProps) {
           <View style={styles.customerHeader}>
             <View style={styles.customerInfo}>
               <Text style={styles.customerName}>{customerData.basicInfo.name}</Text>
-              <Text style={styles.customerId}>ID: {customerData.basicInfo.idNumber}</Text>
+              <Text style={styles.customerId}>
+                {t('common.idLabel', { id: customerData.basicInfo.idNumber })}
+              </Text>
             </View>
 
             <View style={styles.agentBadge}>
@@ -898,11 +902,11 @@ export default function EditCustomer({ customerId }: EditCustomerProps) {
         </View>
 
         {/* Personal Information */}
-        <Text style={styles.sectionHeader}>PERSONAL INFORMATION</Text>
+        <Text style={styles.sectionHeader}>{t('editCustomer.personalInformation')}</Text>
         <View style={styles.section}>
           <View style={styles.field}>
             <Text style={styles.label}>
-              Full Name <Text style={styles.required}>*</Text>
+              {t('editCustomer.fullName')} <Text style={styles.required}>*</Text>
             </Text>
             <TextInput
               style={styles.input}
@@ -918,7 +922,7 @@ export default function EditCustomer({ customerId }: EditCustomerProps) {
 
           <View style={styles.field}>
             <Text style={styles.label}>
-              Mobile Number <Text style={styles.required}>*</Text>
+              {t('editCustomer.mobileNumber')} <Text style={styles.required}>*</Text>
             </Text>
             <TextInput
               style={styles.input}
@@ -935,7 +939,7 @@ export default function EditCustomer({ customerId }: EditCustomerProps) {
 
           <View style={styles.field}>
             <Text style={styles.label}>
-              Address <Text style={styles.required}>*</Text>
+              {t('editCustomer.address')} <Text style={styles.required}>*</Text>
             </Text>
             <TextInput
               style={[styles.input, styles.multilineInput]}
@@ -953,7 +957,7 @@ export default function EditCustomer({ customerId }: EditCustomerProps) {
 
           <View style={styles.row}>
             <View style={[styles.field, styles.halfWidth]}>
-              <Text style={styles.label}>Customer ID</Text>
+              <Text style={styles.label}>{t('editCustomer.customerId')}</Text>
               <View style={styles.readOnlyField}>
                 <Text style={styles.readOnlyIcon}>🔒</Text>
                 <Text style={styles.readOnlyText}>{customerData.personalInfo.customerId}</Text>
@@ -961,7 +965,7 @@ export default function EditCustomer({ customerId }: EditCustomerProps) {
             </View>
 
             <View style={[styles.field, styles.halfWidth]}>
-              <Text style={styles.label}>Home Branch</Text>
+              <Text style={styles.label}>{t('editCustomer.homeBranch')}</Text>
               <View style={styles.readOnlyField}>
                 <Text style={styles.readOnlyIcon}>🏛</Text>
                 <Text style={styles.readOnlyText}>{customerData.personalInfo.homeBranch}</Text>
@@ -971,17 +975,17 @@ export default function EditCustomer({ customerId }: EditCustomerProps) {
 
           <View style={styles.row}>
             <View style={[styles.field, styles.halfWidth]}>
-              <Text style={styles.label}>Current Balance</Text>
+              <Text style={styles.label}>{t('editCustomer.currentBalance')}</Text>
               <View style={styles.readOnlyField}>
                 <Text style={styles.readOnlyIcon}>₹</Text>
                 <Text style={styles.readOnlyText}>
-                  {customerData.personalInfo.currentBalance.toLocaleString('en-IN')}
+                  {formatNumber(customerData.personalInfo.currentBalance)}
                 </Text>
               </View>
             </View>
 
             <View style={[styles.field, styles.halfWidth]}>
-              <Text style={styles.label}>Account Number</Text>
+              <Text style={styles.label}>{t('editCustomer.accountNumber')}</Text>
               {primaryAccount ? (
                 <>
                   <TextInput
@@ -995,7 +999,7 @@ export default function EditCustomer({ customerId }: EditCustomerProps) {
                       })
                     }
                   />
-                  <Text style={styles.fieldHint}>Passbook number, separate from Customer ID</Text>
+                  <Text style={styles.fieldHint}>{t('editCustomer.accountNumberHint')}</Text>
                 </>
               ) : (
                 <View style={styles.readOnlyField}>
@@ -1008,30 +1012,30 @@ export default function EditCustomer({ customerId }: EditCustomerProps) {
         </View>
 
         {/* Collection Mapping */}
-        <Text style={styles.sectionHeader}>COLLECTION MAPPING</Text>
+        <Text style={styles.sectionHeader}>{t('editCustomer.collectionMapping')}</Text>
         <View style={styles.section}>
           <View style={styles.warningBanner}>
             <Text style={styles.warningIcon}>⚠️</Text>
             <Text style={styles.warningText}>
-              Changes to Route or Agent will only apply to future collection cycles. Historical data remains unchanged.
+              {t('editCustomer.mappingWarning')}
             </Text>
           </View>
 
           <View style={styles.field}>
-            <Text style={styles.label}>Assigned Route</Text>
+            <Text style={styles.label}>{t('editCustomer.assignedRoute')}</Text>
             <Pressable onPress={() => openDropdown('route')} style={styles.dropdown}>
               <Text style={styles.dropdownText}>
-                {customerData.collectionMapping.routeId}: {customerData.collectionMapping.assignedRoute}
+                {customerData.collectionMapping.assignedRoute}
               </Text>
               <Text style={styles.dropdownIcon}>▼</Text>
             </Pressable>
           </View>
 
           <View style={styles.field}>
-            <Text style={styles.label}>Primary Agent</Text>
+            <Text style={styles.label}>{t('editCustomer.primaryAgent')}</Text>
             <Pressable onPress={() => openDropdown('agent')} style={styles.dropdown}>
               <Text style={styles.dropdownText}>
-                {customerData.collectionMapping.primaryAgent} (ID: {customerData.collectionMapping.agentId})
+                {customerData.collectionMapping.primaryAgent}
               </Text>
               <Text style={styles.dropdownIcon}>▼</Text>
             </Pressable>
@@ -1040,13 +1044,15 @@ export default function EditCustomer({ customerId }: EditCustomerProps) {
           {requiresDelegation && (
             <View style={styles.field}>
               <Text style={styles.label}>
-                Delegated Agent <Text style={styles.required}>*</Text>
+                {t('editCustomer.delegatedAgent')} <Text style={styles.required}>*</Text>
               </Text>
               <Pressable onPress={() => openDropdown('delegatedAgent')} style={styles.dropdown}>
                 <Text style={styles.dropdownText}>
                   {(() => {
                     const agent = allAgents.find(a => a.id === delegatedAgentId);
-                    return agent ? `${agent.name} (ID: ${agent.id})` : 'Select Agent';
+                    return agent
+                      ? agent.name || unnamedAgent
+                      : t('editCustomer.selectAgent');
                   })()}
                 </Text>
                 <Text style={styles.dropdownIcon}>▼</Text>
@@ -1059,14 +1065,14 @@ export default function EditCustomer({ customerId }: EditCustomerProps) {
             onPress={handleCancel}
             style={({ pressed }) => [styles.cancelButton, { opacity: pressed ? 0.7 : 1 }]}
           >
-            <Text style={styles.cancelButtonText}>Cancel</Text>
+            <Text style={styles.cancelButtonText}>{t('editCustomer.cancel')}</Text>
           </Pressable>
 
           <Pressable
             onPress={handleUpdate}
             style={({ pressed }) => [styles.updateButton, { opacity: pressed ? 0.8 : 1 }]}
           >
-            <Text style={styles.updateButtonText}>Update Customer</Text>
+            <Text style={styles.updateButtonText}>{t('editCustomer.updateCustomer')}</Text>
           </Pressable>
         </View>
       </ScrollView>

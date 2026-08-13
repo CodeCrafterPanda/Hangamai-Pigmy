@@ -9,11 +9,12 @@ import {
   Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useRouter } from 'expo-router';
 import { useSelector, useDispatch, useStore } from 'react-redux';
 import type { State, Dispatch } from '@/utils/store';
 import { useTheme, typography, spacing, radius } from '@/theme';
+import { useTranslation } from '@/i18n';
 import AddCustomerHeader from '@/components/elements/AddCustomerHeader';
 import BottomSheet from '@/components/elements/BottomSheet';
 import {
@@ -59,10 +60,10 @@ const documentTypeOptions = [
   'Passport',
 ];
 
-const frequencyOptions: { label: string; value: SchemeFrequency }[] = [
-  { label: 'Daily', value: SchemeFrequency.DAILY },
-  { label: 'Weekly', value: SchemeFrequency.WEEKLY },
-  { label: 'Monthly', value: SchemeFrequency.MONTHLY },
+const frequencyOptions: SchemeFrequency[] = [
+  SchemeFrequency.DAILY,
+  SchemeFrequency.WEEKLY,
+  SchemeFrequency.MONTHLY,
 ];
 
 function mapDocumentTypeToKYC(documentType: string): KYCType {
@@ -78,10 +79,6 @@ function mapDocumentTypeToKYC(documentType: string): KYCType {
     default:
       return KYCType.OTHER;
   }
-}
-
-function frequencyDisplayLabel(frequency: SchemeFrequency): string {
-  return frequencyOptions.find(o => o.value === frequency)?.label ?? 'Daily';
 }
 
 function schemeNameFor(frequency: SchemeFrequency): string {
@@ -106,6 +103,7 @@ export default function AddNewCustomer({ presetRouteId }: AddNewCustomerProps) {
   const dispatch = useDispatch<Dispatch>();
   const store = useStore<State>();
   const { theme } = useTheme();
+  const { t } = useTranslation();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -120,17 +118,39 @@ export default function AddNewCustomer({ presetRouteId }: AddNewCustomerProps) {
   // screens resolve customers with
   const sessionAgentId = session.agentId || 'demo-agent';
 
+  const unnamedBranch = t('common.unnamedBranch');
+  const unnamedAgent = t('common.unnamedAgent');
+
+  const documentTypeLabel = (documentType: string) => {
+    switch (documentType) {
+      case 'Aadhaar Card':
+        return t('addCustomer.documentTypes.aadhaar');
+      case 'PAN Card':
+        return t('addCustomer.documentTypes.pan');
+      case 'Voter ID':
+        return t('addCustomer.documentTypes.voterId');
+      case 'Driving License':
+        return t('addCustomer.documentTypes.drivingLicense');
+      case 'Passport':
+        return t('addCustomer.documentTypes.passport');
+      default:
+        return documentType;
+    }
+  };
+
   const branchOptions = useMemo(() => {
-    return allBranches.map(b => b.name || 'Hangamai Main Branch');
-  }, [allBranches]);
+    return allBranches.map(b => b.name || unnamedBranch);
+  }, [allBranches, unnamedBranch]);
 
   const routeOptions = useMemo(() => {
-    return allRoutes.map(r => `${r.routeCode} - ${r.name}`);
+    return allRoutes.map(r => r.name);
   }, [allRoutes]);
 
   const agentOptions = useMemo(() => {
-    return allAgents.map(a => `${a.name || 'Agent'} (${a.id})`);
-  }, [allAgents]);
+    return allAgents.map(a => a.name || unnamedAgent);
+  }, [allAgents, unnamedAgent]);
+
+  const soleBranchId = allBranches.length === 1 ? allBranches[0].id : undefined;
 
   const [formData, setFormData] = useState<AddCustomerFormData>({
     personal: {
@@ -143,7 +163,7 @@ export default function AddNewCustomer({ presetRouteId }: AddNewCustomerProps) {
       fullAddress: '',
     },
     assignment: {
-      branch: '',
+      branch: soleBranchId || '',
       // Route Details passes the route it was opened from; entering from anywhere else
       // leaves the normal route picker empty
       route: presetRouteId || '',
@@ -164,6 +184,18 @@ export default function AddNewCustomer({ presetRouteId }: AddNewCustomerProps) {
     },
   });
 
+  useEffect(() => {
+    if (!soleBranchId) return;
+    setFormData(prev => {
+      if (prev.assignment.branch === soleBranchId) return prev;
+      return {
+        ...prev,
+        assignment: { ...prev.assignment, branch: soleBranchId },
+      };
+    });
+  }, [soleBranchId]);
+
+  const isBranchLocked = Boolean(soleBranchId);
   const isRouteLocked = Boolean(presetRouteId);
   const presetRoute = allRoutes.find(r => r.id === presetRouteId);
 
@@ -176,8 +208,8 @@ export default function AddNewCustomer({ presetRouteId }: AddNewCustomerProps) {
   const delegatedAgentOptions = useMemo(() => {
     return allAgents
       .filter(a => a.id !== formData.assignment.primaryAgent)
-      .map(a => `${a.name || 'Agent'} (${a.id})`);
-  }, [allAgents, formData.assignment.primaryAgent]);
+      .map(a => a.name || unnamedAgent);
+  }, [allAgents, formData.assignment.primaryAgent, unnamedAgent]);
 
   const styles = StyleSheet.create({
     container: {
@@ -515,11 +547,11 @@ export default function AddNewCustomer({ presetRouteId }: AddNewCustomerProps) {
         } catch (delegationError) {
           console.error('Error creating delegation:', delegationError);
           Alert.alert(
-            'Partial Save',
-            'Customer was saved, but recording the delegation failed. The delegated agent will not see this customer until it is set again from Edit Customer.',
+            t('addCustomer.partialSave'),
+            t('addCustomer.partialDelegation'),
             [
               {
-                text: 'OK',
+                text: t('common.ok'),
                 onPress: () =>
                   router.replace(`/(app)/(route)/customer-detail/${lastCustomerId}`),
               },
@@ -553,11 +585,11 @@ export default function AddNewCustomer({ presetRouteId }: AddNewCustomerProps) {
         } catch (accountError) {
           console.error('Error creating account/scheme:', accountError);
           Alert.alert(
-            'Partial Save',
-            'Customer was saved, but creating the Pigmy account failed. You can retry from Edit Customer later.',
+            t('addCustomer.partialSave'),
+            t('addCustomer.partialAccount'),
             [
               {
-                text: 'OK',
+                text: t('common.ok'),
                 onPress: () =>
                   router.replace(`/(app)/(route)/customer-detail/${lastCustomerId}`),
               },
@@ -567,16 +599,16 @@ export default function AddNewCustomer({ presetRouteId }: AddNewCustomerProps) {
         }
       }
 
-      Alert.alert('Success', 'Customer added successfully!', [
+      Alert.alert(t('common.success'), t('addCustomer.addedSuccess'), [
         {
-          text: 'OK',
+          text: t('common.ok'),
           onPress: () =>
             router.replace(`/(app)/(route)/customer-detail/${lastCustomerId}`),
         },
       ]);
     } catch (error) {
       console.error('Error adding customer:', error);
-      Alert.alert('Error', 'Failed to add customer');
+      Alert.alert(t('common.error'), t('addCustomer.addFailed'));
     } finally {
       setIsSaving(false);
     }
@@ -584,41 +616,41 @@ export default function AddNewCustomer({ presetRouteId }: AddNewCustomerProps) {
 
   const handleSave = async () => {
     if (!formData.personal.fullName.trim()) {
-      Alert.alert('Validation Error', 'Please enter customer name');
+      Alert.alert(t('addCustomer.validationTitle'), t('addCustomer.enterName'));
       return;
     }
     if (!formData.address.fullAddress.trim()) {
-      Alert.alert('Validation Error', 'Please enter address');
+      Alert.alert(t('addCustomer.validationTitle'), t('addCustomer.enterAddress'));
       return;
     }
     if (!formData.assignment.branch) {
-      Alert.alert('Validation Error', 'Please select a branch');
+      Alert.alert(t('addCustomer.validationTitle'), t('addCustomer.selectBranchError'));
       return;
     }
     if (!formData.assignment.route) {
-      Alert.alert('Validation Error', 'Please select a route');
+      Alert.alert(t('addCustomer.validationTitle'), t('addCustomer.selectRouteError'));
       return;
     }
     if (!formData.assignment.primaryAgent) {
-      Alert.alert('Validation Error', 'Please select primary agent');
+      Alert.alert(t('addCustomer.validationTitle'), t('addCustomer.selectPrimaryAgentError'));
       return;
     }
     if (requiresDelegation && !formData.assignment.delegatedAgent) {
       Alert.alert(
-        'Validation Error',
-        'Please select the agent this customer is delegated to, or set yourself as primary agent',
+        t('addCustomer.validationTitle'),
+        t('addCustomer.selectDelegatedAgentError'),
       );
       return;
     }
     if (!validatePhone(formData.personal.mobileNumber)) {
-      Alert.alert('Validation Error', 'Please enter a valid 10-digit mobile number');
+      Alert.alert(t('addCustomer.validationTitle'), t('addCustomer.invalidMobile'));
       return;
     }
     if (
       formData.pigmyAccount.createAccount &&
       (!formData.pigmyAccount.dailyAmount || formData.pigmyAccount.dailyAmount <= 0)
     ) {
-      Alert.alert('Validation Error', 'Please enter a valid installment amount');
+      Alert.alert(t('addCustomer.validationTitle'), t('addCustomer.invalidInstallment'));
       return;
     }
 
@@ -632,8 +664,8 @@ export default function AddNewCustomer({ presetRouteId }: AddNewCustomerProps) {
 
       if (existingAccount) {
         Alert.alert(
-          'Validation Error',
-          `Account number ${existingAccount.accountNumber} is already in use. Enter a different number or leave the field blank to auto-generate one.`,
+          t('addCustomer.validationTitle'),
+          t('addCustomer.accountInUse', { accountNumber: existingAccount.accountNumber }),
         );
         return;
       }
@@ -654,15 +686,16 @@ export default function AddNewCustomer({ presetRouteId }: AddNewCustomerProps) {
         .map(c => `${c.fullName}${c.phone ? ` (${c.phone})` : ''}`)
         .join('\n');
 
+      const extra =
+        duplicates.length > 3 ? `\n${t('addCustomer.andMore', { count: duplicates.length - 3 })}` : '';
+
       Alert.alert(
-        'Possible Duplicate',
-        `A similar customer may already exist:\n\n${summary}${
-          duplicates.length > 3 ? `\n…and ${duplicates.length - 3} more` : ''
-        }\n\nYou can continue anyway if this is a different person.`,
+        t('addCustomer.possibleDuplicate'),
+        t('addCustomer.possibleDuplicateMessage', { summary: `${summary}${extra}` }),
         [
-          { text: 'Cancel', style: 'cancel' },
+          { text: t('common.cancel'), style: 'cancel' },
           {
-            text: 'Continue Anyway',
+            text: t('common.continueAnyway'),
             onPress: () => {
               void proceedWithSave();
             },
@@ -677,12 +710,12 @@ export default function AddNewCustomer({ presetRouteId }: AddNewCustomerProps) {
 
   const handleCancel = () => {
     Alert.alert(
-      'Cancel',
-      'Are you sure you want to cancel? All data will be lost.',
+      t('addCustomer.cancelTitle'),
+      t('addCustomer.cancelMessage'),
       [
-        { text: 'Continue Editing', style: 'cancel' },
+        { text: t('common.continueEditing'), style: 'cancel' },
         {
-          text: 'Discard',
+          text: t('common.discard'),
           style: 'destructive',
           onPress: () => router.back(),
         },
@@ -702,20 +735,20 @@ export default function AddNewCustomer({ presetRouteId }: AddNewCustomerProps) {
 
   const handleDropdownSelect = (value: string) => {
     if (activeDropdown === 'branch') {
-      const branch = allBranches.find(b => (b.name || 'Hangamai Main Branch') === value);
+      const branch = allBranches.find(b => (b.name || unnamedBranch) === value);
       setFormData({
         ...formData,
         assignment: { ...formData.assignment, branch: branch?.id || value },
       });
     } else if (activeDropdown === 'route') {
-      const routeCode = value.split(' - ')[0];
-      const route = allRoutes.find(r => r.routeCode === routeCode);
+      const route = allRoutes.find(r => r.name === value);
       setFormData({
         ...formData,
         assignment: { ...formData.assignment, route: route?.id || value },
       });
     } else if (activeDropdown === 'agent') {
-      const agentId = value.match(/\(([^)]+)\)/)?.[1] || '';
+      const agent = allAgents.find(a => (a.name || unnamedAgent) === value);
+      const agentId = agent?.id || '';
       const keepsDelegate =
         agentId !== sessionAgentId && agentId !== formData.assignment.delegatedAgent;
       setFormData({
@@ -729,19 +762,22 @@ export default function AddNewCustomer({ presetRouteId }: AddNewCustomerProps) {
         },
       });
     } else if (activeDropdown === 'delegatedAgent') {
-      const agentId = value.match(/\(([^)]+)\)/)?.[1] || '';
+      const agent = allAgents.find(a => (a.name || unnamedAgent) === value);
       setFormData({
         ...formData,
-        assignment: { ...formData.assignment, delegatedAgent: agentId },
+        assignment: { ...formData.assignment, delegatedAgent: agent?.id || '' },
       });
     } else if (activeDropdown === 'documentType') {
       setFormData({ ...formData, kyc: { ...formData.kyc, documentType: value } });
     } else if (activeDropdown === 'frequency') {
-      const selected = frequencyOptions.find(o => o.label === value);
-      if (selected) {
+      if (
+        value === SchemeFrequency.DAILY ||
+        value === SchemeFrequency.WEEKLY ||
+        value === SchemeFrequency.MONTHLY
+      ) {
         setFormData({
           ...formData,
-          pigmyAccount: { ...formData.pigmyAccount, frequency: selected.value },
+          pigmyAccount: { ...formData.pigmyAccount, frequency: value },
         });
       }
     }
@@ -761,7 +797,7 @@ export default function AddNewCustomer({ presetRouteId }: AddNewCustomerProps) {
       case 'documentType':
         return documentTypeOptions;
       case 'frequency':
-        return frequencyOptions.map(o => o.label);
+        return frequencyOptions;
       default:
         return [];
     }
@@ -771,24 +807,24 @@ export default function AddNewCustomer({ presetRouteId }: AddNewCustomerProps) {
     switch (activeDropdown) {
       case 'branch': {
         const branch = allBranches.find(b => b.id === formData.assignment.branch);
-        return branch?.name || 'Hangamai Main Branch';
+        return branch?.name || unnamedBranch;
       }
       case 'route': {
         const route = allRoutes.find(r => r.id === formData.assignment.route);
-        return route ? `${route.routeCode} - ${route.name}` : '';
+        return route ? route.name : '';
       }
       case 'agent': {
         const agent = allAgents.find(a => a.id === formData.assignment.primaryAgent);
-        return agent ? `${agent.name} (${agent.id})` : '';
+        return agent ? agent.name || unnamedAgent : '';
       }
       case 'delegatedAgent': {
         const agent = allAgents.find(a => a.id === formData.assignment.delegatedAgent);
-        return agent ? `${agent.name} (${agent.id})` : '';
+        return agent ? agent.name || unnamedAgent : '';
       }
       case 'documentType':
         return formData.kyc.documentType;
       case 'frequency':
-        return frequencyDisplayLabel(formData.pigmyAccount.frequency);
+        return formData.pigmyAccount.frequency;
       default:
         return '';
     }
@@ -797,20 +833,30 @@ export default function AddNewCustomer({ presetRouteId }: AddNewCustomerProps) {
   const getDropdownTitle = () => {
     switch (activeDropdown) {
       case 'branch':
-        return 'Select Branch';
+        return t('addCustomer.selectBranch');
       case 'route':
-        return 'Select Route';
+        return t('addCustomer.selectRoute');
       case 'agent':
-        return 'Select Primary Agent';
+        return t('addCustomer.selectPrimaryAgent');
       case 'delegatedAgent':
-        return 'Select Delegated Agent';
+        return t('addCustomer.selectDelegatedAgent');
       case 'documentType':
-        return 'Select Document Type';
+        return t('addCustomer.selectDocumentType');
       case 'frequency':
-        return 'Select Frequency';
+        return t('addCustomer.selectFrequency');
       default:
         return '';
     }
+  };
+
+  const getOptionLabel = (option: string) => {
+    if (activeDropdown === 'documentType') {
+      return documentTypeLabel(option);
+    }
+    if (activeDropdown === 'frequency') {
+      return t(`schemeFrequency.${option as SchemeFrequency}`);
+    }
+    return option;
   };
 
   return (
@@ -821,16 +867,16 @@ export default function AddNewCustomer({ presetRouteId }: AddNewCustomerProps) {
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionIcon}>👤</Text>
-            <Text style={styles.sectionTitle}>Personal Details</Text>
+            <Text style={styles.sectionTitle}>{t('addCustomer.personalDetails')}</Text>
           </View>
 
           <View style={styles.field}>
             <Text style={styles.label}>
-              Full Name <Text style={styles.required}>*</Text>
+              {t('addCustomer.fullName')} <Text style={styles.required}>*</Text>
             </Text>
             <TextInput
               style={styles.input}
-              placeholder="e.g. Rajesh Kumar"
+              placeholder={t('addCustomer.fullNamePlaceholder')}
               placeholderTextColor={theme.colors.text.muted}
               value={formData.personal.fullName}
               onChangeText={text =>
@@ -843,11 +889,11 @@ export default function AddNewCustomer({ presetRouteId }: AddNewCustomerProps) {
           </View>
 
           <View style={styles.field}>
-            <Text style={styles.label}>Mobile Number</Text>
+            <Text style={styles.label}>{t('addCustomer.mobileNumber')}</Text>
             <View style={styles.inputWithIcon}>
               <TextInput
                 style={styles.inputFlex}
-                placeholder="10-digit number"
+                placeholder={t('addCustomer.mobilePlaceholder')}
                 placeholderTextColor={theme.colors.text.muted}
                 keyboardType="phone-pad"
                 maxLength={10}
@@ -864,7 +910,7 @@ export default function AddNewCustomer({ presetRouteId }: AddNewCustomerProps) {
           </View>
 
           <View style={styles.field}>
-            <Text style={styles.label}>Customer ID / CIF</Text>
+            <Text style={styles.label}>{t('addCustomer.customerIdCif')}</Text>
             <View style={styles.inputWithIcon}>
               <TextInput
                 style={styles.inputFlex}
@@ -876,10 +922,10 @@ export default function AddNewCustomer({ presetRouteId }: AddNewCustomerProps) {
           </View>
 
           <View style={styles.field}>
-            <Text style={styles.label}>Account Number</Text>
+            <Text style={styles.label}>{t('addCustomer.accountNumber')}</Text>
             <TextInput
               style={styles.input}
-              placeholder="Leave blank to auto-generate"
+              placeholder={t('addCustomer.accountNumberPlaceholder')}
               placeholderTextColor={theme.colors.text.muted}
               autoCapitalize="characters"
               value={formData.personal.accountNumber}
@@ -892,19 +938,16 @@ export default function AddNewCustomer({ presetRouteId }: AddNewCustomerProps) {
             />
             <View style={styles.infoBox}>
               <Text style={styles.infoIcon}>ℹ️</Text>
-              <Text style={styles.infoText}>
-                Enter the passbook account number to use it as-is. It stays separate from the
-                Customer ID above.
-              </Text>
+              <Text style={styles.infoText}>{t('addCustomer.accountNumberHint')}</Text>
             </View>
           </View>
           <View style={styles.field}>
             <Text style={styles.label}>
-              Address <Text style={styles.required}>*</Text>
+              {t('addCustomer.address')} <Text style={styles.required}>*</Text>
             </Text>
             <TextInput
               style={[styles.input, styles.multilineInput]}
-              placeholder="House No, Building, Street, Area, City, Pincode"
+              placeholder={t('addCustomer.addressPlaceholder')}
               placeholderTextColor={theme.colors.text.muted}
               multiline
               numberOfLines={3}
@@ -922,38 +965,47 @@ export default function AddNewCustomer({ presetRouteId }: AddNewCustomerProps) {
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionIcon}>📋</Text>
-            <Text style={styles.sectionTitle}>Assignment</Text>
+            <Text style={styles.sectionTitle}>{t('addCustomer.assignment')}</Text>
           </View>
 
           <View style={styles.field}>
             <Text style={styles.label}>
-              Branch <Text style={styles.required}>*</Text>
+              {t('addCustomer.branch')} <Text style={styles.required}>*</Text>
             </Text>
-            <Pressable onPress={() => openDropdown('branch')} style={styles.dropdown}>
-              <Text
-                style={
-                  formData.assignment.branch ? styles.dropdownText : styles.dropdownPlaceholder
-                }
-              >
-                {formData.assignment.branch
-                  ? allBranches.find(b => b.id === formData.assignment.branch)?.name ||
-                    'Hangamai Main Branch'
-                  : 'Select Branch'}
-              </Text>
-              <Text style={styles.dropdownIcon}>▼</Text>
-            </Pressable>
+            {isBranchLocked ? (
+              <View style={styles.inputWithIcon}>
+                <Text style={styles.readOnlyValue}>
+                  {allBranches[0]?.name || unnamedBranch}
+                </Text>
+                <Text style={styles.inputIcon}>🔒</Text>
+              </View>
+            ) : (
+              <Pressable onPress={() => openDropdown('branch')} style={styles.dropdown}>
+                <Text
+                  style={
+                    formData.assignment.branch ? styles.dropdownText : styles.dropdownPlaceholder
+                  }
+                >
+                  {formData.assignment.branch
+                    ? allBranches.find(b => b.id === formData.assignment.branch)?.name ||
+                      unnamedBranch
+                    : t('addCustomer.selectBranch')}
+                </Text>
+                <Text style={styles.dropdownIcon}>▼</Text>
+              </Pressable>
+            )}
           </View>
 
           <View style={styles.field}>
             <Text style={styles.label}>
-              Route / Beat <Text style={styles.required}>*</Text>
+              {t('addCustomer.routeBeat')} <Text style={styles.required}>*</Text>
             </Text>
             {isRouteLocked ? (
               <View style={styles.inputWithIcon}>
                 <Text style={styles.readOnlyValue}>
                   {presetRoute
-                    ? `${presetRoute.routeCode} - ${presetRoute.name}`
-                    : 'Route selected on the previous screen'}
+                    ? presetRoute.name
+                    : t('addCustomer.routeLockedHint')}
                 </Text>
                 <Text style={styles.inputIcon}>🔒</Text>
               </View>
@@ -967,9 +1019,9 @@ export default function AddNewCustomer({ presetRouteId }: AddNewCustomerProps) {
                   {formData.assignment.route
                     ? (() => {
                         const route = allRoutes.find(r => r.id === formData.assignment.route);
-                        return route ? `${route.routeCode} - ${route.name}` : 'Select Route';
+                        return route ? route.name : t('addCustomer.selectRoute');
                       })()
-                    : 'Select Route'}
+                    : t('addCustomer.selectRoute')}
                 </Text>
                 <Text style={styles.dropdownIcon}>▼</Text>
               </Pressable>
@@ -978,7 +1030,7 @@ export default function AddNewCustomer({ presetRouteId }: AddNewCustomerProps) {
 
           <View style={styles.field}>
             <Text style={styles.label}>
-              Primary Agent <Text style={styles.required}>*</Text>
+              {t('addCustomer.primaryAgent')} <Text style={styles.required}>*</Text>
             </Text>
             <Pressable onPress={() => openDropdown('agent')} style={styles.dropdown}>
               <Text
@@ -996,10 +1048,10 @@ export default function AddNewCustomer({ presetRouteId }: AddNewCustomerProps) {
                       // the session agent may have no Agent record yet, so show the id
                       // rather than implying nothing is selected
                       return agent
-                        ? `${agent.name} (${agent.id})`
-                        : formData.assignment.primaryAgent;
+                        ? agent.name || unnamedAgent
+                        : unnamedAgent;
                     })()
-                  : 'Select Agent'}
+                  : t('addCustomer.selectAgent')}
               </Text>
               <Text style={styles.dropdownIcon}>▼</Text>
             </Pressable>
@@ -1008,7 +1060,7 @@ export default function AddNewCustomer({ presetRouteId }: AddNewCustomerProps) {
           {requiresDelegation && (
             <View style={styles.field}>
               <Text style={styles.label}>
-                Delegated Agent <Text style={styles.required}>*</Text>
+                {t('addCustomer.delegatedAgent')} <Text style={styles.required}>*</Text>
               </Text>
               <Pressable onPress={() => openDropdown('delegatedAgent')} style={styles.dropdown}>
                 <Text
@@ -1023,9 +1075,11 @@ export default function AddNewCustomer({ presetRouteId }: AddNewCustomerProps) {
                         const agent = allAgents.find(
                           a => a.id === formData.assignment.delegatedAgent,
                         );
-                        return agent ? `${agent.name} (${agent.id})` : 'Select Agent';
+                        return agent
+                          ? agent.name || unnamedAgent
+                          : t('addCustomer.selectAgent');
                       })()
-                    : 'Select Agent'}
+                    : t('addCustomer.selectAgent')}
                 </Text>
                 <Text style={styles.dropdownIcon}>▼</Text>
               </Pressable>
@@ -1037,8 +1091,8 @@ export default function AddNewCustomer({ presetRouteId }: AddNewCustomerProps) {
               <Text style={styles.infoIcon}>ℹ️</Text>
               <Text style={styles.infoText}>
                 {requiresDelegation
-                  ? 'The customer stays owned by the primary agent and is delegated to the selected agent for collections.'
-                  : 'The selected agent will be responsible for daily pigmy collections from this customer.'}
+                  ? t('addCustomer.delegatedHint')
+                  : t('addCustomer.primaryHint')}
               </Text>
             </View>
           </View>
@@ -1047,22 +1101,24 @@ export default function AddNewCustomer({ presetRouteId }: AddNewCustomerProps) {
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionIcon}>✓</Text>
-            <Text style={styles.sectionTitle}>KYC Compliance</Text>
+            <Text style={styles.sectionTitle}>{t('addCustomer.kycCompliance')}</Text>
           </View>
 
           <View style={styles.field}>
-            <Text style={styles.label}>Document Type</Text>
+            <Text style={styles.label}>{t('addCustomer.documentType')}</Text>
             <Pressable onPress={() => openDropdown('documentType')} style={styles.dropdown}>
-              <Text style={styles.dropdownText}>{formData.kyc.documentType}</Text>
+              <Text style={styles.dropdownText}>
+                {documentTypeLabel(formData.kyc.documentType)}
+              </Text>
               <Text style={styles.dropdownIcon}>▼</Text>
             </Pressable>
           </View>
 
           <View style={styles.field}>
-            <Text style={styles.label}>Document Number</Text>
+            <Text style={styles.label}>{t('addCustomer.documentNumber')}</Text>
             <TextInput
               style={styles.input}
-              placeholder="XXXX XXXX 1234"
+              placeholder={t('addCustomer.documentNumberPlaceholder')}
               placeholderTextColor={theme.colors.text.muted}
               value={formData.kyc.documentNumber}
               onChangeText={text =>
@@ -1078,14 +1134,14 @@ export default function AddNewCustomer({ presetRouteId }: AddNewCustomerProps) {
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionIcon}>💰</Text>
-            <Text style={styles.sectionTitle}>Pigmy Account</Text>
+            <Text style={styles.sectionTitle}>{t('addCustomer.pigmyAccount')}</Text>
           </View>
 
           <View style={styles.toggleSection}>
             <View style={styles.toggleContent}>
-              <Text style={styles.toggleTitle}>Create Pigmy Account</Text>
+              <Text style={styles.toggleTitle}>{t('addCustomer.createPigmyAccount')}</Text>
               <Text style={styles.toggleSubtitle}>
-                Link a savings scheme with frequency and installment amount
+                {t('addCustomer.createPigmyAccountHint')}
               </Text>
             </View>
             <Switch
@@ -1107,11 +1163,11 @@ export default function AddNewCustomer({ presetRouteId }: AddNewCustomerProps) {
             <>
               <View style={styles.field}>
                 <Text style={styles.label}>
-                  Frequency <Text style={styles.required}>*</Text>
+                  {t('addCustomer.frequency')} <Text style={styles.required}>*</Text>
                 </Text>
                 <Pressable onPress={() => openDropdown('frequency')} style={styles.dropdown}>
                   <Text style={styles.dropdownText}>
-                    {frequencyDisplayLabel(formData.pigmyAccount.frequency)}
+                    {t(`schemeFrequency.${formData.pigmyAccount.frequency}`)}
                   </Text>
                   <Text style={styles.dropdownIcon}>▼</Text>
                 </Pressable>
@@ -1119,11 +1175,11 @@ export default function AddNewCustomer({ presetRouteId }: AddNewCustomerProps) {
 
               <View style={styles.field}>
                 <Text style={styles.label}>
-                  Installment Amount (₹) <Text style={styles.required}>*</Text>
+                  {t('addCustomer.installmentAmount')} <Text style={styles.required}>*</Text>
                 </Text>
                 <TextInput
                   style={styles.input}
-                  placeholder="e.g. 500"
+                  placeholder={t('addCustomer.installmentPlaceholder')}
                   placeholderTextColor={theme.colors.text.muted}
                   keyboardType="numeric"
                   value={String(formData.pigmyAccount.dailyAmount || '')}
@@ -1148,7 +1204,7 @@ export default function AddNewCustomer({ presetRouteId }: AddNewCustomerProps) {
             onPress={handleCancel}
             style={({ pressed }) => [styles.cancelButton, { opacity: pressed ? 0.7 : 1 }]}
           >
-            <Text style={styles.cancelButtonText}>Cancel</Text>
+            <Text style={styles.cancelButtonText}>{t('addCustomer.cancel')}</Text>
           </Pressable>
 
           <Pressable
@@ -1161,7 +1217,7 @@ export default function AddNewCustomer({ presetRouteId }: AddNewCustomerProps) {
           >
             <Text style={styles.saveButtonIcon}>💾</Text>
             <Text style={styles.saveButtonText}>
-              {isSaving ? 'Saving…' : 'Save Customer'}
+              {isSaving ? t('addCustomer.saving') : t('addCustomer.saveCustomer')}
             </Text>
           </Pressable>
         </View>
@@ -1186,7 +1242,7 @@ export default function AddNewCustomer({ presetRouteId }: AddNewCustomerProps) {
                     getDropdownValue() === option && styles.optionTextSelected,
                   ]}
                 >
-                  {option}
+                  {getOptionLabel(option)}
                 </Text>
               </Pressable>
             ))}

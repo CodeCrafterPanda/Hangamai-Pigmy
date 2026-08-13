@@ -3,6 +3,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { StackActions } from '@react-navigation/native';
 import type { NavigationProp, ParamListBase, RouteProp } from '@react-navigation/native';
 import { useTheme } from '@/theme';
+import { useTranslation } from '@/i18n';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 interface TabListenerProps {
@@ -36,6 +37,7 @@ function resetSectionOnTabPress({ navigation, route }: TabListenerProps) {
 export default function AppLayout() {
   const { theme } = useTheme();
   const insets = useSafeAreaInsets();
+  const { t } = useTranslation();
 
   return (
     <Tabs
@@ -61,7 +63,7 @@ export default function AppLayout() {
         name="(home)"
         listeners={resetSectionOnTabPress}
         options={{
-          title: 'Home',
+          title: t('tabs.home'),
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="home-outline" size={size} color={color} />
           ),
@@ -71,7 +73,7 @@ export default function AppLayout() {
         name="(route)"
         listeners={resetSectionOnTabPress}
         options={{
-          title: 'Route',
+          title: t('tabs.route'),
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="map-outline" size={size} color={color} />
           ),
@@ -81,7 +83,7 @@ export default function AppLayout() {
         name="(customers)"
         listeners={resetSectionOnTabPress}
         options={{
-          title: 'Customers',
+          title: t('tabs.customers'),
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="people-outline" size={size} color={color} />
           ),
@@ -91,7 +93,7 @@ export default function AppLayout() {
         name="(history)"
         listeners={resetSectionOnTabPress}
         options={{
-          title: 'History',
+          title: t('tabs.history'),
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="time-outline" size={size} color={color} />
           ),
@@ -101,7 +103,7 @@ export default function AppLayout() {
         name="(profile)"
         listeners={resetSectionOnTabPress}
         options={{
-          title: 'Sync',
+          title: t('tabs.sync'),
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="cloud-upload-outline" size={size} color={color} />
           ),

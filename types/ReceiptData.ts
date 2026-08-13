@@ -12,6 +12,7 @@ export interface ReceiptData {
   time: string;
   paymentMode: string;
   agentId: string;
+  agentName: string;
   isSavedLocally: boolean;
   initials: string;
 }

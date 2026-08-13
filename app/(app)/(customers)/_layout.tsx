@@ -1,8 +1,10 @@
 import { Stack } from 'expo-router';
 import { useTheme } from '@/theme';
+import { useTranslation } from '@/i18n';
 
 export default function CustomersStack() {
   const { theme } = useTheme();
+  const { t } = useTranslation();
 
   return (
     <Stack
@@ -20,7 +22,7 @@ export default function CustomersStack() {
       <Stack.Screen
         name="index"
         options={{
-          title: 'Customers',
+          title: t('customers.title'),
           headerShown: true,
         }}
       />

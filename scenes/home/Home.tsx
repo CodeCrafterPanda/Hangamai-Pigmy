@@ -4,9 +4,11 @@ import { useRouter } from 'expo-router';
 import { useSelector } from 'react-redux';
 import type { State } from '@/utils/store';
 import { useTheme, typography, spacing, radius } from '@/theme';
+import { useTranslation } from '@/i18n';
 import CollectedTodayCard from '@/components/elements/CollectedTodayCard';
 import StatCard from '@/components/elements/StatCard';
-import AttentionBanner from '@/components/elements/AttentionBanner';
+// Restored later: home Attention banner (overdue + pending sync).
+// import AttentionBanner from '@/components/elements/AttentionBanner';
 import CustomerCollectionCard from '@/components/elements/CustomerCollectionCard';
 import BottomSheet from '@/components/elements/BottomSheet';
 import CollectDeposit from '@/scenes/collect-deposit';
@@ -14,7 +16,7 @@ import Receipt from '@/scenes/receipt';
 import {
   selectTotalCollectedToday,
   selectTodayCollectionsByAgent,
-  selectCollectionsNeedingSync,
+  // selectCollectionsNeedingSync,
 } from '@/slices/collections.slice';
 import { selectCustomersByAgent, selectAllCustomers } from '@/slices/customers.slice';
 import { selectDelegationsBySecondaryAgent } from '@/slices/delegations.slice';
@@ -24,12 +26,14 @@ import { selectCashInHand, getCollectionSettlementScope } from '@/slices/settlem
 import { getCurrentBusinessDate } from '@/utils/businessLogic';
 import { navigateToSettlement } from '@/utils/navigation';
 import { SettlementScope } from '@/types';
-import type { DailyStats, AttentionAlert } from '@/types/HomeData';
+import type { DailyStats } from '@/types/HomeData';
+// import type { AttentionAlert } from '@/types/HomeData';
 import type { CustomerCollection } from '@/types/CollectionData';
 
 export default function Home() {
   const router = useRouter();
   const { theme } = useTheme();
+  const { t } = useTranslation();
   const [isBottomSheetOpen, setIsBottomSheetOpen] = useState(false);
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'primary' | 'delegated'>('primary');
@@ -68,7 +72,7 @@ export default function Home() {
     selectTodayCollectionsByAgent(state, agentId, timezone)
   );
 
-  const needsSyncCollections = useSelector(selectCollectionsNeedingSync);
+  // const needsSyncCollections = useSelector(selectCollectionsNeedingSync);
 
   // The active tab is the authoritative collection context. Every money figure below is
   // scoped to it, and so is the settlement it can launch.
@@ -167,12 +171,12 @@ export default function Home() {
   }, [activeCustomers, todayCollections, activeScope, cashInHand]);
 
   // Calculate attention alerts from real data
-  const attentionAlert: AttentionAlert = {
-    // Deferred to PIGMY-MVP-004 (missed-day/penalty). Future wiring:
-    // selectOverdueCustomers (slices/reports.slice.ts) once 004 owns overdue calculation.
-    overdueCustomers: 0,
-    pendingSync: needsSyncCollections.length,
-  };
+  // const attentionAlert: AttentionAlert = {
+  //   // Deferred to PIGMY-MVP-004 (missed-day/penalty). Future wiring:
+  //   // selectOverdueCustomers (slices/reports.slice.ts) once 004 owns overdue calculation.
+  //   overdueCustomers: 0,
+  //   pendingSync: needsSyncCollections.length,
+  // };
 
   const upNextRowGap = spacing(theme, 'sm');
 
@@ -255,15 +259,16 @@ export default function Home() {
     tabText: {
       ...typography(theme, 'body'),
       color: theme.colors.text.secondary,
-      fontWeight: '600',
-      fontSize: 14,
+      fontWeight: '700',
+      fontSize: 16,
+      lineHeight: 20,
     },
     tabTextActive: {
       color: '#FFFFFF',
     },
-    attentionSection: {
-      marginBottom: spacing(theme, 'md'),
-    },
+    // attentionSection: {
+    //   marginBottom: spacing(theme, 'md'),
+    // },
     upNextSection: {
       flex: 1,
       paddingHorizontal: spacing(theme, 'screenPadding'),
@@ -353,10 +358,10 @@ export default function Home() {
     // TODO: Navigate to customers list
   };
 
-  const handleAttentionPress = () => {
-    console.log('Attention banner pressed');
-    // TODO: Navigate to attention details
-  };
+  // const handleAttentionPress = () => {
+  //   console.log('Attention banner pressed');
+  //   // TODO: Navigate to attention details
+  // };
 
   return (
     <View style={styles.container}>
@@ -388,7 +393,7 @@ export default function Home() {
             ]}
           >
             <Text style={[styles.tabText, activeTab === 'primary' && styles.tabTextActive]}>
-              Primary ({primaryCustomers.length})
+              {t('home.primaryTab', { count: primaryCustomers.length })}
             </Text>
           </Pressable>
 
@@ -401,21 +406,23 @@ export default function Home() {
             ]}
           >
             <Text style={[styles.tabText, activeTab === 'delegated' && styles.tabTextActive]}>
-              Delegated ({delegatedCustomers.length})
+              {t('home.delegatedTab', { count: delegatedCustomers.length })}
             </Text>
           </Pressable>
         </View>
 
+        {/* Restored later: Attention banner (overdue customers + pending sync).
         <View style={styles.attentionSection}>
           <AttentionBanner alert={attentionAlert} onPress={handleAttentionPress} />
         </View>
+        */}
       </View>
 
       <View style={styles.upNextSection}>
         <View style={styles.upNextHeader}>
-          <Text style={styles.upNextTitle}>Up Next</Text>
+          <Text style={styles.upNextTitle}>{t('home.upNext')}</Text>
           <Pressable onPress={handleViewAll}>
-            <Text style={styles.viewAllButton}>View All</Text>
+            <Text style={styles.viewAllButton}>{t('home.viewAll')}</Text>
           </Pressable>
         </View>
 
@@ -461,7 +468,7 @@ export default function Home() {
           ) : (
             <View style={{ padding: 20 }}>
               <Text style={{ color: theme.colors.text.primary }}>
-                Customer or account data not found
+                {t('home.missingCollectContext')}
               </Text>
             </View>
           );

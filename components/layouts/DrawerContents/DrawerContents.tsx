@@ -1,9 +1,11 @@
 import { StyleSheet, View, Text } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme, typography } from '@/theme';
+import { useTranslation } from '@/i18n';
 
 export default function DrawerContents() {
   const { theme } = useTheme();
+  const { t } = useTranslation();
 
   const styles = StyleSheet.create({
     root: {
@@ -22,7 +24,7 @@ export default function DrawerContents() {
   return (
     <SafeAreaView>
       <View style={styles.root}>
-        <Text style={styles.text}>Side Menu Contents</Text>
+        <Text style={styles.text}>{t('drawer.sideMenu')}</Text>
       </View>
     </SafeAreaView>
   );

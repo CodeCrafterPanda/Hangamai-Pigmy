@@ -9,7 +9,7 @@ import type en from './translations/en';
  * Adding a language: create `translations/<code>.ts`, add the code here, then register the
  * dictionary in `translations/index.ts`. No screen code changes are required.
  */
-export type Language = 'en';
+export type Language = 'en' | 'mr';
 
 /** Shape every language dictionary must satisfy — English is the source of truth. */
 export type TranslationDictionary = typeof en;

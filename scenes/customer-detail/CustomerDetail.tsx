@@ -425,7 +425,7 @@ export default function CustomerDetail({ customerId }: CustomerDetailProps) {
           <View style={styles.metaRow}>
             <Text style={styles.metaLabel}>{t('customerDetail.route')}</Text>
             <Text style={styles.metaValue}>
-              {route ? `${route.routeCode} — ${route.name}` : '—'}
+              {route?.name || '—'}
             </Text>
           </View>
           <View style={styles.metaRow}>
@@ -493,7 +493,7 @@ export default function CustomerDetail({ customerId }: CustomerDetailProps) {
             ]}
           >
             <Text style={styles.secondaryButtonIcon}>📖</Text>
-            <Text style={styles.secondaryButtonText}>{t('customerDetail.viewPassbook')}</Text>
+            <Text style={styles.secondaryButtonText}>{t('customerDetail.viewPassbook')} </Text>
           </Pressable>
         </View>
 

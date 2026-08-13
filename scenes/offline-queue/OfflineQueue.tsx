@@ -2,6 +2,7 @@ import { View, Text, StyleSheet, ScrollView, Pressable, Alert } from 'react-nati
 import { useMemo } from 'react';
 import { useSelector } from 'react-redux';
 import { useTheme, typography, spacing } from '@/theme';
+import { useTranslation, formatTime, formatNumber } from '@/i18n';
 import SyncStatusCard from '@/components/elements/SyncStatusCard';
 import OfflineTransactionCard from '@/components/elements/OfflineTransactionCard';
 import { selectCollectionsNeedingSync } from '@/slices/collections.slice';
@@ -12,6 +13,7 @@ import type { OfflineTransaction, SyncStatus } from '@/types/OfflineQueueData';
 
 export default function OfflineQueue() {
   const { theme } = useTheme();
+  const { t, language } = useTranslation();
 
   // Get session
   const session = useSelector(selectSession);
@@ -42,14 +44,14 @@ export default function OfflineQueue() {
     failedCount,
     // This build has no backend to sync with, so no sync has ever succeeded. Showing a
     // plausible elapsed time here would claim collections had left the device.
-    lastSyncTime: 'Never',
+    lastSyncTime: t('offlineQueue.never'),
     totalAmount,
   };
 
   // Convert to OfflineTransaction format
   const transactions: OfflineTransaction[] = todayNeedsSyncCollections.map(c => {
     const customer = allCustomers.find(cust => cust.id === c.customerId);
-    const time = new Date(c.collectedAt).toLocaleTimeString('en-US', {
+    const time = formatTime(new Date(c.collectedAt), language, {
       hour: '2-digit',
       minute: '2-digit',
     });
@@ -57,11 +59,11 @@ export default function OfflineQueue() {
     return {
       id: c.id,
       receiptNumber: c.receiptNo,
-      customerName: customer?.fullName || 'Unknown',
+      customerName: customer?.fullName || t('offlineQueue.unknownCustomer'),
       amount: c.amount,
       time,
       status: c.status === 'FAILED' ? 'failed' : 'pending',
-      errorMessage: c.status === 'FAILED' ? 'Sync failed - will retry' : undefined,
+      errorMessage: c.status === 'FAILED' ? t('offlineQueue.syncFailedRetry') : undefined,
       timestamp: new Date(c.collectedAt),
     };
   });
@@ -155,10 +157,7 @@ export default function OfflineQueue() {
   // No backend exists in this MVP build. These controls say so instead of appearing to
   // upload, which would leave the agent believing collections had left the device.
   const notifySyncUnavailable = () => {
-    Alert.alert(
-      'Sync unavailable',
-      'This build has no server connection. Collections are stored on this device and stay available after a restart.',
-    );
+    Alert.alert(t('offlineQueue.syncUnavailableTitle'), t('offlineQueue.syncUnavailable'));
   };
 
   const handleRetryTransaction = (_transactionId: string) => {
@@ -183,9 +182,9 @@ export default function OfflineQueue() {
 
         <View style={styles.transactionsSection}>
           <View style={styles.transactionsHeader}>
-            <Text style={styles.transactionsTitle}>Transactions</Text>
+            <Text style={styles.transactionsTitle}>{t('offlineQueue.transactions')}</Text>
             <Text style={styles.totalAmount}>
-              Total: ₹{syncStatus.totalAmount.toLocaleString('en-IN')}
+              {t('offlineQueue.total', { amount: formatNumber(syncStatus.totalAmount) })}
             </Text>
           </View>
 
@@ -209,7 +208,7 @@ export default function OfflineQueue() {
           >
             <Text style={styles.retryButtonIcon}>🔄</Text>
             <Text style={styles.retryButtonText}>
-              Retry Failed ({failedCount})
+              {t('offlineQueue.retryFailed', { count: failedCount })}
             </Text>
           </Pressable>
         )}
@@ -219,7 +218,7 @@ export default function OfflineQueue() {
           style={({ pressed }) => [styles.syncButton, { opacity: pressed ? 0.8 : 1 }]}
         >
           <Text style={styles.syncButtonIcon}>☁️</Text>
-          <Text style={styles.syncButtonText}>Sync Now</Text>
+          <Text style={styles.syncButtonText}>{t('offlineQueue.syncNow')}</Text>
         </Pressable>
       </View>
     </View>

@@ -1,6 +1,7 @@
 import { Stack } from 'expo-router';
 import { useSelector } from 'react-redux';
 import { useTheme } from '@/theme';
+import { useTranslation, formatDate } from '@/i18n';
 import RouteHeader from '@/components/elements/RouteHeader';
 import AddCustomerHeader from '@/components/elements/AddCustomerHeader';
 import { selectBranchTimezone } from '@/slices/settings.slice';
@@ -8,12 +9,13 @@ import { getCurrentBusinessDate } from '@/utils/businessLogic';
 
 export default function RouteStack() {
   const { theme } = useTheme();
+  const { t, language } = useTranslation();
   const timezone = useSelector(selectBranchTimezone);
 
   const headerData = {
     // Branch business date, not the device calendar date: the header must agree with the
     // date collections are actually booked against.
-    date: new Date(`${getCurrentBusinessDate(timezone)}T00:00:00`).toLocaleDateString('en-IN', {
+    date: formatDate(new Date(`${getCurrentBusinessDate(timezone)}T00:00:00`), language, {
       year: 'numeric',
       month: 'short',
       day: 'numeric',
@@ -51,7 +53,7 @@ export default function RouteStack() {
       <Stack.Screen
         name="delegated-customers"
         options={{
-          title: 'Delegated Customers',
+          title: t('delegatedCustomers.title'),
           headerShown: true,
         }}
       />
@@ -64,7 +66,7 @@ export default function RouteStack() {
       <Stack.Screen
         name="collect-deposit/[accountId]"
         options={{
-          title: 'Collect Deposit',
+          title: t('collection.title'),
           headerShown: true,
         }}
       />

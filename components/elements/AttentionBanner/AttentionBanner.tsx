@@ -1,5 +1,6 @@
 import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { useTheme, typography, spacing, radius } from '@/theme';
+import { useTranslation } from '@/i18n';
 import type { AttentionAlert } from '@/types/HomeData';
 
 interface AttentionBannerProps {
@@ -9,6 +10,7 @@ interface AttentionBannerProps {
 
 export default function AttentionBanner({ alert, onPress }: AttentionBannerProps) {
   const { theme } = useTheme();
+  const { t } = useTranslation();
 
   const styles = StyleSheet.create({
     container: {
@@ -17,10 +19,13 @@ export default function AttentionBanner({ alert, onPress }: AttentionBannerProps
       borderRadius: radius(theme, 'card'),
       borderWidth: 1,
       borderColor: theme.components.banner.warning.borderColor,
+      borderLeftWidth: 4,
+      borderLeftColor: theme.components.banner.warning.iconColor,
       padding: spacing(theme, 'md'),
       flexDirection: 'row',
       alignItems: 'center',
       gap: spacing(theme, 'sm'),
+      overflow: 'hidden',
     },
     iconContainer: {
       width: 40,
@@ -43,8 +48,11 @@ export default function AttentionBanner({ alert, onPress }: AttentionBannerProps
       fontWeight: '600',
     },
     description: {
-      ...typography(theme, 'caption'),
+      ...typography(theme, 'body'),
       color: theme.components.banner.warning.iconColor,
+      fontWeight: '700',
+      fontSize: 16,
+      lineHeight: 20,
     },
     arrow: {
       ...typography(theme, 'pageTitle'),
@@ -63,9 +71,12 @@ export default function AttentionBanner({ alert, onPress }: AttentionBannerProps
       </View>
 
       <View style={styles.content}>
-        <Text style={styles.title}>Attention Needed</Text>
+        <Text style={styles.title}>{t('attentionBanner.title')}</Text>
         <Text style={styles.description}>
-          {alert.overdueCustomers} customers overdue • {alert.pendingSync} pending sync
+          {t('attentionBanner.description', {
+            overdue: alert.overdueCustomers,
+            pendingSync: alert.pendingSync,
+          })}
         </Text>
       </View>
 

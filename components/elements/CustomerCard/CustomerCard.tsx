@@ -1,5 +1,6 @@
 import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { useTheme, typography, spacing, radius } from '@/theme';
+import { useTranslation } from '@/i18n';
 import type { Customer } from '@/types/HomeData';
 
 interface CustomerCardProps {
@@ -9,6 +10,7 @@ interface CustomerCardProps {
 
 export default function CustomerCard({ customer, onCollect }: CustomerCardProps) {
   const { theme } = useTheme();
+  const { t } = useTranslation();
 
   const styles = StyleSheet.create({
     container: {
@@ -96,7 +98,9 @@ export default function CustomerCard({ customer, onCollect }: CustomerCardProps)
         <View style={styles.customerInfo}>
           <Text style={styles.customerName}>{customer.name}</Text>
           <View style={styles.accountRow}>
-            <Text style={styles.accountNumber}>A/C {customer.accountNumber}</Text>
+            <Text style={styles.accountNumber}>
+              {t('customerCard.accountShort', { number: customer.accountNumber })}
+            </Text>
             <View style={styles.dot} />
             <Text style={styles.location}>{customer.location}</Text>
           </View>
@@ -110,7 +114,7 @@ export default function CustomerCard({ customer, onCollect }: CustomerCardProps)
           pressed && styles.collectButtonPressed,
         ]}
       >
-        <Text style={styles.collectButtonText}>Collect</Text>
+        <Text style={styles.collectButtonText}>{t('customerCard.collect')}</Text>
       </Pressable>
     </View>
   );

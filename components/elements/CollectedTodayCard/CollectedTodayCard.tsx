@@ -1,6 +1,7 @@
 import { View, Text, StyleSheet } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme, typography, spacing, radius } from '@/theme';
+import { useTranslation, formatNumber } from '@/i18n';
 
 interface CollectedTodayCardProps {
   amount: number;
@@ -8,6 +9,7 @@ interface CollectedTodayCardProps {
 
 export default function CollectedTodayCard({ amount }: CollectedTodayCardProps) {
   const { theme } = useTheme();
+  const { t } = useTranslation();
 
   const styles = StyleSheet.create({
     container: {
@@ -86,7 +88,7 @@ export default function CollectedTodayCard({ amount }: CollectedTodayCardProps) 
   });
 
   const formatAmount = (value: number) => {
-    return value.toLocaleString('en-IN');
+    return formatNumber(value);
   };
 
   return (
@@ -98,7 +100,7 @@ export default function CollectedTodayCard({ amount }: CollectedTodayCardProps) 
         style={styles.gradient}
       >
         <View style={styles.leftContent}>
-          <Text style={styles.label}>Collected Today</Text>
+          <Text style={styles.label}>{t('collectedTodayCard.label')}</Text>
           <View style={styles.amountContainer}>
             <Text style={styles.currency}>₹</Text>
             <Text style={styles.amount}>{formatAmount(amount)}</Text>

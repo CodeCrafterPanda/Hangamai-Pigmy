@@ -5,6 +5,8 @@ import { useRouter } from 'expo-router';
 import { useDispatch, useSelector, useStore } from 'react-redux';
 import type { State, Dispatch } from '@/utils/store';
 import { useTheme, typography, spacing, radius } from '@/theme';
+import { useTranslation, formatDate, formatNumber } from '@/i18n';
+import type { TranslationKey } from '@/i18n';
 import { selectSession, selectBranchTimezone } from '@/slices/settings.slice';
 import {
   createSettlement,
@@ -29,6 +31,7 @@ export default function Settlement({ scope = SettlementScope.PRIMARY }: Settleme
   const dispatch = useDispatch<Dispatch>();
   const store = useStore<State>();
   const { theme } = useTheme();
+  const { t, language } = useTranslation();
   const [actualCash, setActualCash] = useState('');
   const [reason, setReason] = useState('');
   const [isSaving, setIsSaving] = useState(false);
@@ -77,24 +80,26 @@ export default function Settlement({ scope = SettlementScope.PRIMARY }: Settleme
 
   // System-generated informational prefix, held separately from the agent's own reason so
   // re-renders and repeated submits can never duplicate it inside the text the agent edits.
+  const upiAmount = formatNumber(summary.upiTotal);
   const upiNotePrefix =
-    summary.upiTotal > 0
-      ? `UPI transaction of ₹${summary.upiTotal.toLocaleString('en-IN')}.`
-      : '';
+    summary.upiTotal > 0 ? t('settlement.upiNotePrefix', { amount: upiAmount }) : '';
 
   const composeNotes = () => [upiNotePrefix, reason.trim()].filter(Boolean).join(' ');
 
-  const scopeLabel = scope === SettlementScope.DELEGATED ? 'Delegated' : 'Primary';
+  const scopeLabel =
+    scope === SettlementScope.DELEGATED
+      ? t('settlement.delegatedBook')
+      : t('settlement.primaryBook');
 
   const formattedBusinessDate = useMemo(() => {
     const parsed = new Date(`${businessDate}T00:00:00`);
-    return parsed.toLocaleDateString('en-IN', {
+    return formatDate(parsed, language, {
       weekday: 'long',
       month: 'short',
       day: 'numeric',
       year: 'numeric',
     });
-  }, [businessDate]);
+  }, [businessDate, language]);
 
   const styles = StyleSheet.create({
     container: {
@@ -409,17 +414,14 @@ export default function Settlement({ scope = SettlementScope.PRIMARY }: Settleme
 
     try {
       if (!actualCash.trim()) {
-        Alert.alert('Cash in Hand Required', 'Enter the actual cash amount you are carrying.');
+        Alert.alert(t('settlement.cashRequiredTitle'), t('settlement.cashRequired'));
         return;
       }
 
       // submitSettlement rejects a non-zero variance without notes; validate first so a
       // failed submit never leaves an orphan DRAFT behind.
       if (variance !== 0 && !reason.trim()) {
-        Alert.alert(
-          'Reason Required',
-          'Add a reason explaining the cash variance before closing the day.'
-        );
+        Alert.alert(t('settlement.reasonRequiredTitle'), t('settlement.reasonRequired'));
         return;
       }
 
@@ -438,8 +440,8 @@ export default function Settlement({ scope = SettlementScope.PRIMARY }: Settleme
 
       if (existing && existing.status !== 'DRAFT') {
         Alert.alert(
-          'Already Settled',
-          `The ${scope.toLowerCase()} day closure for ${businessDate} has already been submitted.`
+          t('settlement.alreadySettledTitle'),
+          t('settlement.alreadySettled', { scope: scopeLabel, date: businessDate })
         );
         return;
       }
@@ -485,7 +487,7 @@ export default function Settlement({ scope = SettlementScope.PRIMARY }: Settleme
           scope
         );
         if (!created) {
-          Alert.alert('Error', 'Settlement could not be created. Please try again.');
+          Alert.alert(t('common.error'), t('settlement.createFailed'));
           return;
         }
         settlementId = created.id;
@@ -500,8 +502,8 @@ export default function Settlement({ scope = SettlementScope.PRIMARY }: Settleme
       // is untouched and the agent can correct the input and retry.
       if (!submitted || submitted.status === 'DRAFT') {
         Alert.alert(
-          'Cannot Close Day',
-          settlementsState.error || 'Settlement could not be submitted.'
+          t('settlement.cannotCloseTitle'),
+          settlementsState.error || t('settlement.cannotClose')
         );
         return;
       }
@@ -512,21 +514,22 @@ export default function Settlement({ scope = SettlementScope.PRIMARY }: Settleme
         // day closure must not reduce cash in hand, and the record is kept so this same
         // settlement can be retried instead of a second one being written for the day.
         dispatch(revertSettlementSubmission(settlementId));
-        Alert.alert(
-          'Not Saved',
-          'The day closure could not be written to this device, so it was not applied. Cash in hand is unchanged — please try again.'
-        );
+        Alert.alert(t('settlement.notSavedTitle'), t('settlement.notSaved'));
         return;
       }
 
       Alert.alert(
-        'Day Closed',
-        `${scopeLabel} settlement for ${businessDate} submitted. Cash handed over: ₹${summary.cashTotal.toLocaleString('en-IN')}.`,
-        [{ text: 'OK', onPress: () => router.back() }]
+        t('settlement.dayClosedTitle'),
+        t('settlement.dayClosedMessage', {
+          scope: scopeLabel,
+          date: businessDate,
+          amount: formatNumber(summary.cashTotal),
+        }),
+        [{ text: t('common.ok'), onPress: () => router.back() }]
       );
     } catch (error) {
       console.error('[Settlement] Day close failed:', error);
-      Alert.alert('Error', 'Failed to submit settlement');
+      Alert.alert(t('common.error'), t('settlement.submitFailed'));
     } finally {
       isSubmittingRef.current = false;
       setIsSaving(false);
@@ -535,11 +538,11 @@ export default function Settlement({ scope = SettlementScope.PRIMARY }: Settleme
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      <NestedScreenHeader title="Settlement" subtitle={scopeLabel} />
+      <NestedScreenHeader title={t('settlement.title')} subtitle={scopeLabel} />
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         <View style={styles.dateSection}>
-          <Text style={styles.dateLabel}>BUSINESS DATE</Text>
+          <Text style={styles.dateLabel}>{t('settlement.businessDate')}</Text>
           <Text style={styles.dateValue}>{formattedBusinessDate}</Text>
         </View>
 
@@ -547,8 +550,10 @@ export default function Settlement({ scope = SettlementScope.PRIMARY }: Settleme
           <View style={styles.closedBanner}>
             <Text style={styles.offlineIcon}>🔒</Text>
             <Text style={styles.closedBannerText}>
-              {scopeLabel} book already closed ({existingSettlement!.status.toLowerCase()}).
-              Collections stay in history; only new collections add to cash in hand.
+              {t('settlement.alreadyClosed', {
+                scope: scopeLabel,
+                status: t(`settlementStatus.${existingSettlement!.status}` as TranslationKey),
+              })}
             </Text>
           </View>
         )}
@@ -556,68 +561,72 @@ export default function Settlement({ scope = SettlementScope.PRIMARY }: Settleme
         <View style={styles.summaryCard}>
           <View style={styles.summaryHeader}>
             <Text style={styles.summaryIcon}>📊</Text>
-            <Text style={styles.summaryTitle}>Daily Summary</Text>
+            <Text style={styles.summaryTitle}>{t('settlement.dailySummary')}</Text>
           </View>
 
           <View style={styles.summaryRow}>
             <View style={styles.summaryLabelRow}>
               <Text style={styles.summaryRowIcon}>💵</Text>
-              <Text style={styles.summaryLabel}>Cash Collected</Text>
+              <Text style={styles.summaryLabel}>{t('settlement.cashCollected')}</Text>
             </View>
             <Text style={styles.summaryAmount}>
-              ₹ {summary.cashTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+              ₹ {formatNumber(summary.cashTotal, { minimumFractionDigits: 2 })}
             </Text>
           </View>
 
           <View style={styles.summaryRow}>
             <View style={styles.summaryLabelRow}>
               <Text style={styles.summaryRowIcon}>📱</Text>
-              <Text style={styles.summaryLabel}>UPI Collected</Text>
+              <Text style={styles.summaryLabel}>{t('settlement.upiCollected')}</Text>
             </View>
             <Text style={styles.summaryAmount}>
-              ₹ {summary.upiTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+              ₹ {formatNumber(summary.upiTotal, { minimumFractionDigits: 2 })}
             </Text>
           </View>
 
           <View style={styles.summaryRow}>
             <View style={styles.summaryLabelRow}>
               <Text style={styles.summaryRowIcon}>🧾</Text>
-              <Text style={styles.summaryLabel}>Unsettled Cash in Hand</Text>
+              <Text style={styles.summaryLabel}>{t('settlement.unsettledCashInHand')}</Text>
             </View>
             <Text style={styles.summaryAmount}>
-              ₹ {unsettledCashInHand.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+              ₹ {formatNumber(unsettledCashInHand, { minimumFractionDigits: 2 })}
             </Text>
           </View>
 
           <View style={styles.totalRow}>
-            <Text style={styles.totalLabel}>Total Collection</Text>
+            <Text style={styles.totalLabel}>{t('settlement.totalCollection')}</Text>
             <Text style={styles.totalAmount}>
-              ₹ {summary.totalCollection.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+              ₹ {formatNumber(summary.totalCollection, { minimumFractionDigits: 2 })}
             </Text>
           </View>
 
           <Text style={styles.metaText}>
-            {summary.collectionCount} {scopeLabel.toLowerCase()} collection
-            {summary.collectionCount === 1 ? '' : 's'} on this business date
+            {t(
+              summary.collectionCount === 1
+                ? 'settlement.collectionCountOne'
+                : 'settlement.collectionCountOther',
+              { count: summary.collectionCount, scope: scopeLabel },
+            )}
           </Text>
         </View>
 
         <View style={styles.reconciliationSection}>
-          <Text style={styles.sectionTitle}>Reconciliation</Text>
+          <Text style={styles.sectionTitle}>{t('settlement.reconciliation')}</Text>
 
           <View style={styles.reconciliationCard}>
             <View style={styles.summaryRow}>
-              <Text style={styles.summaryLabel}>Expected Cash (system)</Text>
+              <Text style={styles.summaryLabel}>{t('settlement.expectedCash')}</Text>
               <Text style={styles.summaryAmount}>
-                ₹ {summary.cashTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                ₹ {formatNumber(summary.cashTotal, { minimumFractionDigits: 2 })}
               </Text>
             </View>
 
             <View style={styles.inputSection}>
               <View style={styles.inputHeader}>
-                <Text style={styles.inputLabel}>Declared Physical Cash</Text>
+                <Text style={styles.inputLabel}>{t('settlement.declaredPhysicalCash')}</Text>
                 <Text style={styles.inputHint}>
-                  {isClosed ? 'Declared at closure' : 'Enter actual amount'}
+                  {isClosed ? t('settlement.declaredAtClosure') : t('settlement.enterActualAmount')}
                 </Text>
               </View>
 
@@ -625,7 +634,7 @@ export default function Settlement({ scope = SettlementScope.PRIMARY }: Settleme
                 <Text style={styles.currencySymbol}>₹</Text>
                 {isClosed ? (
                   <Text style={styles.input}>
-                    {existingSettlement!.cashInHand.toLocaleString('en-IN')}
+                    {formatNumber(existingSettlement!.cashInHand)}
                   </Text>
                 ) : (
                   <TextInput
@@ -642,7 +651,7 @@ export default function Settlement({ scope = SettlementScope.PRIMARY }: Settleme
             </View>
 
             <View style={styles.varianceCard}>
-              <Text style={styles.varianceLabel}>Variance</Text>
+              <Text style={styles.varianceLabel}>{t('settlement.variance')}</Text>
               <View style={styles.varianceRight}>
                 <Text
                   style={[
@@ -650,7 +659,7 @@ export default function Settlement({ scope = SettlementScope.PRIMARY }: Settleme
                     isPerfectMatch ? styles.varianceAmountMatch : styles.varianceAmountMismatch,
                   ]}
                 >
-                  ₹ {Math.abs(variance).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                  ₹ {formatNumber(Math.abs(variance), { minimumFractionDigits: 2 })}
                 </Text>
                 <Text
                   style={[
@@ -658,18 +667,22 @@ export default function Settlement({ scope = SettlementScope.PRIMARY }: Settleme
                     isPerfectMatch ? styles.varianceStatusMatch : styles.varianceStatusMismatch,
                   ]}
                 >
-                  {isPerfectMatch ? 'PERFECT MATCH' : variance > 0 ? 'EXCESS' : 'SHORT'}
+                  {isPerfectMatch
+                    ? t('settlement.perfectMatch')
+                    : variance > 0
+                      ? t('settlement.excess')
+                      : t('settlement.short')}
                 </Text>
               </View>
             </View>
 
             <View style={styles.notesSection}>
               <View style={styles.notesHeader}>
-                <Text style={styles.notesLabel}>Reason</Text>
+                <Text style={styles.notesLabel}>{t('settlement.reason')}</Text>
                 {isClosed ? null : requiresReason ? (
-                  <Text style={styles.notesRequired}>Required for variance</Text>
+                  <Text style={styles.notesRequired}>{t('settlement.requiredForVariance')}</Text>
                 ) : (
-                  <Text style={styles.notesOptional}>Optional</Text>
+                  <Text style={styles.notesOptional}>{t('settlement.optional')}</Text>
                 )}
               </View>
 
@@ -684,7 +697,7 @@ export default function Settlement({ scope = SettlementScope.PRIMARY }: Settleme
                     style={styles.notesInput}
                     value={reason}
                     onChangeText={setReason}
-                    placeholder="Add remarks for any discrepancies..."
+                    placeholder={t('settlement.remarksPlaceholder')}
                     placeholderTextColor={theme.colors.text.muted}
                     multiline
                     numberOfLines={4}
@@ -708,14 +721,18 @@ export default function Settlement({ scope = SettlementScope.PRIMARY }: Settleme
         >
           <Text style={styles.submitButtonIcon}>🔒</Text>
           <Text style={styles.submitButtonText}>
-            {isClosed ? 'Day Closed' : isSaving ? 'Closing...' : 'Submit Day Close'}
+            {isClosed
+              ? t('settlement.dayClosed')
+              : isSaving
+                ? t('settlement.closing')
+                : t('settlement.submitDayClose')}
           </Text>
         </Pressable>
 
         <Text style={styles.warningText}>
           {isClosed
-            ? `${scopeLabel} collections for this business date have already been settled.`
-            : 'Verify all amounts before submitting. This action cannot be undone.'}
+            ? t('settlement.alreadySettledWarning', { scope: scopeLabel })
+            : t('settlement.verifyWarning')}
         </Text>
       </View>
     </SafeAreaView>

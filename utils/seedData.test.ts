@@ -2,7 +2,7 @@ import { configureStore } from '@reduxjs/toolkit';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { Dispatch, State } from '@/utils/store';
 import { AccountStatus, CustomerStatus } from '@/types/entities';
-import customers, { addCustomer, selectAllCustomers } from '@/slices/customers.slice';
+import customers, { addCustomer, selectAllCustomers, updateCustomer } from '@/slices/customers.slice';
 import accounts, { addAccount, selectAllAccounts } from '@/slices/accounts.slice';
 import settings, { selectAllRoutes, selectSession } from '@/slices/settings.slice';
 import delegations, { selectAllDelegations } from '@/slices/delegations.slice';
@@ -132,5 +132,64 @@ describe('seedDummyData', () => {
     selectAllCustomers(state).forEach(customer => {
       expect(accountsByCustomer.get(customer.id)).toBe(1);
     });
+  });
+
+  test('every seeded customer is assigned to a route that exists in the dataset', async () => {
+    const store = createTestStore();
+    await runSeed(store);
+
+    const state = stateOf(store);
+    const routeIds = new Set(selectAllRoutes(state).map(route => route.id));
+
+    selectAllCustomers(state).forEach(customer => {
+      expect(routeIds.has(customer.routeId)).toBe(true);
+    });
+
+    expect(selectAllCustomers(state).filter(c => c.routeId === DEMO_ROUTE_SUPA)).toHaveLength(3);
+  });
+
+  test('re-seed repairs a dataset customer whose route assignment no longer matches', async () => {
+    const store = createTestStore();
+    await runSeed(store);
+
+    const seeded = selectAllCustomers(stateOf(store)).find(c => c.routeId === DEMO_ROUTE_SUPA)!;
+    store.dispatch(updateCustomer({ id: seeded.id, updates: { routeId: 'stale-route' } }));
+    expect(selectAllCustomers(stateOf(store)).find(c => c.id === seeded.id)?.routeId).toBe(
+      'stale-route',
+    );
+
+    await runSeed(store);
+
+    expect(selectAllCustomers(stateOf(store)).find(c => c.id === seeded.id)?.routeId).toBe(
+      DEMO_ROUTE_SUPA,
+    );
+  });
+
+  test('re-seed does not reassign an agent-created customer to a dataset route', async () => {
+    const store = createTestStore();
+    await runSeed(store);
+
+    store.dispatch(
+      addCustomer({
+        branchId: DEMO_BRANCH_ID,
+        routeId: 'field-route',
+        primaryAgentId: DEMO_AGENT_ID,
+        fullName: 'Field Added Customer',
+        phone: '9000000001',
+        addressLine1: 'Added on the round',
+        addressLine2: '',
+        city: 'Mumbai',
+        pincode: '400010',
+        state: 'Maharashtra',
+        status: CustomerStatus.ACTIVE,
+      }),
+    );
+
+    await runSeed(store);
+
+    const fieldCustomer = selectAllCustomers(stateOf(store)).find(
+      c => c.fullName === 'Field Added Customer',
+    )!;
+    expect(fieldCustomer.routeId).toBe('field-route');
   });
 });

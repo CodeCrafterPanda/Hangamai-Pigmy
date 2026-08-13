@@ -1,0 +1,200 @@
+{
+  "session": {
+    "agentId": "agent-demo-001",
+    "branchId": "branch-hangamai",
+    "deviceFingerprint": "demo-device"
+  },
+  "branch": {
+    "id": "branch-hangamai",
+    "coopId": "coop-hangamai",
+    "code": "HANGA",
+    "name": "मुख्य शाखा, हंगा",
+    "address": "हंगा, अहिल्यानगर, महाराष्ट्र",
+    "timezone": "Asia/Kolkata"
+  },
+  "agents": [
+    {
+      "id": "agent-demo-001",
+      "branchId": "branch-hangamai",
+      "name": "दिपक राजेंद्र शिंदे",
+      "agentCode": "AGT-001",
+      "phone": "9762753450",
+      "status": "ACTIVE"
+    },
+    {
+      "id": "agent-other-001",
+      "branchId": "branch-hangamai",
+      "name": "एकनाथ गंगाराम शिंदे",
+      "agentCode": "AGT-002",
+      "phone": "9011118863",
+      "status": "ACTIVE"
+    }
+  ],
+  "routes": [
+    {
+      "id": "supa-route",
+      "branchId": "branch-hangamai",
+      "routeCode": "SUPA",
+      "name": "सुपा मार्ग"
+    },
+    {
+      "id": "parner-route",
+      "branchId": "branch-hangamai",
+      "routeCode": "PARNER",
+      "name": "पारनेर मार्ग"
+    },
+    {
+      "id": "hanga-route",
+      "branchId": "branch-hangamai",
+      "routeCode": "HANGA",
+      "name": "हंगा मार्ग"
+    }
+  ],
+  "schemes": [
+    {
+      "id": "scheme-pigmy-daily-1yr",
+      "branchId": "branch-hangamai",
+      "name": "Pigmy Daily 1 Year",
+      "frequency": "DAILY",
+      "minAmount": 100,
+      "penaltyPerDay": 0,
+      "penaltyType": "NONE"
+    }
+  ],
+  "customers": [
+    {
+      "ref": "seed-customer-suresh-patil",
+      "branchId": "branch-hangamai",
+      "routeId": "supa-route",
+      "primaryAgentId": "agent-demo-001",
+      "customerCode": "CUST-0001",
+      "fullName": "Suresh Patil",
+      "phone": "9876543210",
+      "addressLine1": "Shop #4, Market Street",
+      "addressLine2": "Gandhi Nagar",
+      "city": "Mumbai",
+      "pincode": "400001",
+      "state": "Maharashtra",
+      "status": "ACTIVE"
+    },
+    {
+      "ref": "seed-customer-anita-desai",
+      "branchId": "branch-hangamai",
+      "routeId": "supa-route",
+      "primaryAgentId": "agent-demo-001",
+      "customerCode": "CUST-0002",
+      "fullName": "Anita Desai",
+      "phone": "9876543211",
+      "addressLine1": "Market Lane, Shop 12",
+      "addressLine2": "Near City Center",
+      "city": "Mumbai",
+      "pincode": "400002",
+      "state": "Maharashtra",
+      "status": "ACTIVE"
+    },
+    {
+      "ref": "seed-customer-rajesh-kumar",
+      "branchId": "branch-hangamai",
+      "routeId": "supa-route",
+      "primaryAgentId": "agent-demo-001",
+      "customerCode": "CUST-0003",
+      "fullName": "Rajesh Kumar",
+      "phone": "9876543212",
+      "addressLine1": "Home, Sector 15",
+      "addressLine2": "Residential Area",
+      "city": "Mumbai",
+      "pincode": "400003",
+      "state": "Maharashtra",
+      "status": "ACTIVE"
+    },
+    {
+      "ref": "seed-customer-ramesh-general-stores",
+      "branchId": "branch-hangamai",
+      "routeId": "hanga-route",
+      "primaryAgentId": "agent-other-001",
+      "customerCode": "CUST-0004",
+      "fullName": "Ramesh General Stores",
+      "phone": "9876543213",
+      "addressLine1": "Shop #45, Main Road",
+      "addressLine2": "Industrial Area",
+      "city": "Mumbai",
+      "pincode": "400004",
+      "state": "Maharashtra",
+      "status": "ACTIVE"
+    },
+    {
+      "ref": "seed-customer-priya-textiles",
+      "branchId": "branch-hangamai",
+      "routeId": "hanga-route",
+      "primaryAgentId": "agent-other-001",
+      "customerCode": "CUST-0005",
+      "fullName": "Priya Textiles",
+      "phone": "9876543214",
+      "addressLine1": "Shop 78, Textile Market",
+      "addressLine2": "Commercial Zone",
+      "city": "Mumbai",
+      "pincode": "400005",
+      "state": "Maharashtra",
+      "status": "ACTIVE"
+    }
+  ],
+  "accounts": [
+    {
+      "ref": "seed-account-suresh-patil-pigmy",
+      "customerRef": "seed-customer-suresh-patil",
+      "schemeId": "scheme-pigmy-daily-1yr",
+      "accountNumber": "ACCT-2026-0001",
+      "installmentAmount": 500,
+      "status": "ACTIVE"
+    },
+    {
+      "ref": "seed-account-anita-desai-pigmy",
+      "customerRef": "seed-customer-anita-desai",
+      "schemeId": "scheme-pigmy-daily-1yr",
+      "accountNumber": "ACCT-2026-0002",
+      "installmentAmount": 450,
+      "status": "ACTIVE"
+    },
+    {
+      "ref": "seed-account-rajesh-kumar-pigmy",
+      "customerRef": "seed-customer-rajesh-kumar",
+      "schemeId": "scheme-pigmy-daily-1yr",
+      "accountNumber": "ACCT-2026-0003",
+      "installmentAmount": 400,
+      "status": "ACTIVE"
+    },
+    {
+      "ref": "seed-account-ramesh-general-stores-pigmy",
+      "customerRef": "seed-customer-ramesh-general-stores",
+      "schemeId": "scheme-pigmy-daily-1yr",
+      "accountNumber": "ACCT-2026-0004",
+      "installmentAmount": 350,
+      "status": "ACTIVE"
+    },
+    {
+      "ref": "seed-account-priya-textiles-pigmy",
+      "customerRef": "seed-customer-priya-textiles",
+      "schemeId": "scheme-pigmy-daily-1yr",
+      "accountNumber": "ACCT-2026-0005",
+      "installmentAmount": 300,
+      "status": "ACTIVE"
+    }
+  ],
+  "delegations": [
+    {
+      "customerRef": "seed-customer-ramesh-general-stores",
+      "primaryAgentId": "agent-other-001",
+      "secondaryAgentId": "agent-demo-001",
+      "durationDays": 30,
+      "createdBy": "agent-other-001"
+    },
+    {
+      "customerRef": "seed-customer-priya-textiles",
+      "primaryAgentId": "agent-other-001",
+      "secondaryAgentId": "agent-demo-001",
+      "durationDays": 30,
+      "createdBy": "agent-other-001"
+    }
+  ],
+  "ledgerEntries": []
+}

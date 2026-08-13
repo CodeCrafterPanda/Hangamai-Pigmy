@@ -1,5 +1,6 @@
 import { View, Text, StyleSheet, Pressable, Image } from 'react-native';
 import { useTheme, typography, spacing, radius } from '@/theme';
+import { useTranslation } from '@/i18n';
 import type { DelegatedCustomer } from '@/types/DelegatedData';
 
 interface DelegatedCustomerCardProps {
@@ -12,6 +13,7 @@ export default function DelegatedCustomerCard({
   onCollectDeposit,
 }: DelegatedCustomerCardProps) {
   const { theme } = useTheme();
+  const { t } = useTranslation();
 
   const styles = StyleSheet.create({
     container: {
@@ -46,7 +48,7 @@ export default function DelegatedCustomerCard({
       backgroundColor: '#D4834D',
     },
     delegatedText: {
-      ...typography(theme, 'micro'),
+      ...typography(theme, 'caption'),
       color: '#D4834D',
       fontWeight: '700',
       letterSpacing: 0.5,
@@ -149,12 +151,14 @@ export default function DelegatedCustomerCard({
       <View style={styles.header}>
         <View style={styles.delegatedBadge}>
           <View style={styles.delegatedDot} />
-          <Text style={styles.delegatedText}>DELEGATED</Text>
+          <Text style={styles.delegatedText}>{t('delegatedCustomerCard.delegated')}</Text>
         </View>
 
         <View style={styles.validTillContainer}>
           <Text style={styles.calendarIcon}>📅</Text>
-          <Text style={styles.validTillText}>Valid till: {customer.validTill}</Text>
+          <Text style={styles.validTillText}>
+            {t('delegatedCustomerCard.validTill', { date: customer.validTill })}
+          </Text>
         </View>
       </View>
 
@@ -187,13 +191,15 @@ export default function DelegatedCustomerCard({
 
         <View style={styles.customerInfo}>
           <Text style={styles.customerName}>{customer.customerName}</Text>
-          <Text style={styles.accountInfo}>Acct: {customer.accountNumberMasked}</Text>
+          <Text style={styles.accountInfo}>
+            {t('delegatedCustomerCard.accountMasked', { number: customer.accountNumberMasked })}
+          </Text>
         </View>
       </View>
 
       <View style={styles.primaryAgentBox}>
         <Text style={styles.agentIcon}>👤</Text>
-        <Text style={styles.primaryAgentLabel}>Primary Agent: </Text>
+        <Text style={styles.primaryAgentLabel}>{t('delegatedCustomerCard.primaryAgent')}</Text>
         <Text style={styles.primaryAgentName}>{customer.primaryAgent}</Text>
       </View>
 
@@ -202,7 +208,7 @@ export default function DelegatedCustomerCard({
         style={({ pressed }) => [styles.collectButton, { opacity: pressed ? 0.8 : 1 }]}
       >
         <Text style={styles.buttonIcon}>💵</Text>
-        <Text style={styles.buttonText}>Collect Deposit</Text>
+        <Text style={styles.buttonText}>{t('delegatedCustomerCard.collectDeposit')}</Text>
       </Pressable>
     </View>
   );

@@ -7,6 +7,9 @@
  */
 
 import type { MonthlyCollectionReport } from '@/slices/reports.slice';
+import type { TranslationKey, TranslationParams } from '@/i18n';
+
+type Translate = (key: TranslationKey, params?: TranslationParams) => string;
 
 /**
  * Deterministic name derived from the report's own month, never a device clock, so the
@@ -25,34 +28,50 @@ function csvRow(cells: (string | number | undefined)[]): string {
   return cells.map(csvCell).join(',');
 }
 
-export function buildMonthlyReportCsv(report: MonthlyCollectionReport): string {
+export function buildMonthlyReportCsv(
+  report: MonthlyCollectionReport,
+  t: Translate,
+  names?: { agentName?: string; routeName?: string },
+): string {
   const dayNumbers = Array.from({ length: report.daysInMonth }, (_, index) => index + 1);
   const lines: string[] = [];
 
-  lines.push(csvRow(['Monthly Reconciliation']));
-  lines.push(csvRow(['Month', report.monthPrefix]));
-  lines.push(csvRow(['Business date', report.currentBusinessDate]));
-  lines.push(csvRow(['Agent', report.agentId ?? 'All']));
-  lines.push(csvRow(['Book', report.scope ?? 'All']));
-  lines.push(csvRow(['Route', report.routeId ?? 'All']));
-  lines.push(csvRow(['Reconciled', report.isAuditSuccessful ? 'YES' : 'NO']));
-  report.auditErrors.forEach(error => lines.push(csvRow(['Issue', error])));
+  lines.push(csvRow([t('reportExport.title')]));
+  lines.push(csvRow([t('reportExport.month'), report.monthPrefix]));
+  lines.push(csvRow([t('reportExport.businessDate'), report.currentBusinessDate]));
+  lines.push(csvRow([t('reportExport.agent'), names?.agentName || t('reportExport.all')]));
+  lines.push(
+    csvRow([
+      t('reportExport.book'),
+      report.scope
+        ? t(`settlementScope.${report.scope}` as TranslationKey)
+        : t('reportExport.all'),
+    ]),
+  );
+  lines.push(csvRow([t('reportExport.route'), names?.routeName || t('reportExport.all')]));
+  lines.push(
+    csvRow([
+      t('reportExport.reconciled'),
+      report.isAuditSuccessful ? t('reportExport.yes') : t('reportExport.no'),
+    ]),
+  );
+  report.auditErrors.forEach(error => lines.push(csvRow([t('reportExport.issue'), error])));
   lines.push('');
 
   lines.push(
     csvRow([
-      'Customer',
-      'Account',
-      'Installment',
-      'Frequency',
+      t('reportExport.customer'),
+      t('reportExport.account'),
+      t('reportExport.installment'),
+      t('reportExport.frequency'),
       ...dayNumbers.map(day => String(day)),
-      'Total',
-      'Cash',
-      'UPI',
-      'Penalty',
-      'Missed days',
-      'Ledger balance',
-      'Account balance',
+      t('reportExport.total'),
+      t('reportExport.cash'),
+      t('reportExport.upi'),
+      t('reportExport.penalty'),
+      t('reportExport.missedDays'),
+      t('reportExport.ledgerBalance'),
+      t('reportExport.accountBalance'),
     ]),
   );
 
@@ -62,14 +81,16 @@ export function buildMonthlyReportCsv(report: MonthlyCollectionReport): string {
         row.customerName,
         row.accountNumber,
         row.installmentAmount,
-        row.frequency ?? 'UNKNOWN',
+        row.frequency
+          ? t(`schemeFrequency.${row.frequency}` as TranslationKey)
+          : t('reportExport.unknown'),
         ...dayNumbers.map(day => row.dailyCollections[day] ?? 0),
         row.monthlyTotal,
         row.cashCollected,
         row.upiCollected,
         row.penaltyCollected,
         row.missedDays,
-        row.hasLedgerData ? row.ledgerBalance : 'NOT AVAILABLE',
+        row.hasLedgerData ? row.ledgerBalance : t('reportExport.notAvailable'),
         row.cachedBalance,
       ]),
     );
@@ -77,7 +98,7 @@ export function buildMonthlyReportCsv(report: MonthlyCollectionReport): string {
 
   lines.push(
     csvRow([
-      'TOTAL',
+      t('reportExport.totalRow'),
       '',
       '',
       '',
@@ -94,16 +115,17 @@ export function buildMonthlyReportCsv(report: MonthlyCollectionReport): string {
 
   if (report.settlement.isScoped) {
     const { settlement } = report;
+    const scopeLabel = t(`settlementScope.${settlement.scope}` as TranslationKey);
     lines.push('');
-    lines.push(csvRow([`Cash reconciliation (${settlement.scope} book, all routes)`]));
+    lines.push(csvRow([t('reportExport.cashReconciliation', { scope: scopeLabel })]));
     lines.push(
       csvRow([
-        'Business date',
-        'Cash collected',
-        'UPI collected',
-        'Settled cash',
-        'Cash in hand',
-        'Settlement',
+        t('reportExport.businessDate'),
+        t('reportExport.cashCollected'),
+        t('reportExport.upiCollected'),
+        t('reportExport.settledCash'),
+        t('reportExport.cashInHand'),
+        t('reportExport.settlement'),
       ]),
     );
 
@@ -115,14 +137,16 @@ export function buildMonthlyReportCsv(report: MonthlyCollectionReport): string {
           entry.upiCollected,
           entry.settledCash,
           entry.cashInHand,
-          entry.settlementStatus ?? 'NOT SETTLED',
+          entry.settlementStatus
+            ? t(`settlementStatus.${entry.settlementStatus}` as TranslationKey)
+            : t('reportExport.notSettled'),
         ]),
       );
     });
 
     lines.push(
       csvRow([
-        'MONTH',
+        t('reportExport.monthTotal'),
         settlement.cashCollected,
         settlement.upiCollected,
         settlement.settledCash,

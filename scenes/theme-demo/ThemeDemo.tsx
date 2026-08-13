@@ -1,6 +1,7 @@
 import { ScrollView, View, Text, StyleSheet, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme, typography, spacing } from '@/theme';
+import { useTranslation } from '@/i18n';
 import {
   Button,
   GradientButton,
@@ -13,6 +14,7 @@ import { useState } from 'react';
 
 export default function ThemeDemo() {
   const { theme, isDark, toggleTheme } = useTheme();
+  const { t } = useTranslation();
   const [inputValue, setInputValue] = useState('');
 
   const styles = StyleSheet.create({
@@ -74,141 +76,141 @@ export default function ThemeDemo() {
       <ScrollView style={styles.container} contentContainerStyle={styles.content}>
         {/* Header */}
         <View style={styles.header}>
-          <Text style={styles.title}>Theme Demo</Text>
+          <Text style={styles.title}>{t('themeDemo.title')}</Text>
           <Pressable onPress={toggleTheme} style={styles.themeToggle}>
             <Text style={styles.themeToggleText}>
-              {isDark ? '☀️ Light' : '🌙 Dark'}
+              {isDark ? `☀️ ${t('themeDemo.light')}` : `🌙 ${t('themeDemo.dark')}`}
             </Text>
           </Pressable>
         </View>
 
         {/* Typography */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Typography</Text>
+          <Text style={styles.sectionTitle}>{t('themeDemo.typography')}</Text>
           <Card>
             <Text style={{ ...typography(theme, 'displayXL'), color: theme.colors.text.primary }}>
-              Display XL
+              {t('themeDemo.displayXL')}
             </Text>
             <Text style={{ ...typography(theme, 'pageTitle'), color: theme.colors.text.primary }}>
-              Page Title
+              {t('themeDemo.pageTitle')}
             </Text>
             <Text style={{ ...typography(theme, 'sectionTitle'), color: theme.colors.text.primary }}>
-              Section Title
+              {t('themeDemo.sectionTitle')}
             </Text>
             <Text style={{ ...typography(theme, 'body'), color: theme.colors.text.secondary }}>
-              Body Text - Regular weight for content
+              {t('themeDemo.bodyText')}
             </Text>
             <Text style={{ ...typography(theme, 'caption'), color: theme.colors.text.muted }}>
-              Caption Text - Smaller helper text
+              {t('themeDemo.captionText')}
             </Text>
             <Text style={{ ...typography(theme, 'micro'), color: theme.colors.text.muted }}>
-              MICRO TEXT
+              {t('themeDemo.microText')}
             </Text>
           </Card>
         </View>
 
         {/* Buttons */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Buttons</Text>
-          <Text style={styles.description}>Primary, Secondary, and Danger variants</Text>
-          <Button title="Primary Button" variant="primary" />
-          <Button title="Secondary Button" variant="secondary" />
-          <Button title="Danger Button" variant="danger" />
-          <GradientButton title="Gradient Button" useThemeGradient />
+          <Text style={styles.sectionTitle}>{t('themeDemo.buttons')}</Text>
+          <Text style={styles.description}>{t('themeDemo.buttonsHint')}</Text>
+          <Button title={t('themeDemo.primaryButton')} variant="primary" />
+          <Button title={t('themeDemo.secondaryButton')} variant="secondary" />
+          <Button title={t('themeDemo.dangerButton')} variant="danger" />
+          <GradientButton title={t('themeDemo.gradientButton')} useThemeGradient />
         </View>
 
         {/* Cards */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Cards</Text>
+          <Text style={styles.sectionTitle}>{t('themeDemo.cards')}</Text>
           <Card>
             <Text style={{ ...typography(theme, 'sectionTitle'), color: theme.colors.text.primary }}>
-              Default Card
+              {t('themeDemo.defaultCard')}
             </Text>
             <Text style={{ ...typography(theme, 'body'), color: theme.colors.text.secondary }}>
-              This is a card component with theme-aware styling
+              {t('themeDemo.defaultCardBody')}
             </Text>
           </Card>
           <Card elevated>
             <Text style={{ ...typography(theme, 'sectionTitle'), color: theme.colors.text.primary }}>
-              Elevated Card
+              {t('themeDemo.elevatedCard')}
             </Text>
             <Text style={{ ...typography(theme, 'body'), color: theme.colors.text.secondary }}>
-              This card has elevation for emphasis
+              {t('themeDemo.elevatedCardBody')}
             </Text>
           </Card>
         </View>
 
         {/* Chips */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Chips</Text>
-          <Text style={styles.description}>Status indicators and tags</Text>
+          <Text style={styles.sectionTitle}>{t('themeDemo.chips')}</Text>
+          <Text style={styles.description}>{t('themeDemo.chipsHint')}</Text>
           <View style={styles.row}>
-            <Chip label="Default" variant="default" />
-            <Chip label="Primary" variant="primary" />
-            <Chip label="Success" variant="success" />
-            <Chip label="Warning" variant="warning" />
-            <Chip label="Error" variant="error" />
-            <Chip label="Info" variant="info" />
+            <Chip label={t('themeDemo.defaultChip')} variant="default" />
+            <Chip label={t('themeDemo.primaryChip')} variant="primary" />
+            <Chip label={t('themeDemo.successChip')} variant="success" />
+            <Chip label={t('themeDemo.warningChip')} variant="warning" />
+            <Chip label={t('themeDemo.errorChip')} variant="error" />
+            <Chip label={t('themeDemo.infoChip')} variant="info" />
           </View>
         </View>
 
         {/* Inputs */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Inputs</Text>
+          <Text style={styles.sectionTitle}>{t('themeDemo.inputs')}</Text>
           <Input
-            label="Username"
-            placeholder="Enter your username"
+            label={t('themeDemo.username')}
+            placeholder={t('themeDemo.usernamePlaceholder')}
             value={inputValue}
             onChangeText={setInputValue}
           />
           <Input
-            label="Password"
-            placeholder="Enter your password"
+            label={t('themeDemo.password')}
+            placeholder={t('themeDemo.passwordPlaceholder')}
             secureTextEntry
           />
           <Input
-            label="Email with error"
-            placeholder="email@example.com"
-            error="Please enter a valid email address"
+            label={t('themeDemo.emailError')}
+            placeholder={t('themeDemo.emailPlaceholder')}
+            error={t('themeDemo.emailErrorMessage')}
           />
         </View>
 
         {/* Banners */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Banners</Text>
-          <Text style={styles.description}>Alert and notification components</Text>
-          <Banner variant="info" message="This is an informational message" />
-          <Banner variant="success" message="Operation completed successfully!" />
-          <Banner variant="warning" message="Please review before proceeding" />
-          <Banner variant="error" message="An error occurred during processing" />
+          <Text style={styles.sectionTitle}>{t('themeDemo.banners')}</Text>
+          <Text style={styles.description}>{t('themeDemo.bannersHint')}</Text>
+          <Banner variant="info" message={t('themeDemo.bannerInfo')} />
+          <Banner variant="success" message={t('themeDemo.bannerSuccess')} />
+          <Banner variant="warning" message={t('themeDemo.bannerWarning')} />
+          <Banner variant="error" message={t('themeDemo.bannerError')} />
         </View>
 
         {/* Colors */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Colors</Text>
+          <Text style={styles.sectionTitle}>{t('themeDemo.colors')}</Text>
           <Card>
             <View style={{ gap: spacing(theme, 'xs') }}>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
                 <Text style={{ ...typography(theme, 'caption'), color: theme.colors.text.secondary }}>
-                  Primary:
+                  {t('themeDemo.colorPrimary')}
                 </Text>
                 <View style={{ width: 60, height: 24, backgroundColor: theme.colors.brand.primary, borderRadius: 4 }} />
               </View>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
                 <Text style={{ ...typography(theme, 'caption'), color: theme.colors.text.secondary }}>
-                  Success:
+                  {t('themeDemo.colorSuccess')}
                 </Text>
                 <View style={{ width: 60, height: 24, backgroundColor: theme.colors.status.success, borderRadius: 4 }} />
               </View>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
                 <Text style={{ ...typography(theme, 'caption'), color: theme.colors.text.secondary }}>
-                  Warning:
+                  {t('themeDemo.colorWarning')}
                 </Text>
                 <View style={{ width: 60, height: 24, backgroundColor: theme.colors.status.warning, borderRadius: 4 }} />
               </View>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
                 <Text style={{ ...typography(theme, 'caption'), color: theme.colors.text.secondary }}>
-                  Error:
+                  {t('themeDemo.colorError')}
                 </Text>
                 <View style={{ width: 60, height: 24, backgroundColor: theme.colors.status.error, borderRadius: 4 }} />
               </View>

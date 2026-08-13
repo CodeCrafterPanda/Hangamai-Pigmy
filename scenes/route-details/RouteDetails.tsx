@@ -5,6 +5,7 @@ import { useRouter } from 'expo-router';
 import { useSelector } from 'react-redux';
 import type { State } from '@/utils/store';
 import { useTheme, typography, spacing, radius } from '@/theme';
+import { useTranslation } from '@/i18n';
 import FilterChip from '@/components/elements/FilterChip';
 import CustomerCollectionCard from '@/components/elements/CustomerCollectionCard';
 import RouteDetailsHeader from '@/components/elements/RouteDetailsHeader';
@@ -33,6 +34,7 @@ interface RouteDetailsProps {
 export default function RouteDetails({ routeId }: RouteDetailsProps) {
   const router = useRouter();
   const { theme } = useTheme();
+  const { t } = useTranslation();
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState<'pending' | 'collected' | 'all'>('all');
   const [isBottomSheetOpen, setIsBottomSheetOpen] = useState(false);
@@ -83,8 +85,7 @@ export default function RouteDetails({ routeId }: RouteDetailsProps) {
   const activeCustomers = allRouteCustomers;
 
   const headerData: RouteDetailsHeaderType = {
-    routeName: route?.name ?? (routeId ? 'Route not found' : 'No route selected'),
-    routeNumber: route?.routeCode ?? '—',
+    routeName: route?.name ?? (routeId ? t('routeDetails.notFound') : t('routeDetails.noRouteSelected')),
     totalStops: activeCustomers.length,
     isOnline: true,
   };
@@ -295,7 +296,6 @@ export default function RouteDetails({ routeId }: RouteDetailsProps) {
     <SafeAreaView style={styles.container} edges={['top']}>
       <RouteDetailsHeader
         routeName={headerData.routeName}
-        routeNumber={headerData.routeNumber}
         totalStops={headerData.totalStops}
         onSyncPress={handleSync}
       />
@@ -305,7 +305,7 @@ export default function RouteDetails({ routeId }: RouteDetailsProps) {
           <ScrollView horizontal showsHorizontalScrollIndicator={false}>
             <View style={styles.filtersScroll}>
               <FilterChip
-                label="Due Today"
+                label={t('routeDetails.dueToday')}
                 count={filters.dueToday}
                 variant="due"
                 isActive={activeFilter === 'pending'}
@@ -314,7 +314,7 @@ export default function RouteDetails({ routeId }: RouteDetailsProps) {
                 }
               />
               <FilterChip
-                label="Collected"
+                label={t('routeDetails.collected')}
                 count={filters.collected}
                 variant="collected"
                 isActive={activeFilter === 'collected'}
@@ -344,7 +344,9 @@ export default function RouteDetails({ routeId }: RouteDetailsProps) {
             <View style={styles.emptyState}>
               <Text style={styles.emptyIcon}>🔍</Text>
               <Text style={styles.emptyText}>
-                No customers found{searchQuery ? ` matching "${searchQuery}"` : ''}
+                {searchQuery
+                  ? t('routeDetails.emptySearch', { query: searchQuery })
+                  : t('routeDetails.empty')}
               </Text>
             </View>
           )}
@@ -372,7 +374,7 @@ export default function RouteDetails({ routeId }: RouteDetailsProps) {
           ) : (
             <View style={{ padding: 20 }}>
               <Text style={{ color: theme.colors.text.primary }}>
-                Customer or account data not found
+                {t('routeDetails.missingCollectContext')}
               </Text>
             </View>
           );

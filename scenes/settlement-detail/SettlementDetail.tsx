@@ -3,6 +3,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useSelector } from 'react-redux';
 import type { State } from '@/utils/store';
 import { useTheme, typography, spacing, radius } from '@/theme';
+import { useTranslation, formatDateTime, formatNumber } from '@/i18n';
+import type { TranslationKey } from '@/i18n';
 import NestedScreenHeader from '@/components/elements/NestedScreenHeader';
 import { selectSettlementById } from '@/slices/settlements.slice';
 import { selectAgentById } from '@/slices/settings.slice';
@@ -18,6 +20,7 @@ interface SettlementDetailProps {
  */
 export default function SettlementDetail({ settlementId }: SettlementDetailProps) {
   const { theme } = useTheme();
+  const { t, language } = useTranslation();
 
   const settlement = useSelector((state: State) =>
     settlementId ? selectSettlementById(state, settlementId) : undefined
@@ -71,7 +74,6 @@ export default function SettlementDetail({ settlementId }: SettlementDetailProps
     },
     badgeText: {
       ...typography(theme, 'caption'),
-      fontSize: 10,
       fontWeight: '700',
       letterSpacing: 0.5,
     },
@@ -132,7 +134,6 @@ export default function SettlementDetail({ settlementId }: SettlementDetailProps
     meta: {
       ...typography(theme, 'caption'),
       color: theme.colors.text.muted,
-      fontSize: 11,
     },
     readOnlyHint: {
       ...typography(theme, 'caption'),
@@ -158,17 +159,17 @@ export default function SettlementDetail({ settlementId }: SettlementDetailProps
   if (!settlement) {
     return (
       <SafeAreaView style={styles.container} edges={['top']}>
-        <NestedScreenHeader title="Settlement Details" />
+        <NestedScreenHeader title={t('settlementDetail.title')} />
         <View style={styles.emptyState}>
           <Text style={styles.emptyIcon}>🔍</Text>
-          <Text style={styles.emptyText}>Settlement not found</Text>
+          <Text style={styles.emptyText}>{t('settlementDetail.notFound')}</Text>
         </View>
       </SafeAreaView>
     );
   }
 
   const isDelegated = settlement.scope === SettlementScope.DELEGATED;
-  const scopeLabel = isDelegated ? 'Delegated' : 'Primary';
+  const scopeLabel = isDelegated ? t('common.delegated') : t('common.primary');
   const scopeColor = isDelegated ? theme.colors.brand.primary : theme.colors.status.success;
   const statusColor =
     settlement.status === 'APPROVED'
@@ -182,64 +183,69 @@ export default function SettlementDetail({ settlementId }: SettlementDetailProps
     settlement.variance === 0 ? theme.colors.status.success : theme.colors.status.error;
 
   const formatAmount = (amount: number) =>
-    `₹ ${amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
+    `₹ ${formatNumber(amount, { minimumFractionDigits: 2 })}`;
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      <NestedScreenHeader title="Settlement Details" subtitle={scopeLabel} />
+      <NestedScreenHeader title={t('settlementDetail.title')} subtitle={scopeLabel} />
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         <View style={styles.headerCard}>
-          <Text style={styles.dateLabel}>BUSINESS DATE</Text>
+          <Text style={styles.dateLabel}>{t('settlementDetail.businessDate')}</Text>
           <Text style={styles.dateValue}>{settlement.businessDate}</Text>
           <View style={styles.badgeRow}>
             <View style={[styles.badge, { borderColor: scopeColor }]}>
-              <Text style={[styles.badgeText, { color: scopeColor }]}>{settlement.scope}</Text>
+              <Text style={[styles.badgeText, { color: scopeColor }]}>
+                {t(`settlementScope.${settlement.scope}` as TranslationKey)}
+              </Text>
             </View>
             <View style={[styles.badge, { borderColor: statusColor }]}>
-              <Text style={[styles.badgeText, { color: statusColor }]}>{settlement.status}</Text>
+              <Text style={[styles.badgeText, { color: statusColor }]}>
+                {t(`settlementStatus.${settlement.status}` as TranslationKey)}
+              </Text>
             </View>
           </View>
           <Text style={styles.meta}>
-            Agent: {agent?.name || settlement.agentId}
-            {agent?.agentCode ? ` (${agent.agentCode})` : ''}
+            {t('settlementDetail.agent', {
+              name: agent?.name || t('common.unnamedAgent'),
+            })}
           </Text>
         </View>
 
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>Collections</Text>
+          <Text style={styles.cardTitle}>{t('settlementDetail.collections')}</Text>
 
           <View style={styles.row}>
-            <Text style={styles.label}>Cash collected</Text>
+            <Text style={styles.label}>{t('settlementDetail.cashCollected')}</Text>
             <Text style={styles.value}>{formatAmount(settlement.cashTotal)}</Text>
           </View>
 
           <View style={styles.row}>
-            <Text style={styles.label}>UPI collected</Text>
+            <Text style={styles.label}>{t('settlementDetail.upiCollected')}</Text>
             <Text style={styles.value}>{formatAmount(settlement.upiTotal)}</Text>
           </View>
 
           <View style={styles.totalRow}>
-            <Text style={styles.totalLabel}>Total collection</Text>
+            <Text style={styles.totalLabel}>{t('settlementDetail.totalCollection')}</Text>
             <Text style={styles.totalValue}>{formatAmount(settlement.totalCollection)}</Text>
           </View>
         </View>
 
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>Reconciliation</Text>
+          <Text style={styles.cardTitle}>{t('settlementDetail.reconciliation')}</Text>
 
           <View style={styles.row}>
-            <Text style={styles.label}>Expected cash (system)</Text>
+            <Text style={styles.label}>{t('settlementDetail.expectedCash')}</Text>
             <Text style={styles.value}>{formatAmount(settlement.cashTotal)}</Text>
           </View>
 
           <View style={styles.row}>
-            <Text style={styles.label}>Declared physical cash</Text>
+            <Text style={styles.label}>{t('settlementDetail.declaredPhysicalCash')}</Text>
             <Text style={styles.value}>{formatAmount(settlement.cashInHand)}</Text>
           </View>
 
           <View style={styles.row}>
-            <Text style={styles.label}>Variance</Text>
+            <Text style={styles.label}>{t('settlementDetail.variance')}</Text>
             <Text style={[styles.varianceValue, { color: varianceColor }]}>
               {formatAmount(settlement.variance)}
             </Text>
@@ -247,35 +253,33 @@ export default function SettlementDetail({ settlementId }: SettlementDetailProps
         </View>
 
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>Reason / Notes</Text>
+          <Text style={styles.cardTitle}>{t('settlementDetail.reasonNotes')}</Text>
           <Text style={styles.notes}>{settlement.notes || '—'}</Text>
         </View>
 
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>Record</Text>
+          <Text style={styles.cardTitle}>{t('settlementDetail.record')}</Text>
 
           <View style={styles.row}>
-            <Text style={styles.label}>Submitted</Text>
+            <Text style={styles.label}>{t('settlementDetail.submitted')}</Text>
             <Text style={styles.value}>
               {settlement.submittedAt
-                ? new Date(settlement.submittedAt).toLocaleString('en-IN')
-                : 'Not submitted'}
+                ? formatDateTime(new Date(settlement.submittedAt), language)
+                : t('settlementDetail.notSubmitted')}
             </Text>
           </View>
 
           <View style={styles.row}>
-            <Text style={styles.label}>Created</Text>
+            <Text style={styles.label}>{t('settlementDetail.created')}</Text>
             <Text style={styles.value}>
-              {new Date(settlement.createdAt).toLocaleString('en-IN')}
+              {formatDateTime(new Date(settlement.createdAt), language)}
             </Text>
           </View>
 
-          <Text style={styles.meta}>ID: {settlement.id}</Text>
+          <Text style={styles.meta}>{t('settlementDetail.idLabel', { id: settlement.id })}</Text>
         </View>
 
-        <Text style={styles.readOnlyHint}>
-          Historical settlement — read only. Collection history is never changed by a closure.
-        </Text>
+        <Text style={styles.readOnlyHint}>{t('settlementDetail.readOnlyHint')}</Text>
       </ScrollView>
     </SafeAreaView>
   );

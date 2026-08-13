@@ -1,5 +1,6 @@
 import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { useTheme, typography, spacing, radius } from '@/theme';
+import { useTranslation } from '@/i18n';
 import ProgressBar from '@/components/elements/ProgressBar';
 import type { Route, RouteStatus } from '@/types/RouteData';
 
@@ -10,12 +11,13 @@ interface RouteCardProps {
 
 export default function RouteCard({ route, onPress }: RouteCardProps) {
   const { theme } = useTheme();
+  const { t } = useTranslation();
 
   const getStatusConfig = (status: RouteStatus) => {
     switch (status) {
       case 'in_progress':
         return {
-          label: 'In Progress',
+          label: t('routeCard.inProgress'),
           icon: '⏱',
           bgColor: 'rgba(244, 196, 48, 0.15)',
           textColor: '#D4834D',
@@ -24,7 +26,7 @@ export default function RouteCard({ route, onPress }: RouteCardProps) {
         };
       case 'completed':
         return {
-          label: 'Completed',
+          label: t('routeCard.completed'),
           icon: '✓',
           bgColor: theme.colors.surfaceTint.successSoft,
           textColor: theme.colors.status.success,
@@ -33,7 +35,7 @@ export default function RouteCard({ route, onPress }: RouteCardProps) {
         };
       case 'not_started':
         return {
-          label: 'Not Started',
+          label: t('routeCard.notStarted'),
           icon: '⏸',
           bgColor: theme.colors.background.cardElevated,
           textColor: theme.colors.text.muted,
@@ -76,10 +78,6 @@ export default function RouteCard({ route, onPress }: RouteCardProps) {
       fontSize: 16,
       lineHeight: 22,
     },
-    routeId: {
-      ...typography(theme, 'caption'),
-      color: theme.colors.text.muted,
-    },
     statusBadge: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -92,11 +90,11 @@ export default function RouteCard({ route, onPress }: RouteCardProps) {
       borderColor: statusConfig.borderColor,
     },
     statusIcon: {
-      fontSize: 10,
+      fontSize: 14,
       color: statusConfig.textColor,
     },
     statusText: {
-      ...typography(theme, 'micro'),
+      ...typography(theme, 'body'),
       color: statusConfig.textColor,
       fontWeight: '600',
     },
@@ -109,11 +107,11 @@ export default function RouteCard({ route, onPress }: RouteCardProps) {
       alignItems: 'center',
     },
     progressLabel: {
-      ...typography(theme, 'caption'),
+      ...typography(theme, 'body'),
       color: theme.colors.text.secondary,
     },
     progressValue: {
-      ...typography(theme, 'caption'),
+      ...typography(theme, 'body'),
       color: theme.colors.text.primary,
       fontWeight: '700',
     },
@@ -126,12 +124,11 @@ export default function RouteCard({ route, onPress }: RouteCardProps) {
       gap: 2,
     },
     statLabel: {
-      ...typography(theme, 'caption'),
+      ...typography(theme, 'body'),
       color: theme.colors.text.muted,
       fontWeight: '600',
       textTransform: 'uppercase',
       letterSpacing: 0.5,
-      fontSize: 10,
     },
     statValue: {
       ...typography(theme, 'body'),
@@ -151,7 +148,6 @@ export default function RouteCard({ route, onPress }: RouteCardProps) {
             <Text style={styles.routeName} numberOfLines={1}>
               {route.name}
             </Text>
-            <Text style={styles.routeId}>ID: {route.routeId}</Text>
           </View>
 
           <View style={styles.statusBadge}>
@@ -162,7 +158,7 @@ export default function RouteCard({ route, onPress }: RouteCardProps) {
 
         <View style={styles.progressSection}>
           <View style={styles.progressHeader}>
-            <Text style={styles.progressLabel}>Collection Progress</Text>
+            <Text style={styles.progressLabel}>{t('routeCard.collectionProgress')}</Text>
             <Text style={styles.progressValue}>{route.progress}%</Text>
           </View>
           <ProgressBar progress={route.progress} height={4} />
@@ -170,12 +166,12 @@ export default function RouteCard({ route, onPress }: RouteCardProps) {
 
         <View style={styles.statsRow}>
           <View style={styles.statItem}>
-            <Text style={styles.statLabel}>Total Customers</Text>
+            <Text style={styles.statLabel}>{t('routeCard.totalCustomers')}</Text>
             <Text style={styles.statValue}>{route.totalCustomers}</Text>
           </View>
 
           <View style={styles.statItem}>
-            <Text style={styles.statLabel}>Pending</Text>
+            <Text style={styles.statLabel}>{t('routeCard.pending')}</Text>
             <Text style={[styles.statValue, styles.pendingValue]}>
               {route.pendingCustomers}
             </Text>

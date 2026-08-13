@@ -70,7 +70,7 @@ export const STORAGE_KEYS = {
 export const CURRENT_STORAGE_VERSION = 2;
 
 /** Seed payload version tracked on StorageMetadata to prevent duplicate seeding */
-export const CURRENT_SEED_VERSION = 1;
+export const CURRENT_SEED_VERSION = 2;
 
 // ===========================
 // STORAGE INTERFACES

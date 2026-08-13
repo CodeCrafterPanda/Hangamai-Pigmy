@@ -5,6 +5,9 @@
  * content sitting beside it. A replacement dataset is valid exactly when it type-checks against
  * `SeedDataset`. The dataset is pure data: it carries no timestamps and no reducer-generated
  * ids, because both are produced at seed time. See `SEED-DATA.md` for the field-by-field format.
+ *
+ * Customer/account `ref` handles are free-form strings declared in the JSON. Replacing
+ * `seed-data.json` with another dataset that follows this schema does not require a code change.
  */
 
 import type {
@@ -17,13 +20,12 @@ import type {
   Route,
   Scheme,
 } from '@/types';
-import type { SEED_ACCOUNT_REF, SEED_CUSTOMER_REF } from './ids';
 
-/** A `SEED_CUSTOMER_REF` handle. */
-export type SeedCustomerRef = (typeof SEED_CUSTOMER_REF)[keyof typeof SEED_CUSTOMER_REF];
+/** Dataset-internal handle for a customer. Never written to the store. */
+export type SeedCustomerRef = string;
 
-/** A `SEED_ACCOUNT_REF` handle. */
-export type SeedAccountRef = (typeof SEED_ACCOUNT_REF)[keyof typeof SEED_ACCOUNT_REF];
+/** Dataset-internal handle for an account. Never written to the store. */
+export type SeedAccountRef = string;
 
 // Fixed-id entities: written with the id the dataset declares, and re-applied (upserted)
 // unchanged on a recovery re-seed. `createdAt` is stamped by the loader.
@@ -32,9 +34,11 @@ export type SeedAgent = Omit<Agent, 'createdAt'>;
 export type SeedRoute = Omit<Route, 'createdAt'>;
 export type SeedScheme = Omit<Scheme, 'createdAt'>;
 
-/** Customer ids and customer codes are assigned by the customers reducer. */
+/** Customer ids are assigned by the customers reducer. `customerCode` may be supplied. */
 export type SeedCustomer = Omit<Customer, 'id' | 'customerCode' | 'createdAt' | 'updatedAt'> & {
   ref: SeedCustomerRef;
+  /** Optional override; omit to let the generated CUST-NNNN series assign one. */
+  customerCode?: string;
 };
 
 /** Account ids and account numbers are assigned by the accounts reducer. */

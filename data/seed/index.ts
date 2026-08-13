@@ -1,50 +1,27 @@
 /**
- * The seed dataset, assembled from one file per entity.
+ * The seed dataset, loaded from the single JSON source of truth.
  *
- * The content files here are a sample: replacing them wholesale with a different valid dataset
- * is supported and requires no change under `utils/`, `slices/`, `scenes/` or `app/`. `types.ts`
- * is the contract that decides whether a replacement is valid; everything else in this folder is
- * data. Read `SEED-DATA.md` before editing — ids and handles are load-bearing references.
+ * `seed-data.json` is the sample content: replacing it wholesale with a different valid
+ * dataset is supported and requires no change under `utils/`, `slices/`, `scenes/` or `app/`.
+ * `types.ts` is the contract that decides whether a replacement is valid. Read `SEED-DATA.md`
+ * before editing — ids and handles are load-bearing references.
  */
 
-import { seedAccounts } from './accounts';
-import { seedAgents } from './agents';
-import { seedBranch } from './branch';
-import { seedCustomers } from './customers';
-import { seedDelegations } from './delegations';
-import { DEMO_AGENT_ID, DEMO_BRANCH_ID } from './ids';
-import { seedLedgerEntries } from './ledgerEntries';
-import { seedRoutes } from './routes';
-import { seedSchemes } from './schemes';
+import rawSeedData from './seed-data.json';
 import type { SeedDataset } from './types';
 
-export const seedDataset: SeedDataset = {
-  session: {
-    agentId: DEMO_AGENT_ID,
-    branchId: DEMO_BRANCH_ID,
-    deviceFingerprint: 'demo-device',
-  },
-  branch: seedBranch,
-  agents: seedAgents,
-  routes: seedRoutes,
-  schemes: seedSchemes,
-  customers: seedCustomers,
-  accounts: seedAccounts,
-  delegations: seedDelegations,
-  ledgerEntries: seedLedgerEntries,
-};
+export const seedDataset: SeedDataset = rawSeedData as SeedDataset;
 
-export * from './ids';
 export * from './types';
-export {
-  seedAccounts,
-  seedAgents,
-  seedBranch,
-  seedCustomers,
-  seedDelegations,
-  seedLedgerEntries,
-  seedRoutes,
-  seedSchemes,
-};
+
+/**
+ * Convenience ids derived from the JSON so existing test imports keep compiling.
+ * They are not a second dataset — they always read from `seedDataset`.
+ */
+export const DEMO_COOP_ID = seedDataset.branch.coopId;
+export const DEMO_BRANCH_ID = seedDataset.branch.id;
+export const DEMO_AGENT_ID = seedDataset.session.agentId;
+export const DEMO_ROUTE_SUPA = seedDataset.routes[0]?.id ?? '';
+export const DEMO_SCHEME_DAILY_ID = seedDataset.schemes[0]?.id ?? '';
 
 export default seedDataset;

@@ -1,5 +1,6 @@
 import { View, Text, StyleSheet, Pressable, FlatList } from 'react-native';
 import { useTheme, typography, spacing, radius } from '@/theme';
+import { useTranslation } from '@/i18n';
 
 interface AmountSelectorProps {
   amount: number;
@@ -15,6 +16,7 @@ export default function AmountSelector({
   quickAmounts = [100, 200, 300, 400, 500, 1000, 2000, 5000, 10000],
 }: AmountSelectorProps) {
   const { theme } = useTheme();
+  const { t } = useTranslation();
 
   const styles = StyleSheet.create({
     container: {
@@ -100,7 +102,7 @@ export default function AmountSelector({
 
   return (
     <View style={styles.container}>
-      <Text style={styles.label}>ENTER AMOUNT</Text>
+      <Text style={styles.label}>{t('collection.enterAmount')}</Text>
 
       <View style={styles.amountDisplay}>
         <Text style={styles.currencySymbol}>₹</Text>
@@ -129,7 +131,7 @@ export default function AmountSelector({
             onPress={handleClear}
             style={({ pressed }) => [styles.clearButton, { opacity: pressed ? 0.8 : 1 }]}
           >
-            <Text style={styles.clearButtonText}>Clear</Text>
+            <Text style={styles.clearButtonText}>{t('collection.clear')}</Text>
           </Pressable>
         </View>
       </View>

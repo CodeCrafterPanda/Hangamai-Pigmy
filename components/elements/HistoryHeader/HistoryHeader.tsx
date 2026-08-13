@@ -1,8 +1,10 @@
 import { View, Text, StyleSheet } from 'react-native';
 import { useTheme, typography, spacing } from '@/theme';
+import { useTranslation } from '@/i18n';
 
 export default function HistoryHeader() {
   const { theme } = useTheme();
+  const { t } = useTranslation();
 
   const styles = StyleSheet.create({
     container: {
@@ -31,8 +33,8 @@ export default function HistoryHeader() {
   return (
     <View style={styles.container}>
       <View style={styles.leftSection}>
-        <Text style={styles.title}>History</Text>
-        <Text style={styles.subtitle}>Pigmy Collection System</Text>
+        <Text style={styles.title}>{t('collectionsHistory.title')}</Text>
+        <Text style={styles.subtitle}>{t('collectionsHistory.subtitle')}</Text>
       </View>
     </View>
   );

@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router';
 import { useSelector } from 'react-redux';
 import type { State } from '@/utils/store';
 import { useTheme, typography, spacing } from '@/theme';
+import { useTranslation } from '@/i18n';
 import CustomerListCard from '@/components/elements/CustomerListCard';
 import FloatingActionButton from '@/components/elements/FloatingActionButton';
 import { selectSession, selectAllRoutes } from '@/slices/settings.slice';
@@ -14,6 +15,7 @@ import type { CustomerListItem } from '@/types/CustomerListData';
 export default function Customers() {
   const router = useRouter();
   const { theme } = useTheme();
+  const { t } = useTranslation();
 
   const session = useSelector(selectSession);
   const agentId = session.agentId || 'demo-agent';
@@ -41,11 +43,11 @@ export default function Customers() {
         id: customer.id,
         customerCode: customer.customerCode,
         name: customer.fullName,
-        routeName: allRoutes.find(r => r.id === customer.routeId)?.name || 'No route',
+        routeName: allRoutes.find(r => r.id === customer.routeId)?.name || t('customers.noRoute'),
         status: customer.status,
       }))
       .sort((a, b) => a.name.localeCompare(b.name));
-  }, [primaryCustomers, myDelegations, allCustomers, allRoutes]);
+  }, [primaryCustomers, myDelegations, allCustomers, allRoutes, t]);
 
   const styles = StyleSheet.create({
     container: {
@@ -98,7 +100,7 @@ export default function Customers() {
           ) : (
             <View style={styles.emptyState}>
               <Text style={styles.emptyIcon}>👥</Text>
-              <Text style={styles.emptyText}>No customers yet. Tap + to add a customer.</Text>
+              <Text style={styles.emptyText}>{t('customers.empty')}</Text>
             </View>
           )}
         </View>

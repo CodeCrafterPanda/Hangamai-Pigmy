@@ -1,5 +1,6 @@
 import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { useTheme, typography, spacing, radius } from '@/theme';
+import { useTranslation, formatNumber } from '@/i18n';
 import type { OfflineTransaction, TransactionStatus } from '@/types/OfflineQueueData';
 
 interface OfflineTransactionCardProps {
@@ -12,12 +13,13 @@ export default function OfflineTransactionCard({
   onRetry,
 }: OfflineTransactionCardProps) {
   const { theme } = useTheme();
+  const { t } = useTranslation();
 
   const getStatusConfig = (status: TransactionStatus) => {
     switch (status) {
       case 'failed':
         return {
-          label: 'Failed',
+          label: t('offlineTransaction.failed'),
           icon: '⚠',
           bgColor: 'rgba(255, 77, 79, 0.15)',
           textColor: theme.colors.status.error,
@@ -26,7 +28,7 @@ export default function OfflineTransactionCard({
         };
       case 'pending':
         return {
-          label: 'Pending',
+          label: t('offlineTransaction.pending'),
           icon: '⏱',
           bgColor: 'rgba(244, 196, 48, 0.15)',
           textColor: '#D4834D',
@@ -35,7 +37,7 @@ export default function OfflineTransactionCard({
         };
       case 'synced':
         return {
-          label: 'Synced',
+          label: t('offlineTransaction.synced'),
           icon: '✓',
           bgColor: theme.colors.surfaceTint.successSoft,
           textColor: theme.colors.status.success,
@@ -120,10 +122,10 @@ export default function OfflineTransactionCard({
       borderColor: statusConfig.borderColor,
     },
     statusIcon: {
-      fontSize: 10,
+      fontSize: 12,
     },
     statusText: {
-      ...typography(theme, 'micro'),
+      ...typography(theme, 'caption'),
       color: statusConfig.textColor,
       fontWeight: '600',
     },
@@ -159,7 +161,7 @@ export default function OfflineTransactionCard({
             {transaction.customerName}
           </Text>
           <Text style={styles.amount}>
-            ₹{transaction.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+            ₹{formatNumber(transaction.amount, { minimumFractionDigits: 2 })}
           </Text>
         </View>
 
@@ -185,7 +187,7 @@ export default function OfflineTransactionCard({
                 onPress={() => onRetry(transaction.id)}
                 style={({ pressed }) => [styles.retryButton, { opacity: pressed ? 0.7 : 1 }]}
               >
-                <Text style={styles.retryText}>Tap to retry</Text>
+                <Text style={styles.retryText}>{t('offlineTransaction.tapToRetry')}</Text>
                 <Text style={styles.retryIcon}>›</Text>
               </Pressable>
             )}

@@ -1,6 +1,6 @@
 import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { useTheme, typography, spacing, radius, withAlpha } from '@/theme';
-import { useTranslation } from '@/i18n';
+import { useTranslation, formatNumber } from '@/i18n';
 import ProgressBar from '@/components/elements/ProgressBar';
 import type { CustomerAccount, AccountType, AccountStatus } from '@/types/CustomerDetailData';
 
@@ -141,10 +141,10 @@ export default function AccountCard({ account, onPress }: AccountCardProps) {
       borderRadius: radius(theme, 'chip'),
     },
     statusIcon: {
-      fontSize: 10,
+      fontSize: 12,
     },
     statusText: {
-      ...typography(theme, 'micro'),
+      ...typography(theme, 'caption'),
       fontWeight: '600',
     },
     progressBarContainer: {
@@ -171,12 +171,12 @@ export default function AccountCard({ account, onPress }: AccountCardProps) {
         <View style={styles.amountSection}>
           <View style={styles.leftAmount}>
             <Text style={styles.label}>{account.label}</Text>
-            <Text style={styles.amount}>₹{account.amount.toLocaleString('en-IN')}</Text>
+            <Text style={styles.amount}>₹{formatNumber(account.amount)}</Text>
           </View>
 
           <View style={styles.rightAmount}>
             {hasDueToday && (
-              <Text style={styles.dueAmount}>₹{account.dueToday.toLocaleString('en-IN')}</Text>
+              <Text style={styles.dueAmount}>₹{formatNumber(account.dueToday)}</Text>
             )}
             <View
               style={[

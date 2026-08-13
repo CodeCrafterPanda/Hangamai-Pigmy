@@ -1,6 +1,7 @@
 import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { useTheme, typography, spacing } from '@/theme';
 import { useRouter } from 'expo-router';
+import { useTranslation } from '@/i18n';
 
 interface EditCustomerHeaderProps {
   customerId: string;
@@ -9,6 +10,7 @@ interface EditCustomerHeaderProps {
 export default function EditCustomerHeader({ customerId }: EditCustomerHeaderProps) {
   const { theme } = useTheme();
   const router = useRouter();
+  const { t } = useTranslation();
 
   const styles = StyleSheet.create({
     container: {
@@ -62,7 +64,7 @@ export default function EditCustomerHeader({ customerId }: EditCustomerHeaderPro
         </Pressable>
 
         <View style={styles.titleSection}>
-          <Text style={styles.title}>Edit Customer</Text>
+          <Text style={styles.title}>{t('editCustomer.title')}</Text>
           <Text style={styles.subtitle}>{customerId}</Text>
         </View>
       </View>

@@ -1,22 +1,22 @@
 import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { useTheme, typography, spacing } from '@/theme';
 import { useRouter } from 'expo-router';
+import { useTranslation } from '@/i18n';
 
 interface RouteDetailsHeaderProps {
   routeName: string;
-  routeNumber: string;
   totalStops: number;
   onSyncPress?: () => void;
 }
 
 export default function RouteDetailsHeader({
   routeName,
-  routeNumber,
   totalStops,
   onSyncPress,
 }: RouteDetailsHeaderProps) {
   const { theme } = useTheme();
   const router = useRouter();
+  const { t } = useTranslation();
 
   const styles = StyleSheet.create({
     container: {
@@ -93,7 +93,10 @@ export default function RouteDetailsHeader({
             {routeName}
           </Text>
           <Text style={styles.routeInfo}>
-            ROUTE #{routeNumber} • {totalStops} STOPS
+            {t(
+              totalStops === 1 ? 'routeDetails.stopsOne' : 'routeDetails.stopsOther',
+              { count: totalStops },
+            )}
           </Text>
         </View>
       </View>

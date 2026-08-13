@@ -1,5 +1,6 @@
 import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { useTheme, typography, spacing, radius } from '@/theme';
+import { useTranslation } from '@/i18n';
 import { CustomerStatus } from '@/types';
 import type { CustomerListItem } from '@/types/CustomerListData';
 
@@ -10,12 +11,13 @@ interface CustomerListCardProps {
 
 export default function CustomerListCard({ customer, onPress }: CustomerListCardProps) {
   const { theme } = useTheme();
+  const { t } = useTranslation();
 
   const getStatusConfig = (status: CustomerStatus) => {
     switch (status) {
       case CustomerStatus.ACTIVE:
         return {
-          label: 'Active',
+          label: t('customerStatus.ACTIVE'),
           bgColor: theme.colors.surfaceTint.successSoft,
           textColor: theme.colors.status.success,
           borderColor: theme.colors.status.success,
@@ -23,7 +25,7 @@ export default function CustomerListCard({ customer, onPress }: CustomerListCard
         };
       case CustomerStatus.BLOCKED:
         return {
-          label: 'Blocked',
+          label: t('customerStatus.BLOCKED'),
           bgColor: theme.colors.surfaceTint.errorSoft,
           textColor: theme.colors.status.error,
           borderColor: theme.colors.status.error,
@@ -32,7 +34,7 @@ export default function CustomerListCard({ customer, onPress }: CustomerListCard
       case CustomerStatus.INACTIVE:
       default:
         return {
-          label: 'Inactive',
+          label: t('customerStatus.INACTIVE'),
           bgColor: theme.colors.background.cardElevated,
           textColor: theme.colors.text.muted,
           borderColor: theme.colors.background.divider,
@@ -82,7 +84,7 @@ export default function CustomerListCard({ customer, onPress }: CustomerListCard
       borderColor: statusConfig.borderColor,
     },
     statusText: {
-      ...typography(theme, 'micro'),
+      ...typography(theme, 'caption'),
       color: statusConfig.textColor,
       fontWeight: '600',
     },

@@ -3,6 +3,8 @@ import { useRouter } from 'expo-router';
 import { useSelector } from 'react-redux';
 import type { State } from '@/utils/store';
 import { useTheme, typography, spacing, radius } from '@/theme';
+import { useTranslation, formatDate, formatTime, formatNumber } from '@/i18n';
+import { selectAgentById } from '@/slices/settings.slice';
 import type { ReceiptData, ShareMethod } from '@/types/ReceiptData';
 
 interface ReceiptProps {
@@ -13,6 +15,7 @@ interface ReceiptProps {
 export default function Receipt({ collectionId, onClose }: ReceiptProps) {
   const router = useRouter();
   const { theme } = useTheme();
+  const { t, language } = useTranslation();
 
   // Get collection data from Redux
   const collection = useSelector((state: State) =>
@@ -25,6 +28,10 @@ export default function Receipt({ collectionId, onClose }: ReceiptProps) {
 
   const account = useSelector((state: State) =>
     collection ? state.accounts.accounts.byId[collection.accountId] : null
+  );
+
+  const agent = useSelector((state: State) =>
+    collection ? selectAgentById(state, collection.collectedByAgentId) : undefined
   );
 
   // Get initials helper
@@ -49,17 +56,18 @@ export default function Receipt({ collectionId, onClose }: ReceiptProps) {
           customerName: customer.fullName,
           accountNumber: account.accountNumber.slice(-4),
           accountNumberMasked: `•••• •••• ${account.accountNumber.slice(-4)}`,
-          date: new Date(collection.collectedAt).toLocaleDateString('en-IN', {
+          date: formatDate(new Date(collection.collectedAt), language, {
             year: 'numeric',
             month: 'short',
             day: 'numeric',
           }),
-          time: new Date(collection.collectedAt).toLocaleTimeString('en-IN', {
+          time: formatTime(new Date(collection.collectedAt), language, {
             hour: '2-digit',
             minute: '2-digit',
           }),
-          paymentMode: collection.mode === 'CASH' ? 'Cash Deposit' : 'UPI Payment',
+          paymentMode: collection.mode === 'CASH' ? t('receipt.cashDeposit') : t('receipt.upiPayment'),
           agentId: collection.collectedByAgentId,
+          agentName: agent?.name || t('common.unnamedAgent'),
           isSavedLocally: collection.status === 'CREATED',
           initials: getInitials(customer.fullName),
         }
@@ -93,7 +101,7 @@ export default function Receipt({ collectionId, onClose }: ReceiptProps) {
       gap: spacing(theme, 'xs'),
     },
     amountLabel: {
-      ...typography(theme, 'caption'),
+      ...typography(theme, 'body'),
       color: theme.colors.text.muted,
       fontWeight: '700',
       textTransform: 'uppercase',
@@ -155,12 +163,11 @@ export default function Receipt({ collectionId, onClose }: ReceiptProps) {
       gap: spacing(theme, 'xxs'),
     },
     sectionLabel: {
-      ...typography(theme, 'caption'),
+      ...typography(theme, 'body'),
       color: theme.colors.text.muted,
       fontWeight: '700',
       textTransform: 'uppercase',
       letterSpacing: 0.5,
-      fontSize: 10,
     },
     customerName: {
       ...typography(theme, 'sectionTitle'),
@@ -180,12 +187,11 @@ export default function Receipt({ collectionId, onClose }: ReceiptProps) {
       gap: spacing(theme, 'xxs'),
     },
     detailLabel: {
-      ...typography(theme, 'caption'),
+      ...typography(theme, 'body'),
       color: theme.colors.text.muted,
       fontWeight: '700',
       textTransform: 'uppercase',
       letterSpacing: 0.5,
-      fontSize: 10,
     },
     detailValue: {
       ...typography(theme, 'body'),
@@ -222,7 +228,7 @@ export default function Receipt({ collectionId, onClose }: ReceiptProps) {
       fontSize: 18,
     },
     localSaveText: {
-      ...typography(theme, 'caption'),
+      ...typography(theme, 'body'),
       color: '#D4A62E',
       fontWeight: '600',
       flex: 1,
@@ -328,7 +334,11 @@ export default function Receipt({ collectionId, onClose }: ReceiptProps) {
     }
 
     console.log('Share via:', method);
-    const message = `Receipt: ${receiptData.receiptNumber}\nAmount: ₹${receiptData.totalAmount.toLocaleString('en-IN')}\nCustomer: ${receiptData.customerName}`;
+    const message = t('receipt.shareMessage', {
+      receiptNumber: receiptData.receiptNumber,
+      amount: formatNumber(receiptData.totalAmount),
+      customerName: receiptData.customerName,
+    });
 
     if (method === 'whatsapp' || method === 'sms') {
       Share.share({ message });
@@ -343,10 +353,8 @@ export default function Receipt({ collectionId, onClose }: ReceiptProps) {
       <View style={styles.container}>
         <View style={styles.emptyState}>
           <Text style={styles.emptyIcon}>🧾</Text>
-          <Text style={styles.emptyText}>Receipt not available</Text>
-          <Text style={styles.emptyHint}>
-            The transaction behind this receipt could not be found on this device.
-          </Text>
+          <Text style={styles.emptyText}>{t('receipt.notAvailable')}</Text>
+          <Text style={styles.emptyHint}>{t('receipt.notAvailableHint')}</Text>
         </View>
       </View>
     );
@@ -358,9 +366,9 @@ export default function Receipt({ collectionId, onClose }: ReceiptProps) {
         <View style={styles.receiptCard}>
           <View style={styles.cardContent}>
             <View style={styles.amountSection}>
-              <Text style={styles.amountLabel}>TOTAL AMOUNT</Text>
+              <Text style={styles.amountLabel}>{t('receipt.totalAmount')}</Text>
               <Text style={styles.amount}>
-                ₹ {receiptData.totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                ₹ {formatNumber(receiptData.totalAmount, { minimumFractionDigits: 2 })}
               </Text>
             </View>
 
@@ -377,21 +385,23 @@ export default function Receipt({ collectionId, onClose }: ReceiptProps) {
                 <Text style={styles.avatarText}>{receiptData.initials}</Text>
               </View>
               <View style={styles.customerInfo}>
-                <Text style={styles.sectionLabel}>CUSTOMER</Text>
+                <Text style={styles.sectionLabel}>{t('receipt.customer')}</Text>
                 <Text style={styles.customerName}>{receiptData.customerName}</Text>
-                <Text style={styles.accountNumber}>A/C: {receiptData.accountNumberMasked}</Text>
+                <Text style={styles.accountNumber}>
+                  {t('receipt.accountPrefix', { number: receiptData.accountNumberMasked })}
+                </Text>
               </View>
             </View>
 
             <View style={styles.detailsRow}>
               <View style={styles.detailItem}>
-                <Text style={styles.detailLabel}>DATE & TIME</Text>
+                <Text style={styles.detailLabel}>{t('receipt.dateTime')}</Text>
                 <Text style={styles.detailValue}>{receiptData.date}</Text>
                 <Text style={styles.detailValue}>{receiptData.time}</Text>
               </View>
 
               <View style={styles.detailItem}>
-                <Text style={styles.detailLabel}>PAYMENT MODE</Text>
+                <Text style={styles.detailLabel}>{t('receipt.paymentMode')}</Text>
                 <View style={styles.detailValueWithIcon}>
                   <Text style={styles.paymentIcon}>{isUpiPayment ? '📱' : '💵'}</Text>
                   <Text style={styles.detailValue}>{receiptData.paymentMode}</Text>
@@ -400,16 +410,14 @@ export default function Receipt({ collectionId, onClose }: ReceiptProps) {
             </View>
 
             <View style={styles.agentSection}>
-              <Text style={styles.detailLabel}>AGENT ID</Text>
-              <Text style={styles.agentValue}>{receiptData.agentId}</Text>
+              <Text style={styles.detailLabel}>{t('receipt.agent')}</Text>
+              <Text style={styles.agentValue}>{receiptData.agentName}</Text>
             </View>
 
             {receiptData.isSavedLocally && (
               <View style={styles.localSaveBanner}>
                 <Text style={styles.warningIcon}>⚠️</Text>
-                <Text style={styles.localSaveText}>
-                  Saved locally. Will sync when online.
-                </Text>
+                <Text style={styles.localSaveText}>{t('receipt.savedLocally')}</Text>
               </View>
             )}
           </View>

@@ -540,9 +540,16 @@ export function calculateVariance(cashInHand: number, cashTotal: number): number
 // DELEGATION CHECKS
 // ===========================
 
+export type DelegationIneligibilityReason =
+  | 'NO_ACTIVE_DELEGATION'
+  | 'MAX_COLLECTIONS_PER_DAY'
+  | 'MAX_AMOUNT_PER_DAY';
+
 export interface DelegationEligibility {
   isEligible: boolean;
   reason?: string;
+  reasonCode?: DelegationIneligibilityReason;
+  reasonParams?: Record<string, string | number>;
   delegationId?: string;
 }
 
@@ -602,6 +609,7 @@ export function checkDelegationEligibility(
     return {
       isEligible: false,
       reason: 'No active delegation found',
+      reasonCode: 'NO_ACTIVE_DELEGATION',
     };
   }
 
@@ -613,6 +621,8 @@ export function checkDelegationEligibility(
     return {
       isEligible: false,
       reason: `Max collections per day (${applicableDelegation.maxCollectionsPerDay}) reached`,
+      reasonCode: 'MAX_COLLECTIONS_PER_DAY',
+      reasonParams: { limit: applicableDelegation.maxCollectionsPerDay },
       delegationId: applicableDelegation.id,
     };
   }
@@ -625,6 +635,8 @@ export function checkDelegationEligibility(
     return {
       isEligible: false,
       reason: `Max amount per day (₹${applicableDelegation.maxAmountPerDay}) reached`,
+      reasonCode: 'MAX_AMOUNT_PER_DAY',
+      reasonParams: { limit: applicableDelegation.maxAmountPerDay },
       delegationId: applicableDelegation.id,
     };
   }
@@ -715,7 +727,7 @@ export interface MonthlyReportCrossChecks {
 }
 
 function formatInr(amount: number): string {
-  return `₹${amount.toLocaleString('en-IN')}`;
+  return `₹${amount.toLocaleString('en-IN', { numberingSystem: 'latn' })}`;
 }
 
 /** Keeps a surfaced list readable without hiding that more entries exist. */
